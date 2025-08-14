@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+{% load static %}
+{% load components %}
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>
+            {% block title %}
+                Бизнес таблицы
+            {% endblock title %}
+        </title>
+        <meta name="description" content="Бизнес таблицы - это веб-приложение для управления данными о поставщиках, счетах и движении денежных средств.">
+        <meta name="keywords" content="Бизнес, Таблицы, Django, Python, Web Development"/>
+        <link rel="stylesheet" href="{% static 'css/style.css' %}" />
+        <link rel="stylesheet" href="{% static 'awesome/css/all.min.css' %}">
+        <link rel="stylesheet" href="{% static 'css/modal.css' %}">
+        <link rel="stylesheet" href="{% static 'css/loader.css' %}">
+        <link rel="icon" href="{% static 'images/favicon2.ico' %}" type="image/x-icon">
+        {% block extra_styles %}
+            {% render_styles %}
+        {% endblock extra_styles %}
+        {% block extra_scripts %}
+            {% render_scripts %}
+        {% endblock extra_scripts %}
+    </head>
+    <body>
+        <div class="container container--without-menu">
+            <main class="content">
+                {% block content %}
+                {% endblock content %}
+            </main>
+        </div>
+    </body>
+</html>

@@ -1,0 +1,68 @@
+{% extends "layout.html" %}
+{% load static %}
+{% block content %}
+    <div class="page-table-container" id="transactions-container">
+        {% include "components/table.html" with id="transactions-table" fields=fields data=data %}
+        <div id="context-menu" class="dropdown-menu" data-is-admin="{{ is_admin|yesno:'true,false' }}">
+            <a class="dropdown-item context-action" id="add-button" data-action="add">Добавить</a>
+            {% if is_admin %}
+            <a class="dropdown-item context-action" id="edit-button" data-action="edit">Редактировать</a>
+            <a class="dropdown-item context-action" id="delete-button" data-action="delete">Удалить</a>
+            {% endif %}
+            <a class="dropdown-item context-action" id="payment-button" data-action="payment">Оплата</a>
+            <a class="dropdown-item context-action" id="hide-button" data-action="hide">Скрыть</a>
+            <a class="dropdown-item context-action" id="hide-all-button" data-action="hide-all">Скрыть все</a>
+            <a class="dropdown-item context-action" id="show-all-button" data-action="show-all">Показать все</a>
+        </div>
+        <div class="pagination-controls">
+            <button class="pagination-button"
+                    id="first-page"
+                    title="Первая страница"
+                    disabled>
+                <i class="fal fa-angle-double-left"></i>
+            </button>
+            <button class="pagination-button"
+                    id="prev-page"
+                    title="Предыдущая страница"
+                    disabled>
+                <i class="fal fa-angle-left"></i>
+            </button>
+            
+            <div class="pagination-line"></div>
+            <div class="pagination-input-container">
+                <span>Страница</span>
+                <input type="text"
+                       id="current-page"
+                       class="pagination-input"
+                       value="0"
+                       disabled>
+                <span>из</span>
+                <span id="total-pages">0</span>
+            </div>
+            <div class="pagination-line"></div>
+            <button class="pagination-button"
+                    id="next-page"
+                    title="Следующая страница"
+                    disabled>
+                <i class="fal fa-angle-right"></i>
+            </button>
+            <button class="pagination-button"
+                    id="last-page"
+                    title="Последняя страница"
+                    disabled>
+                <i class="fal fa-angle-double-right"></i>
+            </button>
+        </div>
+    </div>
+{% endblock content %}
+{% block extra_scripts %}
+    {{ block.super }}
+    <script src="{% static 'main/js/main.js' %}" type="module"></script>
+    <script src="{% static 'main/js/autonumeric.js' %}"></script>
+    {{ data_ids|json_script:"data-ids" }}
+    {{ changed_cells|json_script:"changed-cells" }}
+    {{ current_page|json_script:"current-page-data" }}
+    {{ total_pages|json_script:"total-pages-data" }}
+    {{ supplier_debts|json_script:"supplier-debts" }}
+    <div id="user-data" data-user-id="{{ request.user.id }}"></div>
+{% endblock extra_scripts %}

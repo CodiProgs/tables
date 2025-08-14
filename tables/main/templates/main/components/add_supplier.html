@@ -1,0 +1,50 @@
+{% load components %}
+{% add_style 'css/modal-form.css' %}
+<form class="modal-form" id="suppliers-form" method="post">
+    <div class="modal-form__content">
+        {% csrf_token %}
+		<div class="modal-form__group">
+            <input class="modal-form__input"
+                   type="text"
+                   id="name"
+                   name="name"
+                   spellcheck="false"
+                   placeholder="Введите поставщика">
+        </div>
+        <div class="modal-form__group">
+            {% include "components/select.html" with id="branch" placeholder="Выберите филиал" %}
+        </div>
+		<div class="modal-form__group">
+            <input class="modal-form__input"
+                   id="cost_percentage"
+                   name="cost_percentage"
+                   spellcheck="false"
+                   placeholder="Введите процент"
+				   type="text"
+				   step="0.1">
+        </div>
+        <div class="modal-form__group">
+            {% include "components/select.html" with id="default_account" placeholder="Выберите в каком банке р/с" %}
+        </div>
+        <div class="modal-form__group">
+            <input class="modal-form__input"
+                   type="text"
+                   id="username"
+                   name="username"
+                   spellcheck="false"
+                   placeholder="Введите логин пользователя">
+        </div>
+        <div class="modal-form__group">
+            <input class="modal-form__input"
+                   type="text"
+                   id="password"
+                   name="password"
+                   spellcheck="false"
+                   placeholder="Введите пароль пользователя">
+        </div>
+        <div class="modal-form__buttons">
+            <button class="button modal-form__button" type="submit">Сохранить</button>
+            <button class="button modal-form__button button--cancel" type="button">Отменить</button>
+        </div>
+    </div>
+</form>

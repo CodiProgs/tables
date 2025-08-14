@@ -1,0 +1,6 @@
+<h2>Статус блокировки: {% if is_blocked %}Заблокирован{% else %}Открыт{% endif %}</h2>
+<form method="post">
+    {% csrf_token %}
+    <button name="action" value="block" {% if is_blocked %}disabled{% endif %}>Заблокировать</button>
+    <button name="action" value="unblock" {% if not is_blocked %}disabled{% endif %}>Разблокировать</button>
+</form>

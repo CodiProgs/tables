@@ -1,0 +1,18 @@
+{% extends "layout.html" %}
+{% block title %}
+    Доступ запрещен
+{% endblock title %}
+{% load static %}
+{% block extra_styles %}
+    <link rel="stylesheet" href="{% static 'css/404.css' %}" />
+{% endblock extra_styles %}
+{% block content %}
+    <div class="error-page">
+        <h1 class="error-page__title">403</h1>
+        <h2 class="error-page__subtitle">Доступ запрещен</h2>
+        <p class="error-page__description">
+            У вас нет прав доступа к этой странице. Пожалуйста, проверьте свои учетные данные или обратитесь к администратору.
+        </p>
+        <a href="{% url 'index' %}" class="button">Вернуться на главную</a>
+    </div>
+{% endblock content %}

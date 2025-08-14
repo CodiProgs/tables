@@ -1,0 +1,39 @@
+{% load custom_filters %}
+{% load components %}
+<div class="table-container">
+    <table class="table" id="{{ id }}">
+        <colgroup>
+            {% for field in fields %}<col id="col-{{ forloop.counter0 }}">{% endfor %}
+        </colgroup>
+        <thead class="table__header">
+            <tr>
+                {% for field in fields %}
+                    <th class="table__cell-header {% if field.is_type_sign %}table__cell-header-sign{% endif %}"
+                        data-column="{{ forloop.counter0 }}"
+                        data-column-type="{% if field.is_boolean %}checkbox{% elif field.is_relation or field.is_enum_field or field.is_type_sign %}select{% elif field.is_amount %}amount{% elif field.is_boolean %}boolean{% elif field.is_percent %}percent{% elif field.is_number %}number{% else %}text{% endif %}"
+                        data-name="{{ field.name }}">
+                        {{ field.verbose_name }}
+                        <div class="table__resize-handle"></div>
+                    </th>
+                {% endfor %}
+            </tr>
+        </thead>
+        <tbody class="table__body">
+            {% if is_grouped and is_grouped|get_item:id %}
+                {% for type, items in data.items %}
+                    <tr class="table__group-row">
+                        <td colspan="{{ fields|length }}" class="table__group-cell">{{ type }}</td>
+                    </tr>
+                    {% for item in items %}
+                        {% include "components/table_row.html" with item=item fields=fields %}
+                    {% endfor %}
+                {% endfor %}
+            {% else %}
+                {% for item in data %}
+                    {% include "components/table_row.html" with item=item fields=fields %}
+                {% endfor %}
+            {% endif %}
+        </tbody>
+    </table>
+</div>
+{% add_script 'js/table.js' module=True %}

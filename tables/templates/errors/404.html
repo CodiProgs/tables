@@ -1,0 +1,16 @@
+{% extends "layout.html" %}
+{% block title %}
+    Страница не найдена
+{% endblock title %}
+{% load static %}
+{% block extra_styles %}
+    <link rel="stylesheet" href="{% static 'css/404.css' %}" />
+{% endblock extra_styles %}
+{% block content %}
+    <div class="error-page">
+        <h1 class="error-page__title">404</h1>
+        <h2 class="error-page__subtitle">К сожалению, такой страницы не существует</h2>
+        <p class="error-page__description">Возможно, вы ошиблись в адресе или страница была удалена</p>
+        <a href="{% url 'index' %}" class="button">Вернуться на главную</a>
+    </div>
+{% endblock content %}

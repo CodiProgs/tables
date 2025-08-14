@@ -1,0 +1,58 @@
+{% extends "layout-without-menu.html" %}
+{% block title %}
+    Вход в систему
+{% endblock title %}
+{% load static %}
+{% block extra_styles %}
+    <link rel="stylesheet" href="{% static 'css/login.css' %}" />
+{% endblock extra_styles %}
+{% block content %}
+    <div class="login">
+        <h1 class="login__heading">Вход</h1>
+        <div class="login__content">
+            <form method="post" class="login__form">
+                {% csrf_token %}
+                <div class="login__field">
+                    <div class="input-container">
+                        <input type="text"
+                               name="username"
+                               required
+                               id="username"
+                               class="login__input"
+                               placeholder="Имя пользователя"
+                               value="{{ form.username.value|default:'' }}">
+                        <i class="far fa-times clear-button"></i>
+                    </div>
+                    {% if form.username.errors %}<div class="login__error">{{ form.username.errors }}</div>{% endif %}
+                </div>
+                <div class="login__field">
+                    <div class="input-container">
+                        <input type="password"
+                               name="password"
+                               required
+                               id="password"
+                               class="login__input"
+                               placeholder="Пароль">
+                        <i class="far fa-times clear-button"></i>
+                    </div>
+                    {% if form.password.errors %}<div class="login__error">{{ form.password.errors }}</div>{% endif %}
+                </div>
+                <div class="login__footer">
+                    {% if form.non_field_errors %}<p class="login__error" id="login__error-all">Ошибка входа</p>{% endif %}
+                    <div class="login__actions">
+                        <button type="submit" class="button login__submit">Войти</button>
+                        <div class="login__fingerprint">
+                            <button type="button" class="button login__register">Зарегистрировать отпечаток</button>
+                            <button type="button" class="button login__btn">
+                                Вход по отпечатку
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+{% endblock content %}
+{% block extra_scripts %}
+    <script src="{% static 'js/login.js' %}" type="module"></script>
+{% endblock extra_scripts %}

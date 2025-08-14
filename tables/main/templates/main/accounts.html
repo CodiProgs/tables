@@ -1,0 +1,14 @@
+{% extends "layout.html" %}
+{% load static %}
+{% block content %}
+    <div class="page-table-container" id="accounts-container">
+        {% include "components/table.html" with id="accounts-table" fields=fields.accounts data=data.accounts %}
+    </div>
+{% endblock content %}
+{% block extra_scripts %}
+    {{ block.super }}
+	<script src="{% static 'main/js/main.js' %}" type="module"></script>
+    <script src="{% static 'main/js/autonumeric.js' %}"></script>
+{% endblock extra_scripts %}
+
+

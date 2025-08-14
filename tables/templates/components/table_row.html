@@ -1,0 +1,42 @@
+{% load custom_filters %}
+<tr class="table__row {% for field in fields %}{% if field.is_type_sign %}{% with value=item.get_type_display %}{% if value == '-' %}text-red{% elif value == '+' %}text-green{% endif %}{% endwith %}{% endif %}{% endfor %}">
+    {% for field in fields %}
+        {% with value=item|get_attr:field.name %}
+            {% if field.is_date %}
+                <td class="table__cell">{{ value|format_date|default:"" }}</td>
+            {% elif field.is_boolean %}
+                {% with label=value|yesno:"Да,Нет" %}
+                    <td class="table__cell">
+                        {% include "components/checkbox.html" with value=value id=forloop.parentloop.counter disabled="true" label=label %}
+                    </td>
+                {% endwith %}
+            {% elif field.is_type_sign %}
+                <td class="table__cell table__cell-sign">{{ item.get_type_display }}</td>
+            {% elif field.is_enum_field %}
+                <td class="table__cell">{{ item.get_type_display }}</td>
+            {% else %}
+                <td class="table__cell{% if field.is_number %} table__cell-number{% endif %}{% if field.is_currency %}{% if value > 0 %} text-green{% elif value < 0 %} text-red{% endif %}{% endif %}">
+                    {% if field.is_currency %}
+                        {{ value|default:"0"|floatformat:2 }}
+                    {% elif field.is_percent %}
+                        {{ value|default:"0" }}
+                    {% elif field.is_number %}
+                        {% if value is not None %}
+                            {% if field.is_float %}
+                                {{ value|floatformat:2|default:"0,00" }}
+                            {% elif field.is_integer %}
+                                {{ value|default:"" }}
+                            {% else %}
+                                {{ value }}
+                            {% endif %}
+                        {% else %}
+                            {{ "" }}
+                        {% endif %}
+                    {% else %}
+                        {{ value|default:"" }}
+                    {% endif %}
+                </td>
+            {% endif %}
+        {% endwith %}
+    {% endfor %}
+</tr>

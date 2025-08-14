@@ -1,0 +1,28 @@
+{% load components %}
+{% add_style 'css/modal-form.css' %}
+<form class="modal-form" id="clients-form" method="post">
+    <div class="modal-form__content">
+        {% csrf_token %}
+		<div class="modal-form__group">
+            <input class="modal-form__input"
+                   type="text"
+                   id="name"
+                   name="name"
+                   spellcheck="false"
+                   placeholder="Введите клиента">
+        </div>
+		<div class="modal-form__group">
+            <input class="modal-form__input"
+                   id="percentage"
+                   name="percentage"
+                   spellcheck="false"
+                   placeholder="Введите процент"
+				   type="text"
+				   step="0.1">
+        </div>
+        <div class="modal-form__buttons">
+            <button class="button modal-form__button" type="submit">Сохранить</button>
+            <button class="button modal-form__button button--cancel" type="button">Отменить</button>
+        </div>
+    </div>
+</form>

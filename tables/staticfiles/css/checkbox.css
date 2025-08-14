@@ -1,0 +1,183 @@
+.checkbox {
+	box-sizing: border-box;
+	display: flex;
+	align-items: center;
+	--background-color: #fff;
+	--checkbox-height: 14px;
+}
+
+.checkbox__label {
+	display: flex;
+	align-items: center;
+}
+
+@-moz-keyframes dothabottomcheck {
+	0% {
+		height: 0;
+	}
+	100% {
+		height: calc(var(--checkbox-height) / 2);
+	}
+}
+
+@-webkit-keyframes dothabottomcheck {
+	0% {
+		height: 0;
+	}
+	100% {
+		height: calc(var(--checkbox-height) / 2);
+	}
+}
+
+@keyframes dothabottomcheck {
+	0% {
+		height: 0;
+	}
+	100% {
+		height: calc(var(--checkbox-height) / 2);
+	}
+}
+
+@keyframes dothatopcheck {
+	0% {
+		height: 0;
+	}
+	50% {
+		height: 0;
+	}
+	100% {
+		height: calc(var(--checkbox-height));
+	}
+}
+
+@-webkit-keyframes dothatopcheck {
+	0% {
+		height: 0;
+	}
+	50% {
+		height: 0;
+	}
+	100% {
+		height: calc(var(--checkbox-height));
+	}
+}
+
+@-moz-keyframes dothatopcheck {
+	0% {
+		height: 0;
+	}
+	50% {
+		height: 0;
+	}
+	100% {
+		height: calc(var(--checkbox-height));
+	}
+}
+
+.checkbox .checkbox__input {
+	display: none;
+}
+
+.checkbox .checkbox__label .checkbox__box {
+	height: var(--checkbox-height);
+	width: var(--checkbox-height);
+	background-color: transparent;
+	border: calc(var(--checkbox-height) * 0.1) solid var(--color-primary);
+	border-radius: 3px;
+	position: relative;
+	display: inline-block;
+	-moz-box-sizing: border-box;
+	-webkit-box-sizing: border-box;
+	box-sizing: border-box;
+	-moz-transition: border-color ease 0.2s;
+	-o-transition: border-color ease 0.2s;
+	-webkit-transition: border-color ease 0.2s;
+	transition: border-color ease 0.2s;
+	cursor: pointer;
+}
+
+.checkbox .checkbox__label .checkbox__box:focus {
+	box-shadow: rgba(0, 0, 0, 0.16) 0px 1px 4px 0px,
+		var(--color-button-primary-hover) 0px 0px 0px 3px;
+	outline: none;
+}
+
+.checkbox .checkbox__label .checkbox__box::before,
+.checkbox .checkbox__label .checkbox__box::after {
+	-moz-box-sizing: border-box;
+	-webkit-box-sizing: border-box;
+	box-sizing: border-box;
+	position: absolute;
+	height: 0;
+	width: calc(var(--checkbox-height) * 0.2);
+	background-color: var(--color-primary);
+	display: inline-block;
+	-moz-transform-origin: left top;
+	-ms-transform-origin: left top;
+	-o-transform-origin: left top;
+	-webkit-transform-origin: left top;
+	transform-origin: left top;
+	border-radius: 3px;
+	content: ' ';
+	-webkit-transition: opacity ease 0.5;
+	-moz-transition: opacity ease 0.5;
+	transition: opacity ease 0.5;
+	opacity: 0;
+}
+.checkbox .checkbox__label .checkbox__box::before {
+	top: calc(var(--checkbox-height) * 0.72);
+	left: calc(var(--checkbox-height) * 0.41);
+	box-shadow: 0 0 0 calc(var(--checkbox-height) * 0.05) var(--background-color);
+	-moz-transform: rotate(-135deg);
+	-ms-transform: rotate(-135deg);
+	-o-transform: rotate(-135deg);
+	-webkit-transform: rotate(-135deg);
+	transform: rotate(-135deg);
+}
+
+.checkbox .checkbox__label .checkbox__box::after {
+	top: calc(var(--checkbox-height) * 0.37);
+	left: calc(var(--checkbox-height) * 0.05);
+	-moz-transform: rotate(-45deg);
+	-ms-transform: rotate(-45deg);
+	-o-transform: rotate(-45deg);
+	-webkit-transform: rotate(-45deg);
+	transform: rotate(-45deg);
+}
+
+.checkbox .checkbox__input:checked + .checkbox__label .checkbox__box::after,
+.checkbox .checkbox__label .checkbox__box.checked::after {
+	height: calc(var(--checkbox-height) / 2);
+	-moz-animation: dothabottomcheck 0.2s ease 0s forwards;
+	-o-animation: dothabottomcheck 0.2s ease 0s forwards;
+	-webkit-animation: dothabottomcheck 0.2s ease 0s forwards;
+	animation: dothabottomcheck 0.2s ease 0s forwards;
+	opacity: 1;
+}
+.checkbox .checkbox__input:checked + .checkbox__label .checkbox__box::before,
+.checkbox .checkbox__label .checkbox__box.checked::before {
+	height: calc(var(--checkbox-height) * 1.2);
+	-moz-animation: dothatopcheck 0.4s ease 0s forwards;
+	-o-animation: dothatopcheck 0.4s ease 0s forwards;
+	-webkit-animation: dothatopcheck 0.4s ease 0s forwards;
+	animation: dothatopcheck 0.4s ease 0s forwards;
+	opacity: 1;
+}
+
+.checkbox .checkbox__input:disabled + .checkbox__label .checkbox__box {
+	opacity: 0.5;
+	cursor: default;
+}
+
+.checkbox .checkbox__input:disabled + .checkbox__label {
+	cursor: default;
+}
+
+.checkbox .checkbox__text {
+	margin-left: 8px;
+}
+
+.table__row--selected .checkbox .checkbox__label .checkbox__box::before {
+	box-shadow: 0 0 0 calc(var(--checkbox-height) * 0.05)
+		var(--color-button-primary-border);
+}

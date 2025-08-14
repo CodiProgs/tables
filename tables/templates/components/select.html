@@ -1,0 +1,16 @@
+<div class="select">
+    <input type="text"
+           hidden
+           class="select__input"
+           id="{{ id|default:'select_default' }}"
+           name="{{ id|default:'select_default' }}"
+           placeholder="{{ placeholder }}">
+    <div class="select__control" tabindex="0">
+        <span class="select__text{% if placeholder %} select__placeholder {% endif %}">
+            {% if placeholder %}{{ placeholder }}{% endif %}
+        </span>
+        <i class="far fa-chevron-down select__arrow"></i>
+        <i class="far fa-times select__clear"></i>
+    </div>
+    <div class="select__dropdown"></div>
+</div>

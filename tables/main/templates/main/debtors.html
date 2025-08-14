@@ -1,0 +1,52 @@
+{% extends "layout.html" %}
+{% load static %}
+{% block content %}
+<div class="page-table-container" id="debtors-container">
+    <div id="context-menu" class="dropdown-menu">
+        {% if is_admin %}
+        <a class="dropdown-item context-action" id="settle-debt-button" data-action="settle-debt">Погасить долг</a>
+        {% endif %}
+        <a class="dropdown-item context-action" id="hide-button" data-action="hide">Скрыть</a>
+        <a class="dropdown-item context-action" id="hide-all-button" data-action="hide-all">Скрыть все</a>
+        <a class="dropdown-item context-action" id="show-all-button" data-action="show-all">Показать все</a>
+    </div>
+
+    <ul class="debtors-office-list">
+        {% for branch in branch_debts %}
+        <li class="debtors-office-list__item">
+            <div class="debtors-office-list__row" data-target="branch-{{ forloop.counter }}">
+                <button class="debtors-office-list__toggle" type="button" aria-label="Подробнее">+</button>
+                <span class="debtors-office-list__title">{{ branch.branch }}</span>
+                <span class="debtors-office-list__amount {% if branch.debt < 0 %}text-red{% else %}text-green{% endif %}">
+                    {{ branch.debt|floatformat:2 }}
+                </span>
+            </div>
+            <div class="debtors-office-list__details" id="branch-{{ forloop.counter }}">
+                
+            </div>
+        </li>
+        {% endfor %}
+        {% for row in summary %}
+        <li class="debtors-office-list__item">
+            <div class="debtors-office-list__row" data-target="summary-{{ forloop.counter }}">
+                <button class="debtors-office-list__toggle" type="button" aria-label="Подробнее">+</button>
+                <span class="debtors-office-list__title">{{ row.name }}</span>
+                <span class="debtors-office-list__amount {% if row.amount < 0 %}text-red{% else %}text-green{% endif %}">
+                    {{ row.amount|floatformat:2 }}
+                </span>
+            </div>
+            <div class="debtors-office-list__details" id="summary-{{ forloop.counter }}">
+                
+            </div>
+        </li>
+        {% endfor %}
+    </ul>
+</div>
+{% endblock content %}
+
+{% block extra_scripts %}
+    {{ block.super }}
+    <script src="{% static 'main/js/main.js' %}" type="module"></script>
+    <script src="{% static 'main/js/autonumeric.js' %}"></script>
+    {{ data_ids|json_script:"data-ids" }}
+{% endblock extra_scripts %}
