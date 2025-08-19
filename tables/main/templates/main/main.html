@@ -19,15 +19,14 @@
                     id="first-page"
                     title="Первая страница"
                     disabled>
-                <i class="fal fa-angle-double-left"></i>
+                <img src="{% static 'images/angle-double-left.svg' %}" alt="angle-double-left" class="icon">
             </button>
             <button class="pagination-button"
                     id="prev-page"
                     title="Предыдущая страница"
                     disabled>
-                <i class="fal fa-angle-left"></i>
+                <img src="{% static 'images/angle-left.svg' %}" alt="angle-double-left" class="icon">
             </button>
-            
             <div class="pagination-line"></div>
             <div class="pagination-input-container">
                 <span>Страница</span>
@@ -44,13 +43,13 @@
                     id="next-page"
                     title="Следующая страница"
                     disabled>
-                <i class="fal fa-angle-right"></i>
+                <img src="{% static 'images/angle-right.svg' %}" alt="angle-double-left" class="icon">
             </button>
             <button class="pagination-button"
                     id="last-page"
                     title="Последняя страница"
                     disabled>
-                <i class="fal fa-angle-double-right"></i>
+                <img src="{% static 'images/angle-double-right.svg' %}" alt="angle-double-left" class="icon">
             </button>
         </div>
     </div>
@@ -58,11 +57,11 @@
 {% block extra_scripts %}
     {{ block.super }}
     <script src="{% static 'main/js/main.js' %}" type="module"></script>
-    <script src="{% static 'main/js/autonumeric.js' %}"></script>
+    <script src="{% static 'main/js/autonumeric.js' %}" defer></script>
     {{ data_ids|json_script:"data-ids" }}
     {{ changed_cells|json_script:"changed-cells" }}
     {{ current_page|json_script:"current-page-data" }}
     {{ total_pages|json_script:"total-pages-data" }}
-    {{ supplier_debts|json_script:"supplier-debts" }}
+    {{ debts|json_script:"debts" }}
     <div id="user-data" data-user-id="{{ request.user.id }}"></div>
 {% endblock extra_scripts %}

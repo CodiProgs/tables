@@ -13,11 +13,10 @@
         <meta name="description" content="Бизнес таблицы - это веб-приложение для управления данными о поставщиках, счетах и движении денежных средств.">
         <meta name="keywords" content="Бизнес, Таблицы, Django, Python, Web Development"/>
         <link rel="stylesheet" href="{% static 'css/style.css' %}" />
-        <link rel="stylesheet" href="{% static 'awesome/css/all.min.css' %}">
         <link rel="stylesheet" href="{% static 'css/modal.css' %}">
         <link rel="stylesheet" href="{% static 'css/table.css' %}">
         <link rel="stylesheet" href="{% static 'css/loader.css' %}">
-        <link rel="icon" href="{% static 'images/favicon2.ico' %}" type="image/x-icon">
+        <link rel="stylesheet" href="{% static 'awesome/css/all.min.css' %}">
         {% block extra_styles %}
             {% render_styles %}
         {% endblock extra_styles %}
@@ -51,9 +50,9 @@
                     <li class="nav-item {% if request.resolver_match.url_name == 'cash_flow_report' %}active{% endif %}">
                         <a href="{% url 'main:cash_flow_report' %}">Отчет ДДС</a>
                     </li>
-                    <li class="nav-item {% if request.resolver_match.url_name == 'money_transfers' %}active{% endif %}">
+                    {% comment %} <li class="nav-item {% if request.resolver_match.url_name == 'money_transfers' %}active{% endif %}">
                         <a href="{% url 'main:money_transfers' %}">Перемещение ₽</a>
-                    </li>
+                    </li> {% endcomment %}
                     <li class="nav-item {% if request.resolver_match.url_name == 'profit_distribution' %}active{% endif %}">
                         <a href="{% url 'main:profit_distribution' %}">Распред. прибыли</a>
                     </li>

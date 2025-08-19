@@ -1,9 +1,10 @@
+{% load static %}
 <div class="modal">
     <div class="modal__content">
         <div class="modal__header">
             <h3 class="modal__title"></h3>
             <button class="modal__close" tabindex="0">
-                <i class="fas fa-times"></i>
+                <img src="{% static 'images/close.svg' %}" alt="close" class="icon">
             </button>
         </div>
         <div class="modal__body"></div>

@@ -1,5 +1,7 @@
 {% extends "layout.html" %}
 {% load static %}
+{% load components %}
+
 {% block content %}
     <div class="page-table-container" id="cash_flow-container">
         {% include "components/table.html" with id="cash_flow-table" fields=fields data=data %}
@@ -8,18 +10,22 @@
             <a class="dropdown-item context-action" id="edit-button" data-action="edit">Редактировать</a>
             <a class="dropdown-item context-action" id="delete-button" data-action="delete">Удалить</a>
         </div>
+        <div class="stats-container">
+            {% include "components/select.html" with id="supplier" placeholder="Выберите поставщика" %}
+            <canvas id="statsChart">таблица</canvas>
+        </div>
         <div class="pagination-controls">
             <button class="pagination-button"
                     id="first-page"
                     title="Первая страница"
                     disabled>
-                <i class="fal fa-angle-double-left"></i>
+                <img src="{% static 'images/angle-double-left.svg' %}" alt="angle-double-left" class="icon">
             </button>
             <button class="pagination-button"
                     id="prev-page"
                     title="Предыдущая страница"
                     disabled>
-                <i class="fal fa-angle-left"></i>
+                <img src="{% static 'images/angle-left.svg' %}" alt="angle-double-left" class="icon">
             </button>
             <div class="pagination-line"></div>
             <div class="pagination-input-container">
@@ -37,13 +43,13 @@
                     id="next-page"
                     title="Следующая страница"
                     disabled>
-                <i class="fal fa-angle-right"></i>
+                <img src="{% static 'images/angle-right.svg' %}" alt="angle-double-left" class="icon">
             </button>
             <button class="pagination-button"
                     id="last-page"
                     title="Последняя страница"
                     disabled>
-                <i class="fal fa-angle-double-right"></i>
+                <img src="{% static 'images/angle-double-right.svg' %}" alt="angle-double-left" class="icon">
             </button>
         </div>
     </div>
@@ -52,6 +58,7 @@
     {{ block.super }}
 	<script src="{% static 'main/js/main.js' %}" type="module"></script>
     <script src="{% static 'main/js/autonumeric.js' %}"></script>
+    <script src="{% static 'main/js/chart.js' %}" type="module" defer></script>
     {{ data_ids|json_script:"data-ids" }}
     {{ current_page|json_script:"current-page-data" }}
     {{ total_pages|json_script:"total-pages-data" }}

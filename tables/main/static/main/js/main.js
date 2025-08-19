@@ -1,4 +1,5 @@
 import { DynamicFormHandler } from '/static/js/dynamicFormHandler.js'
+import SelectHandler from '/static/js/selectHandler.js'
 import { TableManager } from '/static/js/table.js'
 import { initTableHandlers } from '/static/js/tableHandlers.js'
 import { createLoader, getCSRFToken, showError } from '/static/js/ui-utils.js'
@@ -482,8 +483,8 @@ const addMenuHandler = () => {
 			const row = e.target.closest(
 				'tbody tr:not(.table__row--summary):not(.table__row--empty)'
 			)
-			const table = e.target.closest('table')
 
+			const table = e.target.closest('table')
 			if (row && table) {
 				e.preventDefault()
 
@@ -492,7 +493,19 @@ const addMenuHandler = () => {
 				if (deleteButton) deleteButton.style.display = 'block'
 				if (paymentButton) paymentButton.style.display = 'block'
 				if (hideButton) hideButton.style.display = 'block'
-				if (settleDebtButton) settleDebtButton.style.display = 'block'
+				if (settleDebtButton) {
+					if (table.id && table.id.startsWith('branch-repayments-')) {
+						settleDebtButton.style.display = 'none'
+					} else {
+						settleDebtButton.style.display = 'block'
+					}
+
+					if (table.id && table.id === 'investors-table') {
+						settleDebtButton.textContent = 'Изменить сумму'
+					} else {
+						settleDebtButton.textContent = 'Погасить долг'
+					}
+				}
 
 				showMenu(e.pageX, e.pageY)
 				return
@@ -923,32 +936,82 @@ const colorizeZeroDebts = tableId => {
 	})
 }
 
-const colorizeRemainingAmountBySupplierDebt = (supplierDebts = []) => {
+const colorizeRemainingAmountByDebts = (debts = {}) => {
 	const table = document.getElementById('transactions-table')
-	if (!table || !Array.isArray(supplierDebts) || supplierDebts.length === 0)
-		return
+
+	if (!table || typeof debts !== 'object') return
 
 	const headers = table.querySelectorAll('thead th')
 	let remainingAmountCol = -1
+	let bonusCol = -1
+	let clientPercentageCol = -1
 
 	headers.forEach((header, idx) => {
+		if (header.dataset.name === 'supplier_percentage') {
+			// remainingAmountCol = idx
+		}
+		if (header.dataset.name === 'bonus') {
+			bonusCol = idx
+		}
 		if (header.dataset.name === 'remaining_amount') {
-			remainingAmountCol = idx
+			clientPercentageCol = idx
 		}
 	})
 
-	if (remainingAmountCol === -1) return
-
 	const rows = table.querySelectorAll('tbody tr:not(.table__row--summary)')
 	rows.forEach((row, idx) => {
-		const cell = row.querySelectorAll('td')[remainingAmountCol]
-		if (!cell) return
+		if (remainingAmountCol !== -1 && debts.supplier_debts) {
+			const cell = row.querySelectorAll('td')[remainingAmountCol]
+			const debt = debts.supplier_debts[idx]
+			if (cell) {
+				if (
+					debt === 0 ||
+					debt === '0' ||
+					debt === '0 р.' ||
+					debt === '0,00 р.' ||
+					debt === '0.00'
+				) {
+					cell.classList.add('back-green')
+				} else {
+					cell.classList.remove('back-green')
+				}
+			}
+		}
+		if (bonusCol !== -1 && debts.bonus_debt) {
+			const cell = row.querySelectorAll('td')[bonusCol]
+			const debt = debts.bonus_debt[idx]
+			if (cell) {
+				if (
+					(debt === 0 ||
+						debt === '0' ||
+						debt === '0 р.' ||
+						debt === '0,00 р.' ||
+						debt === '0.00') &&
+					cell.textContent.trim() !== '0'
+				) {
+					cell.classList.add('back-green')
+				} else {
+					cell.classList.remove('back-green')
+				}
+			}
+		}
+		if (clientPercentageCol !== -1 && debts.client_debt) {
+			const cell = row.querySelectorAll('td')[clientPercentageCol]
+			const debt = debts.client_debt[idx]
 
-		const debt = supplierDebts[idx]
-		if (debt === 0 || debt === '0' || debt === '0 р.' || debt === '0,00 р.') {
-			cell.classList.add('back-green')
-		} else {
-			cell.classList.remove('back-green')
+			if (cell) {
+				if (
+					debt === 0 ||
+					debt === '0' ||
+					debt === '0 р.' ||
+					debt === '0,00 р.' ||
+					debt === '0.00'
+				) {
+					cell.classList.add('back-green')
+				} else {
+					cell.classList.remove('back-green')
+				}
+			}
 		}
 	})
 }
@@ -1155,9 +1218,7 @@ export class TablePaginator {
 			if (btn) btn.disabled = true
 		})
 
-		if (data.message) {
-			console.log('Сообщение сервера:', data.message)
-		} else if (!response.ok) {
+		if (!response.ok) {
 			showError(`Ошибка загрузки данных для ${this.entityName}.`)
 		}
 	}
@@ -1374,116 +1435,6 @@ const paymentFormHandler = createFormHandler(
 	}
 )
 
-const settleDebtFormHandler = createFormHandler(
-	`${BASE_URL}${SUPPLIERS}/settle-debt/`,
-	`debtors-table`,
-	`settle-debt-form`,
-	`${BASE_URL}${SUPPLIERS}/debtors/`,
-	[],
-	{
-		url: '/components/main/settle-debt/',
-		title: 'Погашение долга',
-		...(mainConfig.modalConfig.context
-			? { context: mainConfig.modalConfig.context }
-			: {}),
-	},
-	result => {
-		if (result.html) {
-			let tableId
-
-			switch (result.type) {
-				case 'Бонусы':
-					tableId = 'summary-bonus'
-					break
-				case 'Выдачи клиентам':
-					tableId = 'summary-remaining'
-					break
-				case 'Поставщики':
-					tableId = `branch-transactions-${result.branch}`
-
-					TableManager.addTableRow(
-						{ html: result.html_debt_repayments },
-						tableId
-					)
-
-					TableManager.calculateTableSummary(
-						`branch-transactions-${result.branch}`,
-						['supplier_debt']
-					)
-
-					break
-				default:
-					tableId = `branch-transactions-${result.branch}`
-			}
-
-			TableManager.updateTableRow(result, tableId)
-
-			refreshData(tableId)
-
-			const row = TableManager.getRowById(result.id, tableId)
-			TableManager.formatCurrencyValuesForRow(tableId, row)
-
-			hideDebtorRowIfNoDebt(row, tableId, result.type)
-
-			const table = document.getElementById(tableId)
-			if (table) {
-				const summaryCells = table.querySelectorAll('td.table__cell--summary')
-				summaryCells.forEach(cell => {
-					if (cell.classList.contains('text-green')) {
-						cell.classList.remove('text-green')
-						cell.classList.add('text-red')
-					} else if (cell.classList.contains('text-red')) {
-						cell.classList.remove('text-red')
-						cell.classList.add('text-green')
-					}
-				})
-				colorizeZeroDebts(tableId)
-			}
-
-			if (
-				typeof result.branch === 'string' ||
-				typeof result.type === 'string'
-			) {
-				const branchSpans = Array.from(
-					document.querySelectorAll('.debtors-office-list__title')
-				)
-				let branchKey = null
-				if (typeof result.branch === 'string') {
-					branchKey = result.branch
-				} else if (typeof result.type === 'string') {
-					if (result.type === 'Бонусы' || result.type === 'bonus') {
-						branchKey = 'Бонусы'
-					} else if (
-						result.type === 'Выдачи клиентам' ||
-						result.type === 'remaining'
-					) {
-						branchKey = 'Выдачи клиентам'
-					}
-				}
-				const branchSpan = branchSpans.find(
-					span => span.textContent.trim() === branchKey.trim()
-				)
-				if (branchSpan) {
-					const amountSpan = branchSpan.parentElement.querySelector(
-						'.debtors-office-list__amount'
-					)
-					if (amountSpan) {
-						let debt = Number(result.total_debt)
-						if (!isNaN(debt)) {
-							let formatted = debt.toLocaleString('ru-RU').replace(/,/g, ' ')
-							formatted = formatted.replace(/,00$/, '')
-							if (!formatted.endsWith('р.') && !formatted.endsWith('р')) {
-								formatted = formatted + ' р.'
-							}
-							amountSpan.textContent = formatted
-						}
-					}
-				}
-			}
-		}
-	}
-)
-
 const collectionFormHandler = createFormHandler(
 	`${BASE_URL}money_transfers/collection/`,
 	'suppliers-account-table',
@@ -1576,6 +1527,39 @@ const collectionFormHandler = createFormHandler(
 	}
 )
 
+const moneyTransfersFormHandler = createFormHandler(
+	`${BASE_URL}${MONEY_TRANSFERS}/add/`,
+	'suppliers-account-table',
+	'money_transfers-form',
+	[],
+	[
+		{ id: 'source_supplier', url: `${BASE_URL}${SUPPLIERS}/list/` },
+		{ id: 'destination_supplier', url: `${BASE_URL}${SUPPLIERS}/list/` },
+	],
+	{
+		url: '/components/main/add_money_transfers/',
+		title: 'Перевод денег',
+		...(mainConfig.modalConfig.context
+			? { context: mainConfig.modalConfig.context }
+			: {}),
+	},
+	result => {
+		if (result.table_html) {
+			const table = document.getElementById('suppliers-account-table')
+			if (table) {
+				const wrapper = document.createElement('div')
+				wrapper.innerHTML = result.table_html
+				const newTable = wrapper.querySelector('table')
+				if (newTable) {
+					table.parentNode.replaceChild(newTable, table)
+					TableManager.init()
+					handleSupplierAccounts()
+				}
+			}
+		}
+	}
+)
+
 const handleTransactions = async config => {
 	try {
 		const transactionIdsData = document.getElementById('data-ids')?.textContent
@@ -1608,14 +1592,13 @@ const handleTransactions = async config => {
 	let supplierDebtsAll
 
 	try {
-		const supplierDebtsData =
-			document.getElementById('supplier-debts')?.textContent
-		if (supplierDebtsData) {
-			const supplierDebts = JSON.parse(supplierDebtsData)
-			supplierDebtsAll = supplierDebts
-			colorizeRemainingAmountBySupplierDebt(supplierDebts)
+		const debtsData = document.getElementById('debts')?.textContent
+		if (debtsData) {
+			const debts = JSON.parse(debtsData)
+			supplierDebtsAll = debts.supplier_debts || []
+			colorizeRemainingAmountByDebts(debts)
 
-			hideCompletedTransactions(supplierDebts)
+			hideCompletedTransactions(debts.supplier_debts)
 		} else {
 			console.warn("Element with ID 'supplier-debts' not found or empty.")
 		}
@@ -1815,7 +1798,7 @@ const handleSupplierAccounts = async () => {
 	}
 
 	const collectionButton = document.getElementById('collection-button')
-	if (collectionButton) {
+	if (collectionButton && !collectionButton.dataset.listenerAdded) {
 		collectionButton.addEventListener('click', async function (e) {
 			await collectionFormHandler.init(0)
 
@@ -1829,6 +1812,26 @@ const handleSupplierAccounts = async () => {
 			}
 
 			setupCurrencyInput('amount')
+
+			collectionButton.dataset.listenerAdded = 'true'
+		})
+	}
+
+	const moneyTransfersButton = document.getElementById('add-button')
+	if (moneyTransfersButton && !moneyTransfersButton.dataset.listenerAdded) {
+		moneyTransfersButton.addEventListener('click', async function (e) {
+			await moneyTransfersFormHandler.init(0)
+
+			const supplierId = TableManager.getSelectedRowId(
+				'suppliers-account-table'
+			)
+			if (supplierId && supplierId !== 'ИТОГО') {
+				selectOptionById('source_supplier', supplierId)
+			}
+
+			setupCurrencyInput('amount')
+
+			moneyTransfersButton.dataset.listenerAdded = 'true'
 		})
 	}
 }
@@ -1858,6 +1861,56 @@ const handleCashFlow = async config => {
 			setIds(cash_flow_ids, `${CASH_FLOW}-table`)
 			colorizeAmounts(`${CASH_FLOW}-table`)
 		},
+	})
+
+	const selectSupplier = document.getElementById('supplier')
+	const select = selectSupplier.querySelector('select')
+	SelectHandler.setupSelects({
+		select: select,
+		url: '/suppliers/list/',
+	})
+
+	document.addEventListener('click', function (e) {
+		const option = e.target.closest('.select__option')
+		if (option) {
+			const supplierId = option.dataset.value
+			if (!supplierId) return
+
+			fetch(`/cash_flow/payment_stats/${supplierId}/`)
+				.then(res => res.json())
+				.then(data => {
+					const chartElem = document.getElementById('statsChart')
+					if (!chartElem) return
+					const ctx = chartElem.getContext('2d')
+					if (window.supplierChart) {
+						window.supplierChart.destroy()
+					}
+					window.supplierChart = new Chart(ctx, {
+						type: 'bar',
+						data: {
+							labels: data.months,
+							datasets: [
+								{
+									label: '',
+									data: data.values,
+									backgroundColor: 'rgba(54, 162, 235, 0.5)',
+									borderColor: 'rgba(54, 162, 235, 1)',
+									borderWidth: 1,
+									stepped: true,
+								},
+							],
+						},
+						options: {
+							scales: {
+								y: { beginAtZero: true },
+							},
+							plugins: {
+								legend: { display: false },
+							},
+						},
+					})
+				})
+		}
 	})
 }
 
@@ -1989,6 +2042,48 @@ const handleDebtors = () => {
 									}
 								}
 							)
+						} else if (value === 'Инвесторам') {
+							details.innerHTML =
+								'<div class="debtors-details-title">Прибыль</div>' +
+								data.html +
+								'<div class="debtors-details-title">Инвесторы</div>' +
+								(data.html_investors || '')
+
+							const profitTable = details.querySelector(`#${data.table_id}`)
+							if (profitTable) {
+								const tbody = profitTable.querySelector('.table__body')
+								if (tbody && !tbody.children.length) {
+									const emptyRow = document.createElement('tr')
+									emptyRow.className = 'table__row table__row--empty'
+									const td = document.createElement('td')
+									td.colSpan =
+										profitTable.querySelectorAll('thead th').length || 1
+									td.className = 'table__cell table__cell--empty'
+									td.textContent = 'Нет данных'
+									emptyRow.appendChild(td)
+									tbody.appendChild(emptyRow)
+								} else {
+									setIds(data.data_ids, data.table_id)
+								}
+							}
+
+							const investorsTable = details.querySelector('#investors-table')
+							if (investorsTable) {
+								const tbody = investorsTable.querySelector('.table__body')
+								if (tbody && !tbody.children.length) {
+									const emptyRow = document.createElement('tr')
+									emptyRow.className = 'table__row table__row--empty'
+									const td = document.createElement('td')
+									td.colSpan =
+										investorsTable.querySelectorAll('thead th').length || 1
+									td.className = 'table__cell table__cell--empty'
+									td.textContent = 'Нет данных'
+									emptyRow.appendChild(td)
+									tbody.appendChild(emptyRow)
+								} else {
+									setIds(data.investor_ids, 'investors-table')
+								}
+							}
 						} else {
 							details.innerHTML = data.html
 
@@ -2058,6 +2153,143 @@ const handleDebtors = () => {
 			if (table) {
 				const currentRowId = TableManager.getSelectedRowId(table.id)
 				if (currentRowId) {
+					let type
+
+					if (table.id === 'investors-table') {
+						type = 'investors'
+					} else {
+						type = 'transactions'
+					}
+
+					const getUrl = `${BASE_URL}${SUPPLIERS}/debtors/${type}/`
+
+					const settleDebtFormHandler = createFormHandler(
+						`${BASE_URL}${SUPPLIERS}/settle-debt/`,
+						`debtors-table`,
+						`settle-debt-form`,
+						getUrl,
+						[],
+						{
+							url: '/components/main/settle-debt/',
+							title:
+								type === 'investors' ? 'Изменение суммы' : 'Погашение долга',
+							...(mainConfig.modalConfig.context
+								? { context: mainConfig.modalConfig.context }
+								: {}),
+						},
+						result => {
+							if (result.html) {
+								let tableId
+
+								switch (result.type) {
+									case 'Бонусы':
+										tableId = 'summary-bonus'
+										break
+									case 'Выдачи клиентам':
+										tableId = 'summary-remaining'
+										break
+									case 'Поставщики':
+										tableId = `branch-transactions-${result.branch}`
+
+										TableManager.addTableRow(
+											{ html: result.html_debt_repayments },
+											`branch-repayments-${result.branch}`
+										)
+									case 'Инвесторы':
+										tableId = 'investors-table'
+
+										break
+									default:
+										tableId = `branch-transactions-${result.branch}`
+								}
+
+								TableManager.updateTableRow(result, tableId)
+
+								if (result.type === 'Поставщики') {
+									TableManager.calculateTableSummary(
+										`branch-transactions-${result.branch}`,
+										['supplier_debt']
+									)
+								}
+
+								refreshData(tableId)
+
+								const row = TableManager.getRowById(result.id, tableId)
+								TableManager.formatCurrencyValuesForRow(tableId, row)
+
+								hideDebtorRowIfNoDebt(row, tableId, result.type)
+
+								const table = document.getElementById(tableId)
+								if (table) {
+									const summaryCells = table.querySelectorAll(
+										'td.table__cell--summary'
+									)
+									summaryCells.forEach(cell => {
+										if (cell.classList.contains('text-green')) {
+											cell.classList.remove('text-green')
+											cell.classList.add('text-red')
+										} else if (cell.classList.contains('text-red')) {
+											cell.classList.remove('text-red')
+											cell.classList.add('text-green')
+										}
+									})
+									colorizeZeroDebts(tableId)
+								}
+
+								if (
+									typeof result.branch === 'string' ||
+									typeof result.type === 'string'
+								) {
+									const branchSpans = Array.from(
+										document.querySelectorAll('.debtors-office-list__title')
+									)
+									let branchKey = null
+									if (typeof result.branch === 'string') {
+										branchKey = result.branch
+									} else if (typeof result.type === 'string') {
+										if (result.type === 'Бонусы' || result.type === 'bonus') {
+											branchKey = 'Бонусы'
+										} else if (
+											result.type === 'Выдачи клиентам' ||
+											result.type === 'remaining'
+										) {
+											branchKey = 'Выдачи клиентам'
+										}
+									}
+
+									if (branchKey) {
+										const branchSpan = branchSpans.find(
+											span =>
+												span.textContent.trim() ===
+												branchKey.replace(/_/g, ' ').trim()
+										)
+										if (branchSpan) {
+											const amountSpan = branchSpan.parentElement.querySelector(
+												'.debtors-office-list__amount'
+											)
+											if (amountSpan) {
+												let debt = Number(result.total_debt)
+												if (!isNaN(debt)) {
+													let formatted = debt
+														.toLocaleString('ru-RU')
+														.replace(/,/g, ' ')
+													formatted = formatted.replace(/,00$/, '')
+													if (
+														!formatted.endsWith('р.') &&
+														!formatted.endsWith('р')
+													) {
+														formatted = formatted + ' р.'
+													}
+													amountSpan.textContent = formatted
+												}
+											}
+										}
+									}
+								}
+							}
+						}
+					)
+
 					await settleDebtFormHandler.init(currentRowId)
 					setupCurrencyInput('amount')
 					const typeInput = document.getElementById('type')
@@ -2068,6 +2300,10 @@ const handleDebtors = () => {
 							typeInput.value = 'remaining'
 						} else if (table.id.startsWith('branch-transactions')) {
 							typeInput.value = 'branch'
+						} else if (table.id === 'investors-table') {
+							typeInput.value = 'investors'
+						} else if (table.id === 'summary-profit') {
+							typeInput.value = 'profit'
 						}
 					}
 				} else {

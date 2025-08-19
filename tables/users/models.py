@@ -37,9 +37,6 @@ class UserType(models.Model):
         verbose_name = "Тип пользователя"
         verbose_name_plural = "Типы пользователей"
 
-def get_default_user_type():
-    return UserType.objects.get(name="Поставщик").id
-
 class User(AbstractUser):
     username = models.CharField(max_length=150, unique=True, verbose_name="Логин")
     last_name = models.CharField(
@@ -59,7 +56,6 @@ class User(AbstractUser):
         verbose_name="Тип пользователя",
         null=True,
         blank=True,
-        default=get_default_user_type,
     )
 
     supplier = models.OneToOneField(

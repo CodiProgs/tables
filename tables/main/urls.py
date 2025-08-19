@@ -23,6 +23,7 @@ urlpatterns = [
 	path("cash_flow/delete/<int:pk>/", views.cash_flow_delete, name="cash_flow_delete"),
 	path("cash_flow/report/", views.cash_flow_report, name="cash_flow_report"),
 	path("cash_flow/list/", views.cash_flow_list, name="cash_flow_list"),
+	path("cash_flow/payment_stats/<int:supplier_id>/", views.cash_flow_payment_stats, name="cash_flow_payment_stats"),
 	path("transactions/list/", views.transaction_list, name="transaction_list"),
 	path("transactions/<int:pk>/", views.transaction_detail, name="transaction_detail"),
 	path("transactions/add/", views.transaction_create, name="transaction_create"),
@@ -40,7 +41,11 @@ urlpatterns = [
 	path("clients/delete/<int:pk>/", views.client_delete, name="client_delete"),
 	path("suppliers/", views.suppliers, name="suppliers"),
 	path("suppliers/debtors/", views.debtors, name="debtors"),
-	path("suppliers/debtors/<int:pk>/", views.debtor_detail, name="debtor_detail"),
+	path(
+		"suppliers/debtors/<str:type>/<int:pk>/",
+		views.debtor_detail,
+		name="debtor_detail"
+	),
 	path("suppliers/debtors/details/", views.debtor_details, name="debtor_details"),
 	path("suppliers/list/", views.supplier_list, name="supplier_list"),
 	path("suppliers/<int:pk>/", views.supplier_detail, name="supplier_detail"),

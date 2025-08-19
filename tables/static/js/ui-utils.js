@@ -43,7 +43,7 @@ export async function showError(error) {
 	const toast = document.createElement('div')
 	toast.className = 'toast toast--error'
 	toast.innerHTML = `
-        <i class="fas fa-exclamation-circle toast__icon"></i>
+        <img src="/static/images/exclamation-circle.svg" alt="exclamation-circle" class="toast__icon">
         <span class="toast__message">${error}</span>
         <button class="toast__close" title="Закрыть">&times;</button>
     `
@@ -67,7 +67,7 @@ export async function showQuestion(question, title, onConfirm) {
 		const content = `
 		<div class='modal__message'>
 			<div class='modal__message-content'>
-				<i class="fas fa-question-circle modal__message-icon modal__message-icon--question"></i>
+				<img src="/static/images/question-circle.svg" alt="question-circle" class="toast__icon modal__message-icon modal__message-icon--question">
 				<p>${question}</p>
 			</div>
 			<div class='modal__message-buttons'>
@@ -125,7 +125,7 @@ export async function showSuccess(success = 'Успешно') {
 	const toast = document.createElement('div')
 	toast.className = 'toast toast--success'
 	toast.innerHTML = `
-        <i class="fas fa-check-circle toast__icon"></i>
+        <img src="/static/images/check-circle.svg" alt="check-circle" class="toast__icon">
         <span class="toast__message">${success}</span>
         <button class="toast__close" title="Закрыть">&times;</button>
     `
@@ -160,14 +160,15 @@ export function collapseContainer(containerId, title) {
 	const collapsedContent = document.createElement('div')
 
 	collapseBtn.className = 'collapse-btn'
-	collapseBtn.innerHTML = '<i class="fas fa-chevron-left"></i>'
+	collapseBtn.innerHTML =
+		'<img src="{% static "images/angle-right.svg" %}" alt="exclamation-circle">'
 
 	collapsedContent.className = 'collapsed-content'
 	collapsedContent.style.opacity = '0'
 	collapsedContent.innerHTML = `
         <span class="vertical-text">${title}</span>
         <button class="collapse-btn expand-btn">
-            <i class="fas fa-chevron-right"></i>
+            <img src="{% static 'images/angle-right.svg' %}" alt="exclamation-circle">
         </button>
     `
 

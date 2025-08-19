@@ -10,6 +10,11 @@ class Client(models.Model):
         default=0.0,
         verbose_name="Процент"
     )
+    comment = models.TextField(
+        blank=True,
+        null=True,
+        verbose_name="Комментарий"
+    )
 
     def __str__(self):
         return self.name
@@ -209,6 +214,14 @@ class Transaction(models.Model):
         Долг по бонусам = бонус - возвращенный бонус
         """
         return self.bonus - self.returned_bonus
+
+    @property
+    def client_debt_paid(self):
+        """
+        Долг клиента, рассчитанный от оплаченной суммы
+        """
+        result = math.floor(self.paid_amount * (100 - self.client_percentage) / 100)
+        return Decimal(result) - self.returned_to_client
 
 class AccountType(models.Model):
     name = models.CharField(max_length=100, verbose_name="Тип счета")
@@ -453,3 +466,20 @@ class SupplierDebtRepayment(models.Model):
         verbose_name = "Погашение долга поставщика"
         verbose_name_plural = "Погашения долгов поставщиков"
         ordering = ['created_at']
+
+class Investor(models.Model):
+    name = models.CharField(max_length=255, verbose_name="Инвестор")
+    balance = models.DecimalField(
+        max_digits=15,
+        decimal_places=2,
+        default=0,
+        verbose_name="Сумма"
+    )
+
+    def __str__(self):
+        return self.name
+
+    class Meta:
+        verbose_name = "Инвестор"
+        verbose_name_plural = "Инвесторы"
+        ordering = ['name']

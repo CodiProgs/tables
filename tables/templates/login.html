@@ -21,7 +21,8 @@
                                class="login__input"
                                placeholder="Имя пользователя"
                                value="{{ form.username.value|default:'' }}">
-                        <i class="far fa-times clear-button"></i>
+                        <!--<i class="far fa-times clear-button"></i>-->
+                        <img src="{% static 'images/close.svg' %}" alt="Close" class="clear-button">
                     </div>
                     {% if form.username.errors %}<div class="login__error">{{ form.username.errors }}</div>{% endif %}
                 </div>
@@ -33,7 +34,8 @@
                                id="password"
                                class="login__input"
                                placeholder="Пароль">
-                        <i class="far fa-times clear-button"></i>
+                        <!--<i class="far fa-times clear-button"></i>-->
+                        <img src="{% static 'images/close.svg' %}" alt="Close" class="clear-button">
                     </div>
                     {% if form.password.errors %}<div class="login__error">{{ form.password.errors }}</div>{% endif %}
                 </div>

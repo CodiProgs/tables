@@ -1,3 +1,4 @@
+{% load static %}
 <div class="select">
     <input type="text"
            hidden
@@ -9,8 +10,10 @@
         <span class="select__text{% if placeholder %} select__placeholder {% endif %}">
             {% if placeholder %}{{ placeholder }}{% endif %}
         </span>
-        <i class="far fa-chevron-down select__arrow"></i>
-        <i class="far fa-times select__clear"></i>
+        <!--<i class="far fa-chevron-down select__arrow"></i>-->
+        <img src="{% static 'images/chevron-down.svg' %}" alt="Close" class="select__arrow">
+        <!--<i class="far fa-times select__clear"></i>-->
+        <img src="{% static 'images/close.svg' %}" alt="Close" class="select__clear">
     </div>
     <div class="select__dropdown"></div>
 </div>

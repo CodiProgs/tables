@@ -11,7 +11,8 @@ from .models import (
 	PaymentPurpose,
 	MoneyTransfer,
 	Branch,
-	SupplierDebtRepayment
+	SupplierDebtRepayment,
+	Investor
 )
 
 
@@ -26,3 +27,4 @@ admin.site.register(PaymentPurpose)
 admin.site.register(MoneyTransfer)
 admin.site.register(Branch)
 admin.site.register(SupplierDebtRepayment)
+admin.site.register(Investor)
