@@ -3,17 +3,23 @@
 {% block content %}
     <div class="page-table-container" id="suppliers-account-container">
         {% include "components/table.html" with id="suppliers-account-table" fields=fields data=data %}
-        <div id="context-menu" class="dropdown-menu" data-is-admin="{{ is_admin|yesno:'true,false' }}">
+        <div id="context-menu"
+             class="dropdown-menu"
+             data-is-admin="{{ is_admin|yesno:'true,false' }}">
             {% if is_admin %}
-            <a class="dropdown-item context-action" id="collection-button" data-action="collection">Инкассация</a>
-            <a class="dropdown-item context-action" id="add-button" data-action="add">Перемещение ₽</a>
+                <a class="dropdown-item context-action"
+                   id="collection-button"
+                   data-action="collection">Инкассация</a>
+                <a class="dropdown-item context-action"
+                   id="add-button"
+                   data-action="add">Перемещение ₽</a>
             {% endif %}
         </div>
     </div>
 {% endblock content %}
 {% block extra_scripts %}
     {{ block.super }}
-	<script src="{% static 'main/js/main.js' %}" type="module"></script>
+    <script src="{% static 'main/js/main.js' %}" type="module"></script>
     <script src="{% static 'main/js/autonumeric.js' %}"></script>
     {{ account_ids|json_script:"account-ids" }}
     {{ supplier_ids|json_script:"supplier-ids" }}

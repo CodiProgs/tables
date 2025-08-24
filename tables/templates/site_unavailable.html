@@ -1,10 +1,14 @@
 <!DOCTYPE html>
 <html lang="ru">
-<head>
-    <meta charset="UTF-8">
-    <title>Сайт временно недоступен</title>
-    <link rel="stylesheet" href="/static/css/style.css">
-    <style>
+    <head>
+        <meta charset="UTF-8">
+        <meta name="description"
+              content="Сайт временно недоступен. Пожалуйста, попробуйте зайти позже. Спасибо за понимание!">
+        <meta name="keywords"
+              content="сайт недоступен, временно недоступен, ошибка, попробуйте позже">
+        <title>Сайт временно недоступен</title>
+        <link rel="stylesheet" href="{% static 'css/style.css' %}">
+        <style>
         .block-page {
             min-height: 100vh;
             display: flex;
@@ -37,19 +41,21 @@
             color: #ff4f4f;
             margin-bottom: 16px;
         }
-    </style>
-</head>
-<body>
-    <div class="block-page">
-        <div class="block-card">
-            <div class="block-icon">🚧</div>
-            <div class="block-title">Сайт сейчас не работает</div>
-            <div class="block-text">
-                Мы временно приостановили работу сайта.<br>
-                Пожалуйста, попробуйте зайти позже.<br>
-                Спасибо за понимание!
+        </style>
+    </head>
+    <body>
+        <div class="block-page">
+            <div class="block-card">
+                <div class="block-icon">🚧</div>
+                <div class="block-title">Сайт сейчас не работает</div>
+                <div class="block-text">
+                    Мы временно приостановили работу сайта.
+                    <br>
+                    Пожалуйста, попробуйте зайти позже.
+                    <br>
+                    Спасибо за понимание!
+                </div>
             </div>
         </div>
-    </div>
-</body>
+    </body>
 </html>

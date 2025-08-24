@@ -81,7 +81,7 @@ class ColumnSizeCalculator {
 		const tableWidth = container.clientWidth - 1
 		const visibleColumnsCount = visibleHeaders.length
 
-		if (tableWidth <= 560 && visibleColumnsCount <= 5) {
+		if (tableWidth <= 560 && visibleColumnsCount <= 4) {
 			this.handleSmallContainer(computedWidths, tableWidth, visibleHeaders)
 		}
 
@@ -1332,10 +1332,10 @@ export const TableManager = {
 		}
 
 		if (data.html) {
-			table.querySelectorAll('.table__row--selected').forEach(row => {
+			document.querySelectorAll('.table__row--selected').forEach(row => {
 				row.classList.remove('table__row--selected')
 			})
-			table.querySelectorAll('.table__cell--selected').forEach(cell => {
+			document.querySelectorAll('.table__cell--selected').forEach(cell => {
 				cell.classList.remove('table__cell--selected')
 			})
 
@@ -1381,9 +1381,9 @@ export const TableManager = {
 			if (updatedRow) {
 				updatedRow.setAttribute('data-id', data.id)
 
-				const table = document.getElementById(tableId)
-
-				const allSelectedRows = table.querySelectorAll('.table__row--selected')
+				const allSelectedRows = document.querySelectorAll(
+					'.table__row--selected'
+				)
 				allSelectedRows.forEach(row => {
 					row.classList.remove('table__row--selected')
 					const selectedCells = row.querySelectorAll('.table__cell--selected')

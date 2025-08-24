@@ -494,7 +494,10 @@ const addMenuHandler = () => {
 				if (paymentButton) paymentButton.style.display = 'block'
 				if (hideButton) hideButton.style.display = 'block'
 				if (settleDebtButton) {
-					if (table.id && table.id.startsWith('branch-repayments-')) {
+					if (
+						(table.id && table.id.startsWith('branch-repayments-')) ||
+						table.id === 'investor-operations-table'
+					) {
 						settleDebtButton.style.display = 'none'
 					} else {
 						settleDebtButton.style.display = 'block'
@@ -1953,29 +1956,23 @@ const handleMoneyTransfers = async config => {
 	initTableHandlers(config)
 }
 
-const handleDebtors = () => {
-	document.querySelectorAll('.debtors-office-list__amount').forEach(el => {
-		let text = el.textContent.trim()
-		text = text.replace(/,00$/, '')
-		let num = text.replace(/\s/g, '').replace('р.', '').replace('р', '')
-		let number = Number(num.replace(',', '.'))
-		if (!isNaN(number)) {
-			let formatted = number.toLocaleString('ru-RU').replace(/,/g, ' ')
-			text = formatted
-		}
-		if (!text.endsWith('р.') && !text.endsWith('р')) {
-			text = text + ' р.'
-		}
-		el.textContent = text
-
-		if (el.classList.contains('text-green')) {
-			el.classList.remove('text-green')
-			el.classList.add('text-red')
-		} else if (el.classList.contains('text-red')) {
-			el.classList.remove('text-red')
-			el.classList.add('text-green')
-		}
-	})
+const handleDebtors = async () => {
+	document
+		.querySelectorAll('.debtors-office-list__amount, .debtors-total')
+		.forEach(el => {
+			let text = el.textContent.trim()
+			text = text.replace(/,00$/, '')
+			let num = text.replace(/\s/g, '').replace('р.', '').replace('р', '')
+			let number = Number(num.replace(',', '.'))
+			if (!isNaN(number)) {
+				let formatted = number.toLocaleString('ru-RU').replace(/,/g, ' ')
+				text = formatted
+			}
+			if (!text.endsWith('р.') && !text.endsWith('р')) {
+				text = text + ' р.'
+			}
+			el.textContent = text
+		})
 
 	document
 		.querySelectorAll('.debtors-office-list__row')
@@ -2047,7 +2044,9 @@ const handleDebtors = () => {
 								'<div class="debtors-details-title">Прибыль</div>' +
 								data.html +
 								'<div class="debtors-details-title">Инвесторы</div>' +
-								(data.html_investors || '')
+								(data.html_investors || '') +
+								'<div class="debtors-details-title">Операции</div>' +
+								(data.html_operations || '')
 
 							const profitTable = details.querySelector(`#${data.table_id}`)
 							if (profitTable) {
@@ -2082,6 +2081,30 @@ const handleDebtors = () => {
 									tbody.appendChild(emptyRow)
 								} else {
 									setIds(data.investor_ids, 'investors-table')
+
+									TableManager.calculateTableSummary('investors-table', [
+										'balance',
+									])
+								}
+							}
+
+							const operationsTable = details.querySelector(
+								'#investor-operations-table'
+							)
+							if (operationsTable) {
+								const tbody = operationsTable.querySelector('.table__body')
+								if (tbody && !tbody.children.length) {
+									const emptyRow = document.createElement('tr')
+									emptyRow.className = 'table__row table__row--empty'
+									const td = document.createElement('td')
+									td.colSpan =
+										operationsTable.querySelectorAll('thead th').length || 1
+									td.className = 'table__cell table__cell--empty'
+									td.textContent = 'Нет данных'
+									emptyRow.appendChild(td)
+									tbody.appendChild(emptyRow)
+								} else {
+									setIds(data.operation_ids, 'investor-operations-table')
 								}
 							}
 						} else {
@@ -2109,18 +2132,20 @@ const handleDebtors = () => {
 
 						const table = details.querySelector('table')
 
-						const summaryCells = table.querySelectorAll(
-							'td.table__cell--summary'
-						)
-						summaryCells.forEach(cell => {
-							if (cell.classList.contains('text-green')) {
-								cell.classList.remove('text-green')
-								cell.classList.add('text-red')
-							} else if (cell.classList.contains('text-red')) {
-								cell.classList.remove('text-red')
-								cell.classList.add('text-green')
-							}
-						})
+						if (table && table.id.startsWith('branch-transactions-')) {
+							const summaryCells = table.querySelectorAll(
+								'td.table__cell--summary'
+							)
+							summaryCells.forEach(cell => {
+								if (cell.classList.contains('text-green')) {
+									cell.classList.remove('text-green')
+									cell.classList.add('text-red')
+								} else if (cell.classList.contains('text-red')) {
+									cell.classList.remove('text-red')
+									cell.classList.add('text-green')
+								}
+							})
+						}
 
 						colorizeZeroDebts(table.id)
 						hideCompletedDebtors(table.id, type === 'branch' ? 'branch' : value)
@@ -2134,6 +2159,172 @@ const handleDebtors = () => {
 				}
 			})
 		})
+
+	const balanceContainer = document.getElementById('balance-container')
+	try {
+		if (!balanceContainer) {
+			throw new Error('Контейнер для баланса не найден.')
+		}
+
+		const response = await fetch('/assets-liabilities/')
+		if (!response.ok) {
+			throw new Error('Ошибка при загрузке данных.')
+		}
+
+		const data = await response.json()
+
+		const nonCurrentAssetsHtml = `
+			<div class="debtors-office-list__header">Внеоборотные активы</div>
+			<ul class="debtors-office-list">
+				<li class="debtors-office-list__item">
+					<div class="debtors-office-list__row">
+						<button class="debtors-office-list__toggle" type="button" aria-label="Подробнее">+</button>
+						<span class="debtors-office-list__title">Основные средства</span>
+						<span class="debtors-office-list__amount">${data.assets.categories[0].items[0].sum.toLocaleString(
+							'ru-RU'
+						)} р.</span>
+					</div>
+					<div class="debtors-office-list__details">
+						<p>Детали пока отсутствуют</p>
+					</div>
+				</li>
+			</ul>
+		`
+
+		const currentAssetsHtml = `
+			<div class="debtors-office-list__header">Оборотные активы</div>
+			<ul class="debtors-office-list">
+				<li class="debtors-office-list__item">
+					<div class="debtors-office-list__row">
+						<button class="debtors-office-list__toggle" type="button" aria-label="Подробнее">+</button>
+						<span class="debtors-office-list__title">Товарные остатки</span>
+						<span class="debtors-office-list__amount">${data.assets.categories[1].items[0].sum.toLocaleString(
+							'ru-RU'
+						)} р.</span>
+					</div>
+					<div class="debtors-office-list__details">
+						<p>Детали пока отсутствуют</p>
+					</div>
+				</li>
+			</ul>
+		`
+
+		const receivablesHtml = `
+			<ul class="debtors-office-list">
+				<li class="debtors-office-list__item">
+					<div class="debtors-office-list__row">
+						<button class="debtors-office-list__toggle" type="button" aria-label="Подробнее">+</button>
+						<span class="debtors-office-list__title">Дебиторская задолженность</span>
+						<span class="debtors-office-list__amount">${data.assets.categories[1].items[1].sum.toLocaleString(
+							'ru-RU'
+						)} р.</span>
+					</div>
+					<div class="debtors-office-list__details">
+						${
+							data.assets.categories[1].items[1].details
+								? data.assets.categories[1].items[1].details
+										.map(
+											detail => `
+							<p>${detail.branch}: ${detail.debt.toLocaleString('ru-RU')} р.</p>
+						`
+										)
+										.join('')
+								: '<p>Детали пока отсутствуют</p>'
+						}
+					</div>
+				</li>
+			</ul>
+		`
+
+		const cashHtml = `
+			<ul class="debtors-office-list">
+				<li class="debtors-office-list__item">
+					<div class="debtors-office-list__row">
+						<button class="debtors-office-list__toggle" type="button" aria-label="Подробнее">+</button>
+						<span class="debtors-office-list__title">Денежные средства</span>
+						<span class="debtors-office-list__amount">${data.assets.categories[1].items[2].sum.toLocaleString(
+							'ru-RU'
+						)} р.</span>
+					</div>
+					<div class="debtors-office-list__details">
+						<p>Детали пока отсутствуют</p>
+					</div>
+				</li>
+			</ul>
+		`
+
+		const assetsSummaryHtml = `
+			<div class="debtors-header">
+			<div class="debtors-office-list__header">Активы</div>
+			<p class="debtors-office-list__amount">${data.assets.sum.toLocaleString(
+				'ru-RU'
+			)} р.</p>
+			</div>
+		`
+
+		const obligationsHtml = `
+			<ul class="debtors-office-list">
+				<li class="debtors-office-list__item">
+					<div class="debtors-office-list__row">
+						<button class="debtors-office-list__toggle" type="button" aria-label="Подробнее">+</button>
+						<span class="debtors-office-list__title">Обязательства</span>
+						<span class="debtors-office-list__amount">${data.liabilities.categories[0].sum.toLocaleString(
+							'ru-RU'
+						)} р.</span>
+					</div>
+					<div class="debtors-office-list__details">
+						<p>Детали пока отсутствуют</p>
+					</div>
+				</li>
+			</ul>
+		`
+
+		const liabilitiesHtml = `
+			<div class="debtors-header">
+			<div class="debtors-office-list__header">Пассивы</div>
+			<p class="debtors-office-list__amount">${data.liabilities.sum.toLocaleString(
+				'ru-RU'
+			)} р.</p>
+			</div>
+		`
+
+		const capitalHtml = `
+			<div class="debtors-header">
+			<div class="debtors-office-list__header">Капитал</div>
+			<p class="debtors-office-list__amount">${data.capital.sum.toLocaleString(
+				'ru-RU'
+			)} р.</p>
+			</div>
+		`
+
+		balanceContainer.innerHTML =
+			nonCurrentAssetsHtml +
+			currentAssetsHtml +
+			receivablesHtml +
+			cashHtml +
+			assetsSummaryHtml +
+			obligationsHtml +
+			liabilitiesHtml +
+			capitalHtml
+
+		document
+			.querySelectorAll('.debtors-office-list__toggle')
+			.forEach(button => {
+				button.addEventListener('click', () => {
+					const details = button
+						.closest('.debtors-office-list__item')
+						.querySelector('.debtors-office-list__details')
+					if (details) {
+						details.classList.toggle('open')
+						button.classList.toggle('open')
+					}
+				})
+			})
+		// TODO: сделать чтобы он открывался на нажатие всего заголовка а не только кнопки
+	} catch (error) {
+		console.error('Ошибка при загрузке данных:', error)
+		balanceContainer.innerHTML = '<p>Ошибка при загрузке данных.</p>'
+	}
 
 	const officeList = document.querySelector('.debtors-office-list')
 	if (officeList) {
@@ -2168,9 +2359,22 @@ const handleDebtors = () => {
 						`debtors-table`,
 						`settle-debt-form`,
 						getUrl,
-						[],
+						type === 'investors'
+							? [
+									{
+										id: 'operation_type',
+										url: [
+											{ id: 'deposit', name: 'Внесение' },
+											{ id: 'withdrawal', name: 'Забор' },
+										],
+									},
+							  ]
+							: [],
 						{
-							url: '/components/main/settle-debt/',
+							url:
+								type === 'investors'
+									? '/components/main/debt_operation_investor/'
+									: '/components/main/settle-debt/',
 							title:
 								type === 'investors' ? 'Изменение суммы' : 'Погашение долга',
 							...(mainConfig.modalConfig.context
@@ -2195,12 +2399,64 @@ const handleDebtors = () => {
 											{ html: result.html_debt_repayments },
 											`branch-repayments-${result.branch}`
 										)
+
+										const table = document.getElementById(
+											`branch-repayments-${result.branch}`
+										)
+										if (table) {
+											table
+												.querySelectorAll('tr.table__row--empty')
+												.forEach(row => row.remove())
+										}
+
+										break
 									case 'Инвесторы':
 										tableId = 'investors-table'
+
+										TableManager.addTableRow(
+											{ html: result.html_investor_debt_operation },
+											`investor-operations-table`
+										)
 
 										break
 									default:
 										tableId = `branch-transactions-${result.branch}`
+								}
+
+								const debtsHeader = document.getElementById(
+									result.total_summary_debts !== undefined ||
+										result.total_summary_debts !== null
+										? 'summary-header'
+										: 'branch-debts-header'
+								)
+								if (debtsHeader) {
+									const totalSpan =
+										debtsHeader.querySelector('span.debtors-total')
+									if (totalSpan) {
+										let number = Number(
+											result.total_summary_debts ||
+												result.total_branch_debts ||
+												0
+										)
+										if (!isNaN(number)) {
+											let formatted = number
+												.toLocaleString('ru-RU')
+												.replace(/,/g, ' ')
+											let text = formatted
+											if (!text.endsWith('р.') && !text.endsWith('р')) {
+												text = text + ' р.'
+											}
+											totalSpan.textContent = text
+
+											if (number === 0) {
+												totalSpan.classList.remove('text-red')
+												totalSpan.classList.add('text-green')
+											} else {
+												totalSpan.classList.remove('text-green')
+												totalSpan.classList.add('text-red')
+											}
+										}
+									}
 								}
 
 								TableManager.updateTableRow(result, tableId)
@@ -2210,6 +2466,13 @@ const handleDebtors = () => {
 										`branch-transactions-${result.branch}`,
 										['supplier_debt']
 									)
+								} else if (
+									result.type === 'Инвесторы' ||
+									result.type === 'investors'
+								) {
+									TableManager.calculateTableSummary('investors-table', [
+										'balance',
+									])
 								}
 
 								refreshData(tableId)
@@ -2221,18 +2484,20 @@ const handleDebtors = () => {
 
 								const table = document.getElementById(tableId)
 								if (table) {
-									const summaryCells = table.querySelectorAll(
-										'td.table__cell--summary'
-									)
-									summaryCells.forEach(cell => {
-										if (cell.classList.contains('text-green')) {
-											cell.classList.remove('text-green')
-											cell.classList.add('text-red')
-										} else if (cell.classList.contains('text-red')) {
-											cell.classList.remove('text-red')
-											cell.classList.add('text-green')
-										}
-									})
+									if (table && table.id.startsWith('branch-transactions-')) {
+										const summaryCells = table.querySelectorAll(
+											'td.table__cell--summary'
+										)
+										summaryCells.forEach(cell => {
+											if (cell.classList.contains('text-green')) {
+												cell.classList.remove('text-green')
+												cell.classList.add('text-red')
+											} else if (cell.classList.contains('text-red')) {
+												cell.classList.remove('text-red')
+												cell.classList.add('text-green')
+											}
+										})
+									}
 									colorizeZeroDebts(tableId)
 								}
 
@@ -2281,6 +2546,60 @@ const handleDebtors = () => {
 														formatted = formatted + ' р.'
 													}
 													amountSpan.textContent = formatted
+
+													if (debt === 0) {
+														amountSpan.classList.remove('text-red')
+														amountSpan.classList.add('text-green')
+
+														const selectedRow = document.querySelector(
+															'tr.table__row--selected'
+														)
+														if (selectedRow) {
+															selectedRow.classList.remove(
+																'table__row--selected'
+															)
+															selectedRow.classList.add('hidden-row')
+														}
+													} else {
+														amountSpan.classList.remove('text-green')
+														amountSpan.classList.add('text-red')
+													}
+												}
+											}
+										}
+									}
+								}
+
+								if (result.total_profit !== undefined) {
+									const investorSpan = Array.from(
+										document.querySelectorAll('.debtors-office-list__title')
+									).find(span => span.textContent.trim() === 'Инвесторам')
+
+									if (investorSpan) {
+										const amountSpan = investorSpan.parentElement.querySelector(
+											'.debtors-office-list__amount'
+										)
+										if (amountSpan) {
+											let profit = Number(result.total_profit)
+											if (!isNaN(profit)) {
+												let formatted = profit
+													.toLocaleString('ru-RU')
+													.replace(/,/g, ' ')
+												formatted = formatted.replace(/,00$/, '')
+												if (
+													!formatted.endsWith('р.') &&
+													!formatted.endsWith('р')
+												) {
+													formatted = formatted + ' р.'
+												}
+												amountSpan.textContent = formatted
+
+												if (profit === 0) {
+													amountSpan.classList.remove('text-red')
+													amountSpan.classList.add('text-green')
+												} else {
+													amountSpan.classList.remove('text-green')
+													amountSpan.classList.add('text-red')
 												}
 											}
 										}

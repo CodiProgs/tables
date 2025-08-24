@@ -483,3 +483,58 @@ class Investor(models.Model):
         verbose_name = "Инвестор"
         verbose_name_plural = "Инвесторы"
         ordering = ['name']
+
+class InvestorDebtOperation(models.Model):
+    OPERATION_TYPES = [
+        ("deposit", "Внесение"),
+        ("withdrawal", "Забор"),
+    ]
+
+    investor = models.ForeignKey(
+        Investor,
+        on_delete=models.CASCADE,
+        verbose_name="Инвестор",
+        related_name="debt_operations"
+    )
+    operation_type = models.CharField(
+        max_length=10,
+        choices=OPERATION_TYPES,
+        verbose_name="Тип операции"
+    )
+    amount = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        verbose_name="Сумма операции"
+    )
+    created_at = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name="Дата и время создания"
+    )
+
+    def __str__(self):
+        return f"{self.investor.name}: {self.get_operation_type_display()} {self.amount} р. ({self.created_at:%d.%m.%Y %H:%M})"
+
+    class Meta:
+        verbose_name = "Операция с долгом инвестора"
+        verbose_name_plural = "Операции с долгами инвесторов"
+        ordering = ['created_at']
+
+class Equipment(models.Model):
+    name = models.CharField(
+        max_length=255,
+        verbose_name="Название"
+    )
+    amount = models.DecimalField(
+        max_digits=15,
+        decimal_places=2,
+        default=0,
+        verbose_name="Сумма"
+    )
+
+    def __str__(self):
+        return self.name
+
+    class Meta:
+        verbose_name = "Оборудование"
+        verbose_name_plural = "Оборудование"
+        ordering = ['name']

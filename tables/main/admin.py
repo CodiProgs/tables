@@ -12,7 +12,9 @@ from .models import (
 	MoneyTransfer,
 	Branch,
 	SupplierDebtRepayment,
-	Investor
+	Investor,
+	InvestorDebtOperation,
+	Equipment
 )
 
 
@@ -28,3 +30,5 @@ admin.site.register(MoneyTransfer)
 admin.site.register(Branch)
 admin.site.register(SupplierDebtRepayment)
 admin.site.register(Investor)
+admin.site.register(InvestorDebtOperation)
+admin.site.register(Equipment)

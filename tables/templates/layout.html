@@ -10,13 +10,17 @@
                 Бизнес таблицы
             {% endblock title %}
         </title>
-        <meta name="description" content="Бизнес таблицы - это веб-приложение для управления данными о поставщиках, счетах и движении денежных средств.">
-        <meta name="keywords" content="Бизнес, Таблицы, Django, Python, Web Development"/>
+        <meta name="description"
+              content="Бизнес таблицы - это веб-приложение для управления данными о поставщиках, счетах и движении денежных средств.">
+        <meta name="keywords"
+              content="Бизнес, Таблицы, Django, Python, Web Development" />
         <link rel="stylesheet" href="{% static 'css/style.css' %}" />
         <link rel="stylesheet" href="{% static 'css/modal.css' %}">
         <link rel="stylesheet" href="{% static 'css/table.css' %}">
         <link rel="stylesheet" href="{% static 'css/loader.css' %}">
-        <link rel="stylesheet" href="{% static 'awesome/css/all.min.css' %}">
+        <link rel="icon"
+              href="{% static 'images/favicon.ico' %}"
+              type="image/x-icon">
         {% block extra_styles %}
             {% render_styles %}
         {% endblock extra_styles %}
@@ -27,37 +31,37 @@
     <body>
         <div class="container">
             {% if not request.user.user_type.name == "Поставщик" %}
-            <nav class="sidebar-nav">
-                <ul class="nav-list">
-                    <li class="nav-item {% if request.path == '/' %}active{% endif %}">
-                        <a href="{% url 'main:index' %}">Главная</a>
-                    </li>
-                    <li class="nav-item {% if request.resolver_match.url_name == 'debtors' %}active{% endif %}">
-                        <a href="{% url 'main:debtors' %}">Долги</a>
-                    </li>
-                    <li class="nav-item {% if request.resolver_match.url_name == 'cash_flow' %}active{% endif %}">
-                        <a href="{% url 'main:cash_flow' %}">ДДС</a>
-                    </li>
-                    <li class="nav-item {% if 'accounts' in request.path %}active{% endif %}">
-                        <a href="{% url 'main:supplier_accounts' %}">Остатки на счетах</a> 
-                    </li>
-                    <li class="nav-item {% if request.resolver_match.url_name == 'suppliers' %}active{% endif %}">
-                        <a href="{% url 'main:suppliers' %}">Поставщики</a>
-                    </li>
-                    <li class="nav-item {% if 'clients' in request.path %}active{% endif %}">
-                        <a href="{% url 'main:clients' %}">Клиенты</a>
-                    </li>
-                    <li class="nav-item {% if request.resolver_match.url_name == 'cash_flow_report' %}active{% endif %}">
-                        <a href="{% url 'main:cash_flow_report' %}">Отчет ДДС</a>
-                    </li>
-                    {% comment %} <li class="nav-item {% if request.resolver_match.url_name == 'money_transfers' %}active{% endif %}">
-                        <a href="{% url 'main:money_transfers' %}">Перемещение ₽</a>
-                    </li> {% endcomment %}
-                    <li class="nav-item {% if request.resolver_match.url_name == 'profit_distribution' %}active{% endif %}">
-                        <a href="{% url 'main:profit_distribution' %}">Распред. прибыли</a>
-                    </li>
-                </ul>
-            </nav>
+                <nav class="sidebar-nav">
+                    <ul class="nav-list">
+                        <li class="nav-item {% if request.path == '/' %}active{% endif %}">
+                            <a href="{% url 'main:index' %}">Главная</a>
+                        </li>
+                        <li class="nav-item {% if request.resolver_match.url_name == 'debtors' %}active{% endif %}">
+                            <a href="{% url 'main:debtors' %}">Долги</a>
+                        </li>
+                        <li class="nav-item {% if request.resolver_match.url_name == 'cash_flow' %}active{% endif %}">
+                            <a href="{% url 'main:cash_flow' %}">ДДС</a>
+                        </li>
+                        <li class="nav-item {% if 'accounts' in request.path %}active{% endif %}">
+                            <a href="{% url 'main:supplier_accounts' %}">Остатки на счетах</a>
+                        </li>
+                        <li class="nav-item {% if request.resolver_match.url_name == 'suppliers' %}active{% endif %}">
+                            <a href="{% url 'main:suppliers' %}">Поставщики</a>
+                        </li>
+                        <li class="nav-item {% if 'clients' in request.path %}active{% endif %}">
+                            <a href="{% url 'main:clients' %}">Клиенты</a>
+                        </li>
+                        <li class="nav-item {% if request.resolver_match.url_name == 'cash_flow_report' %}active{% endif %}">
+                            <a href="{% url 'main:cash_flow_report' %}">Отчет ДДС</a>
+                        </li>
+                        {% comment %} <li class="nav-item {% if request.resolver_match.url_name == 'money_transfers' %}active{% endif %}">
+                            <a href="{% url 'main:money_transfers' %}">Перемещение ₽</a>
+                        </li> {% endcomment %}
+                        {% comment %} <li class="nav-item {% if request.resolver_match.url_name == 'profit_distribution' %}active{% endif %}">
+                            <a href="{% url 'main:profit_distribution' %}">Распред. прибыли</a>
+                        </li> {% endcomment %}
+                    </ul>
+                </nav>
             {% endif %}
             <main class="content">
                 {% block content %}

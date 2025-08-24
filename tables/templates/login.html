@@ -22,7 +22,6 @@
                                placeholder="Имя пользователя"
                                value="{{ form.username.value|default:'' }}">
                         <!--<i class="far fa-times clear-button"></i>-->
-                        <img src="{% static 'images/close.svg' %}" alt="Close" class="clear-button">
                     </div>
                     {% if form.username.errors %}<div class="login__error">{{ form.username.errors }}</div>{% endif %}
                 </div>
@@ -35,7 +34,6 @@
                                class="login__input"
                                placeholder="Пароль">
                         <!--<i class="far fa-times clear-button"></i>-->
-                        <img src="{% static 'images/close.svg' %}" alt="Close" class="clear-button">
                     </div>
                     {% if form.password.errors %}<div class="login__error">{{ form.password.errors }}</div>{% endif %}
                 </div>
@@ -45,9 +43,7 @@
                         <button type="submit" class="button login__submit">Войти</button>
                         <div class="login__fingerprint">
                             <button type="button" class="button login__register">Зарегистрировать отпечаток</button>
-                            <button type="button" class="button login__btn">
-                                Вход по отпечатку
-                            </button>
+                            <button type="button" class="button login__btn">Вход по отпечатку</button>
                         </div>
                     </div>
                 </div>

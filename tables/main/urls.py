@@ -54,4 +54,5 @@ urlpatterns = [
 	path("suppliers/delete/<int:pk>/", views.supplier_delete, name="supplier_delete"),
 	path("suppliers/settle-debt/<int:pk>/", views.settle_supplier_debt, name="settle_supplier_debt"),
 	path("branches/list/", views.branch_list, name="branch_list"),
+	path('assets-liabilities/', views.get_assets_and_liabilities, name='assets_liabilities'),
 ]

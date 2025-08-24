@@ -4,15 +4,21 @@
     <div class="page-table-container" id="suppliers-container">
         {% include "components/table.html" with id="suppliers-table" fields=fields data=data %}
         <div id="context-menu" class="dropdown-menu">
-            <a class="dropdown-item context-action" id="add-button" data-action="add">Добавить</a>
-            <a class="dropdown-item context-action" id="edit-button" data-action="edit">Редактировать</a>
-            <a class="dropdown-item context-action" id="delete-button" data-action="delete">Удалить</a>
+            <a class="dropdown-item context-action"
+               id="add-button"
+               data-action="add">Добавить</a>
+            <a class="dropdown-item context-action"
+               id="edit-button"
+               data-action="edit">Редактировать</a>
+            <a class="dropdown-item context-action"
+               id="delete-button"
+               data-action="delete">Удалить</a>
         </div>
     </div>
 {% endblock content %}
 {% block extra_scripts %}
     {{ block.super }}
-	<script src="{% static 'main/js/main.js' %}" type="module"></script>
+    <script src="{% static 'main/js/main.js' %}" type="module"></script>
     <script src="{% static 'main/js/autonumeric.js' %}"></script>
     {{ data_ids|json_script:"data-ids" }}
 {% endblock extra_scripts %}

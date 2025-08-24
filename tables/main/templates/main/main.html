@@ -3,29 +3,53 @@
 {% block content %}
     <div class="page-table-container" id="transactions-container">
         {% include "components/table.html" with id="transactions-table" fields=fields data=data %}
-        <div id="context-menu" class="dropdown-menu" data-is-admin="{{ is_admin|yesno:'true,false' }}">
-            <a class="dropdown-item context-action" id="add-button" data-action="add">Добавить</a>
+        <div id="context-menu"
+             class="dropdown-menu"
+             data-is-admin="{{ is_admin|yesno:'true,false' }}">
+            <a class="dropdown-item context-action"
+               id="add-button"
+               data-action="add">Добавить</a>
             {% if is_admin %}
-            <a class="dropdown-item context-action" id="edit-button" data-action="edit">Редактировать</a>
-            <a class="dropdown-item context-action" id="delete-button" data-action="delete">Удалить</a>
+                <a class="dropdown-item context-action"
+                   id="edit-button"
+                   data-action="edit">Редактировать</a>
+                <a class="dropdown-item context-action"
+                   id="delete-button"
+                   data-action="delete">Удалить</a>
             {% endif %}
-            <a class="dropdown-item context-action" id="payment-button" data-action="payment">Оплата</a>
-            <a class="dropdown-item context-action" id="hide-button" data-action="hide">Скрыть</a>
-            <a class="dropdown-item context-action" id="hide-all-button" data-action="hide-all">Скрыть все</a>
-            <a class="dropdown-item context-action" id="show-all-button" data-action="show-all">Показать все</a>
+            <a class="dropdown-item context-action"
+               id="payment-button"
+               data-action="payment">Оплата</a>
+            <a class="dropdown-item context-action"
+               id="hide-button"
+               data-action="hide">Скрыть</a>
+            <a class="dropdown-item context-action"
+               id="hide-all-button"
+               data-action="hide-all">Скрыть все</a>
+            <a class="dropdown-item context-action"
+               id="show-all-button"
+               data-action="show-all">Показать все</a>
         </div>
         <div class="pagination-controls">
             <button class="pagination-button"
                     id="first-page"
                     title="Первая страница"
                     disabled>
-                <img src="{% static 'images/angle-double-left.svg' %}" alt="angle-double-left" class="icon">
+                <img src="{% static 'images/angle-double-left.svg' %}"
+                     alt="angle-double-left"
+                     class="icon"
+                     height="12"
+                     width="12">
             </button>
             <button class="pagination-button"
                     id="prev-page"
                     title="Предыдущая страница"
                     disabled>
-                <img src="{% static 'images/angle-left.svg' %}" alt="angle-double-left" class="icon">
+                <img src="{% static 'images/angle-left.svg' %}"
+                     alt="angle-double-left"
+                     class="icon"
+                     height="12"
+                     width="12">
             </button>
             <div class="pagination-line"></div>
             <div class="pagination-input-container">
@@ -43,13 +67,21 @@
                     id="next-page"
                     title="Следующая страница"
                     disabled>
-                <img src="{% static 'images/angle-right.svg' %}" alt="angle-double-left" class="icon">
+                <img src="{% static 'images/angle-right.svg' %}"
+                     alt="angle-double-left"
+                     class="icon"
+                     height="12"
+                     width="12">
             </button>
             <button class="pagination-button"
                     id="last-page"
                     title="Последняя страница"
                     disabled>
-                <img src="{% static 'images/angle-double-right.svg' %}" alt="angle-double-left" class="icon">
+                <img src="{% static 'images/angle-double-right.svg' %}"
+                     alt="angle-double-left"
+                     class="icon"
+                     height="12"
+                     width="12">
             </button>
         </div>
     </div>
