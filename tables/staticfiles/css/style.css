@@ -464,6 +464,7 @@ textarea::placeholder {
 	flex-shrink: 0;
 	background-color: #f5f7fa;
 	border-right: 1px solid #e1e6eb;
+	border-top: 1px solid #e1e6eb;
 }
 
 .nav-list {
@@ -652,6 +653,18 @@ textarea::placeholder {
 .debtors-office-list__row:hover {
 	background: var(--color-table-background, #f5f7fa);
 }
+.debtors-office-list__row-item {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding: 0 8px;
+	height: 28px;
+	cursor: pointer;
+	transition: background 0.15s;
+}
+.debtors-office-list__row-item:hover {
+	background: #fff;
+}
 .debtors-office-list__toggle {
 	background: none;
 	border: none;
@@ -672,6 +685,19 @@ textarea::placeholder {
 .debtors-office-list__toggle.open {
 	color: var(--color-primary, #2b579a);
 	transform: rotate(45deg);
+}
+.debtors-office-list__header {
+	font-weight: 600;
+	color: #2c3e50;
+	text-transform: uppercase;
+	letter-spacing: 0.05em;
+	padding: 10px;
+}
+.debtors-office__header {
+	font-size: 16px;
+}
+.debtors-office__header--top {
+	border-top: 1px solid var(--color-border-window, #e1e6eb);
 }
 .debtors-office-list__title {
 	flex: 1;
@@ -733,8 +759,9 @@ textarea::placeholder {
 }
 
 .debtors-data {
-	flex: 1 1 auto;
+	flex: 0 0 auto;
 	overflow-y: auto;
+	width: 50%;
 }
 
 #statsChart {
@@ -761,22 +788,74 @@ textarea::placeholder {
 	height: 12px;
 }
 
-.debtors-office-list__header {
-	font-weight: 600;
-	color: #2c3e50;
-	text-transform: uppercase;
-	letter-spacing: 0.05em;
-	padding: 10px;
-}
-
 .debtors-header {
 	display: flex;
 	justify-content: space-between;
 	align-items: center;
 	max-width: 610px;
+	padding-right: 10px;
 }
 
 .debtors-total {
-	font-size: 1.2rem;
 	font-weight: 700;
+}
+
+/* #balance-container .debtors-header {
+	border-bottom: 1px solid var(--color-border-window, #e1e6eb);
+} */
+
+#balance-container .debtors-office-list__details {
+	padding: 0;
+	border: 1px solid var(--color-table-border);
+}
+
+#balance-container .debtors-office-list__row-item {
+	border-bottom: 1px solid var(--color-table-border);
+}
+
+#debtors-container.page-table-container {
+	flex-direction: row;
+}
+
+#debtors-container .stats-container {
+	width: 50%;
+	max-height: 100%;
+	border: none;
+}
+
+#debtors-container .debtors-data,
+#debtors-container .stats-container {
+	padding: 10px 15px;
+}
+
+#debtors-container .debtors-header,
+#debtors-container .debtors-office-list {
+	max-width: 100%;
+}
+
+#debtors-container .debtors-data {
+	border-right: 1px solid var(--color-border-window);
+}
+
+@media (max-width: 768px) {
+	#debtors-container.page-table-container {
+		flex-direction: column;
+	}
+
+	#debtors-container .debtors-data,
+	#debtors-container .stats-container {
+		width: 100%;
+		max-width: 100%;
+		padding: 10px;
+		max-height: 50%;
+	}
+
+	#debtors-container .debtors-data {
+		flex: 1 1 auto;
+		border-right: none;
+	}
+
+	#debtors-container .stats-container {
+		border-top: 1px solid var(--color-border-window);
+	}
 }

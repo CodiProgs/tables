@@ -99,8 +99,13 @@ export class FormBuilder {
 		input.className = 'create-form__input'
 		input.name = th.dataset.name || `field_${index}`
 
-		const clearButton = document.createElement('i')
-		clearButton.className = 'far fa-times clear-button'
+		// 		const clearButton = document.createElement('i')
+		// 		clearButton.className = 'far fa-times clear-button'
+
+		const clearButton = document.createElement('img')
+		clearButton.src = '/static/images/close.svg'
+		clearButton.alt = 'Close'
+		clearButton.className = 'clear-button'
 
 		container.appendChild(input)
 		container.appendChild(clearButton)

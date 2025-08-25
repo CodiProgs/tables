@@ -156,6 +156,8 @@ class Transaction(models.Model):
     modified_by_accountant = models.BooleanField(default=False, verbose_name="Изменено бухгалтером")
     viewed_by_admin = models.BooleanField(default=False, verbose_name="Просмотрено администратором")
 
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Дата создания")
+
     class Meta:
         default_permissions = ()
         verbose_name = "Транзакция"
@@ -420,6 +422,10 @@ class MoneyTransfer(models.Model):
         verbose_name="Дата перевода"
     )
     
+    created_at = models.DateTimeField(
+        auto_now_add=True,
+    )
+
     def __str__(self):
         source = f"{self.source_supplier.name} - " if self.source_supplier else ""
         source += self.source_account.name
@@ -475,6 +481,7 @@ class Investor(models.Model):
         default=0,
         verbose_name="Сумма"
     )
+    created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
         return self.name
@@ -519,7 +526,7 @@ class InvestorDebtOperation(models.Model):
         verbose_name_plural = "Операции с долгами инвесторов"
         ordering = ['created_at']
 
-class Equipment(models.Model):
+class BalanceData(models.Model):
     name = models.CharField(
         max_length=255,
         verbose_name="Название"
@@ -530,11 +537,25 @@ class Equipment(models.Model):
         default=0,
         verbose_name="Сумма"
     )
+    category = models.CharField(
+        max_length=100,
+        verbose_name="Категория"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
         return self.name
 
     class Meta:
-        verbose_name = "Оборудование"
-        verbose_name_plural = "Оборудование"
+        verbose_name = "Данные для баланса"
+        verbose_name_plural = "Данные для баланса"
         ordering = ['name']
+
+class MonthlyCapital(models.Model):
+    year = models.IntegerField()
+    month = models.IntegerField()
+    capital = models.DecimalField(max_digits=20, decimal_places=2)
+    calculated_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('year', 'month')

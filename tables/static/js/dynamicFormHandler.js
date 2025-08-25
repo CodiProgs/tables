@@ -25,7 +25,6 @@ export class DynamicFormHandler {
 
 		try {
 			this.currentEditId = editId ?? null
-
 			await this.initializeForm()
 
 			const modalContent = await this.fetchModalContent()

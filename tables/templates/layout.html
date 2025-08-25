@@ -45,9 +45,11 @@
                         <li class="nav-item {% if 'accounts' in request.path %}active{% endif %}">
                             <a href="{% url 'main:supplier_accounts' %}">Остатки на счетах</a>
                         </li>
+                        {% if request.user.is_authenticated and request.user.user_type.name == "Администратор" %}
                         <li class="nav-item {% if request.resolver_match.url_name == 'suppliers' %}active{% endif %}">
                             <a href="{% url 'main:suppliers' %}">Поставщики</a>
                         </li>
+                        {% endif %}
                         <li class="nav-item {% if 'clients' in request.path %}active{% endif %}">
                             <a href="{% url 'main:clients' %}">Клиенты</a>
                         </li>

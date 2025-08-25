@@ -3,6 +3,18 @@ from . import views
 
 app_name = "main"
 
+class SignedIntConverter:
+    regex = '-?\d+'
+
+    def to_python(self, value):
+        return int(value)
+
+    def to_url(self, value):
+        return str(value)
+
+from django.urls import register_converter
+register_converter(SignedIntConverter, 'signed_int')
+
 urlpatterns = [
 	path("", views.index, name="index"),
 	path("accounts/", views.accounts, name="accounts"),
@@ -42,7 +54,7 @@ urlpatterns = [
 	path("suppliers/", views.suppliers, name="suppliers"),
 	path("suppliers/debtors/", views.debtors, name="debtors"),
 	path(
-		"suppliers/debtors/<str:type>/<int:pk>/",
+		"suppliers/debtors/<str:type>/<signed_int:pk>/",
 		views.debtor_detail,
 		name="debtor_detail"
 	),
@@ -52,7 +64,8 @@ urlpatterns = [
 	path("suppliers/add/", views.supplier_create, name="supplier_create"),
 	path("suppliers/edit/<int:pk>/", views.supplier_edit, name="supplier_edit"),
 	path("suppliers/delete/<int:pk>/", views.supplier_delete, name="supplier_delete"),
-	path("suppliers/settle-debt/<int:pk>/", views.settle_supplier_debt, name="settle_supplier_debt"),
+	path("suppliers/settle-debt/<signed_int:pk>/", views.settle_supplier_debt, name="settle_supplier_debt"),
 	path("branches/list/", views.branch_list, name="branch_list"),
-	path('assets-liabilities/', views.get_assets_and_liabilities, name='assets_liabilities'),
+	path("company_balance_stats/", views.company_balance_stats, name="company_balance_stats"),
+    path("company_balance_stats/by_month/", views.company_balance_stats_by_month, name="company_balance_stats_by_month"),
 ]

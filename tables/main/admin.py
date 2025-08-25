@@ -14,7 +14,8 @@ from .models import (
 	SupplierDebtRepayment,
 	Investor,
 	InvestorDebtOperation,
-	Equipment
+	BalanceData,
+	MonthlyCapital
 )
 
 
@@ -31,4 +32,5 @@ admin.site.register(Branch)
 admin.site.register(SupplierDebtRepayment)
 admin.site.register(Investor)
 admin.site.register(InvestorDebtOperation)
-admin.site.register(Equipment)
+admin.site.register(BalanceData)
+admin.site.register(MonthlyCapital)

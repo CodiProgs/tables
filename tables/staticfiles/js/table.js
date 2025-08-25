@@ -2066,3 +2066,15 @@ export const TableManager = {
 		return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ')
 	},
 }
+
+document.addEventListener('DOMContentLoaded', function () {
+	const navList = document.querySelector('.nav-list')
+	if (navList) {
+		const itemsCount = navList.children.length
+		if (itemsCount === 6) {
+			navList.style.gridTemplateColumns = 'repeat(3, minmax(150px, 1fr))'
+		} else {
+			navList.style.gridTemplateColumns = 'repeat(4, minmax(150px, 1fr))'
+		}
+	}
+})

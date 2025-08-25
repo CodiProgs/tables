@@ -3,11 +3,9 @@
 {% block content %}
     <div class="page-table-container" id="debtors-container">
         <div id="context-menu" class="dropdown-menu">
-            {% if is_admin %}
-                <a class="dropdown-item context-action"
-                   id="settle-debt-button"
-                   data-action="settle-debt">Погасить долг</a>
-            {% endif %}
+            <a class="dropdown-item context-action"
+                id="settle-debt-button"
+                data-action="settle-debt">Погасить долг</a>
             <a class="dropdown-item context-action"
                id="hide-button"
                data-action="hide">Скрыть</a>
@@ -44,8 +42,10 @@
                 {% endfor %}
             </ul>
             <div class="debtors-header" id="summary-header">
+                {% if total_summary_debts%}
                 <h2 class="debtors-office-list__header">Кредиторка</h2>
                 <span class="debtors-total {% if total_summary_debts != 0 %}text-red{% else %}text-green{% endif %}">{{ total_summary_debts|floatformat:2 }}</span>
+                {% endif %}
             </div>
             <ul class="debtors-office-list">
                 {% for row in summary %}
@@ -67,8 +67,12 @@
             </ul>
         </div>
         <div class="stats-container">
-            <h2 class="debtors-office-list__header">Баланс</h2>
+            {% if is_admin %}
+            <h2 class="debtors-office-list__header debtors-office__header">Баланс</h2>
             <div id="balance-container"></div>
+            <h2 class="debtors-office-list__header debtors-office__header debtors-office__header--top">Рентабельность капитала</h2>
+            <canvas id="statsChart">таблица</canvas>
+            {% endif %}
         </div>
     </div>
 {% endblock content %}
@@ -76,5 +80,6 @@
     {{ block.super }}
     <script src="{% static 'main/js/main.js' %}" type="module"></script>
     <script src="{% static 'main/js/autonumeric.js' %}"></script>
+    <script src="{% static 'main/js/chart.js' %}" type="module" defer></script>
     {{ data_ids|json_script:"data-ids" }}
 {% endblock extra_scripts %}

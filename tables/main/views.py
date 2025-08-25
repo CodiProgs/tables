@@ -1,8 +1,8 @@
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
 from tables.utils import get_model_fields
-from django.db import transaction
-from .models import Transaction, Client, Supplier, Account, CashFlow, SupplierAccount, PaymentPurpose, MoneyTransfer, Branch, SupplierDebtRepayment, Investor, InvestorDebtOperation, Equipment
+from django.db import transaction, models
+from .models import Transaction, Client, Supplier, Account, CashFlow, SupplierAccount, PaymentPurpose, MoneyTransfer, Branch, SupplierDebtRepayment, Investor, InvestorDebtOperation, BalanceData, MonthlyCapital
 from django.http import JsonResponse
 from django.forms.models import model_to_dict
 from django.template.loader import render_to_string
@@ -16,6 +16,8 @@ from collections import defaultdict
 from functools import wraps
 from django.core.exceptions import PermissionDenied
 from datetime import datetime
+from calendar import monthrange
+from django.utils import timezone
 
 locale.setlocale(locale.LC_ALL, "ru_RU.UTF-8")
 
@@ -2149,10 +2151,9 @@ def settle_supplier_debt(request, pk: int):
         with transaction.atomic():
             amount = clean_currency(request.POST.get("amount"))
             type_ = request.POST.get("type")
-
+            
             if not amount:
                 return JsonResponse({"status": "error", "message": "Сумма обязательна"}, status=400)
-
             try:
                 amount_value = Decimal(amount)
                 if amount_value < 0:
@@ -2160,7 +2161,7 @@ def settle_supplier_debt(request, pk: int):
             except Exception:
                 return JsonResponse({"status": "error", "message": "Некорректная сумма"}, status=400)
 
-            if type_ != "investors":
+            if type_ != "investors" and type_ != "short_term_liabilities" and type_ != "credit" and type_ != "equipment":
                 trans = get_object_or_404(Transaction, id=pk)
 
             if type_ == "branch":
@@ -2204,7 +2205,7 @@ def settle_supplier_debt(request, pk: int):
                 fields = [
                     {"name": "created_at", "verbose_name": "Дата"},
                     {"name": "supplier", "verbose_name": "Поставщик"},
-                    {"name": "supplier_debt", "verbose_name": "Сумма оплаты", "is_amount": True},
+                    {"name": "supplier_debt", "verbose_name": "Сумма", "is_amount": True},
                     {"name": "supplier_percentage", "verbose_name": "%", "is_percent": True},
                 ]
 
@@ -2347,8 +2348,6 @@ def settle_supplier_debt(request, pk: int):
                 })
 
             elif type_ == "investors":
-                from .models import Investor
-
                 operation_type = request.POST.get("operation_type")
                 if operation_type not in ["withdrawal", "deposit"]:
                     return JsonResponse({"status": "error", "message": "Некорректный тип операции"}, status=400)
@@ -2423,6 +2422,72 @@ def settle_supplier_debt(request, pk: int):
                     "html_investor_debt_operation": html_investor_debt_operation,
                 })
 
+            elif type_ in ["short_term_liabilities", "credit", "equipment"]:
+                type_map = {
+                    "equipment": "Оборудование",
+                    "credit": "Кредит",
+                    "short_term_liabilities": "Краткосрочные обязательства",
+                }
+                balance_type = type_map.get(type_, type_)
+                balance_obj = get_object_or_404(BalanceData, name=balance_type)
+                balance_obj.amount = amount_value
+                balance_obj.save()
+
+                equipment = BalanceData.objects.filter(name="Оборудование").aggregate(total=Sum("amount"))["total"] or Decimal(0)
+                credit = BalanceData.objects.filter(name="Кредит").aggregate(total=Sum("amount"))["total"] or Decimal(0)
+                short_term = BalanceData.objects.filter(name="Краткосрочные обязательства").aggregate(total=Sum("amount"))["total"] or Decimal(0)
+
+                debtors = []
+                total_debtors = Decimal(0)
+                for branch in Supplier.objects.exclude(branch=None).values_list("branch__id", "branch__name").distinct():
+                    branch_id, branch_name = branch
+                    branch_debt = sum(
+                        (t.supplier_debt or Decimal(0)) for t in Transaction.objects.filter(supplier__branch_id=branch_id)
+                    )
+                    debtors.append({"branch": branch_name, "amount": branch_debt})
+                    
+                    total_debtors += branch_debt
+                
+                safe_amount = MoneyTransfer.objects.filter(destination_account__name="Наличные").aggregate(total=Sum("amount"))["total"] or Decimal(0)
+                safe_amount += MoneyTransfer.objects.filter(source_account__name="Наличные").aggregate(total=Sum("amount"))["total"] or Decimal(0)
+
+                investors = list(Investor.objects.values("name", "balance"))
+                investors = [{"name": inv["name"], "amount": inv["balance"]} for inv in investors]
+                investors_total = sum([inv["amount"] for inv in investors], Decimal(0))
+
+                bonuses = sum((t.bonus_debt or Decimal(0)) for t in Transaction.objects.all())
+                client_debts = sum((t.client_debt or Decimal(0)) for t in Transaction.objects.all())
+
+                assets_total = equipment + Decimal(0) + total_debtors + safe_amount + investors_total
+                liabilities_total = credit + client_debts + short_term + bonuses
+                capital = assets_total - liabilities_total
+
+                data = {
+                    "non_current_assets": {
+                        "total": equipment,
+                        "items": [{"name": "Оборудование", "amount": equipment}]
+                    },
+                    "current_assets": {
+                        "inventory": {"total": 0, "items": []},
+                        "debtors": {"total": total_debtors, "items": debtors},
+                        "cash": {"total": safe_amount + investors_total,
+                                "items": [{"name": "Сейф", "amount": safe_amount}] + investors},
+                    },
+                    "assets": assets_total,
+                    "liabilities": {
+                        "total": liabilities_total,
+                        "items": [
+                            {"name": "Кредит", "amount": credit},
+                            {"name": "Кредиторская задолженность", "amount": client_debts},
+                            {"name": "Краткосрочные обязательства", "amount": short_term},
+                            {"name": "Бонусы", "amount": bonuses},
+                        ],
+                    },
+                    "capital": capital,
+                    "type": "balance"
+                }
+                return JsonResponse(data, safe=False)
+
             else:
                 return JsonResponse({"status": "error", "message": "Некорректный тип"}, status=400)
     except Exception as e:
@@ -2431,11 +2496,28 @@ def settle_supplier_debt(request, pk: int):
 @forbid_supplier
 @login_required
 def debtor_detail(request, type, pk):
-    if type == "investors":
-        from .models import Investor
+    type_map = {
+        "equipment": "Оборудование",
+        "credit": "Кредит",
+        "short_term_liabilities": "Краткосрочные обязательства",
+    }
+    type = type_map.get(type, type)
+    if type in ["Оборудование", "Кредит", "Краткосрочные обязательства"]:
+        obj = BalanceData.objects.filter(name=type).order_by('-created_at').first()
+        if not obj:
+            return JsonResponse({"error": "Данные не найдены"}, status=404)
+        data = {
+            "name": obj.name,
+            "amount": obj.amount
+        }
+    elif type == "investors":
+        if pk == -1:
+            return JsonResponse({"error": "ID инвестора не указан"}, status=400)
         obj = get_object_or_404(Investor, id=pk)
         data = model_to_dict(obj)
     elif type == "transactions":
+        if pk == -1:
+            return JsonResponse({"error": "ID транзакции не указан"}, status=400)
         transaction = get_object_or_404(Transaction, id=pk)
         data = model_to_dict(transaction)
         if "amount" in data:
@@ -2508,7 +2590,7 @@ def debtor_details(request):
         transaction_fields = [
             {"name": "created_at", "verbose_name": "Дата"},
             {"name": "supplier", "verbose_name": "Поставщик"},
-            {"name": "supplier_debt", "verbose_name": "Сумма оплаты", "is_amount": True},
+            {"name": "supplier_debt", "verbose_name": "Сумма", "is_amount": True},
             {"name": "supplier_percentage", "verbose_name": "%", "is_percent": True},
         ]
         transaction_data = []
@@ -2704,85 +2786,165 @@ def cash_flow_payment_stats(request, supplier_id):
         "values": [stats[m] for m in months]
     })
 
-def get_assets_and_liabilities(request):
-    equipment_sum = Equipment.objects.aggregate(total=Sum('amount'))['total'] or 0
+@forbid_supplier
+@login_required
+@require_GET
+def company_balance_stats(request):
+    equipment = BalanceData.objects.filter(name="Оборудование").aggregate(total=Sum("amount"))["total"] or Decimal(0)
+    credit = BalanceData.objects.filter(name="Кредит").aggregate(total=Sum("amount"))["total"] or Decimal(0)
+    short_term = BalanceData.objects.filter(name="Краткосрочные обязательства").aggregate(total=Sum("amount"))["total"] or Decimal(0)
 
-    inventory_sum = 0  # Статичное значение
+    debtors = []
+    total_debtors = Decimal(0)
+    for branch in Supplier.objects.exclude(branch=None).values_list("branch__id", "branch__name").distinct():
+        branch_id, branch_name = branch
+        branch_debt = sum(
+            (t.supplier_debt or Decimal(0)) for t in Transaction.objects.filter(supplier__branch_id=branch_id, paid_amount__gt=0)
+        )
+        debtors.append({"branch": branch_name, "amount": branch_debt})
+        total_debtors += branch_debt
 
-    branches = Branch.objects.all()
-    receivables = []
-    receivables_sum = 0
-    for branch in branches:
-        transactions = Transaction.objects.filter(supplier__branch=branch)
-        branch_debt = sum(t.supplier_debt for t in transactions)
-        receivables.append({
-            "branch": branch.name,
-            "debt": branch_debt
-        })
-        receivables_sum += branch_debt
+    safe_amount = MoneyTransfer.objects.filter(destination_account__name="Наличные").aggregate(total=Sum("amount"))["total"] or Decimal(0)
+    safe_amount += MoneyTransfer.objects.filter(source_account__name="Наличные").aggregate(total=Sum("amount"))["total"] or Decimal(0)
 
-    cash_account = Account.objects.filter(name="Наличные").first()
-    cash_sum = 0
-    if cash_account:
-        incoming_transfers = MoneyTransfer.objects.filter(
-            destination_account=cash_account
-        ).aggregate(total=Sum('amount'))['total'] or 0
+    investors = list(Investor.objects.values("name", "balance"))
+    investors = [{"name": inv["name"], "amount": inv["balance"]} for inv in investors]
+    investors_total = sum([inv["amount"] for inv in investors], Decimal(0))
 
-        outgoing_transfers = MoneyTransfer.objects.filter(
-            source_account=cash_account
-        ).aggregate(total=Sum('amount'))['total'] or 0
+    bonuses = sum((t.bonus_debt or Decimal(0)) for t in Transaction.objects.all())
 
-        cash_sum = incoming_transfers - outgoing_transfers
+    client_debts = sum((t.client_debt or Decimal(0)) for t in Transaction.objects.filter(paid_amount__gt=0).all())
 
-    total_assets = equipment_sum + inventory_sum + receivables_sum + cash_sum
+    assets_total = equipment + Decimal(0) + total_debtors + safe_amount + investors_total
 
-    # Обязательств
-    liabilities_sum = 0  # Пока статичное значение
+    liabilities_total = credit + client_debts + short_term + bonuses
+    
+    current_capital = assets_total - liabilities_total
 
-    # Пассивы
-    total_liabilities = 0  # Пока статичное значение
+    current_year = datetime.now().year
+    current_month = datetime.now().month
+    capitals = []
+    months = []
+    for month in range(1, 13):
+        if month == current_month:
+            capital = float(get_monthly_capital(current_year, month))
+        else:
+            mc = MonthlyCapital.objects.filter(year=current_year, month=month).first()
+            capital = float(mc.capital) if mc else 0
+        capitals.append(capital)
+        months.append(datetime(current_year, month, 1).strftime('%B'))
 
-    # Капитал
-    capital_sum = total_assets - total_liabilities
-
-    # Формирование данных
+    
     data = {
-        "assets": {
-            "title": "Активы",
-            "sum": total_assets,
-            "categories": [
-                {
-                    "title": "Внеоборотные активы",
-                    "items": [
-                        {"title": "Основные средства", "sum": equipment_sum}
-                    ]
-                },
-                {
-                    "title": "Оборотные активы",
-                    "items": [
-                        {"title": "Товарные остатки", "sum": inventory_sum},
-                        {
-                            "title": "Дебиторская задолженность",
-                            "sum": receivables_sum,
-                            "details": receivables
-                        },
-                        {"title": "Денежные средства", "sum": cash_sum}
-                    ]
-                }
-            ]
+        "non_current_assets": {
+            "total": equipment,
+            "items": [{"name": "Оборудование", "amount": equipment}]
         },
+        "current_assets": {
+            "inventory": {"total": 0, "items": []},
+            "debtors": {"total": total_debtors, "items": debtors},
+            "cash": {"total": safe_amount + investors_total,
+                     "items": [{"name": "Сейф", "amount": safe_amount}] + investors},
+        },
+        "assets": assets_total,
         "liabilities": {
-            "title": "Пассивы",
-            "sum": total_liabilities,
-            "categories": [
-                {"title": "Обязательства", "sum": liabilities_sum}
-            ]
+            "total": liabilities_total,
+            "items": [
+                {"name": "Кредит", "amount": credit},
+                {"name": "Кредиторская задолженность", "amount": client_debts},
+                {"name": "Краткосрочные обязательства", "amount": short_term},
+                {"name": "Бонусы", "amount": bonuses},
+            ],
         },
-        "capital": {
-            "title": "Капитал",
-            "sum": capital_sum
-        }
+        "capital": current_capital,
+        "capitals_by_month": {
+            "months": months,
+            "capitals": capitals
+        },
     }
+    return JsonResponse(data, safe=False)
 
-    return JsonResponse(data)
+@forbid_supplier
+@login_required
+@require_GET
+def company_balance_stats_by_month(request):
+    current_year = datetime.now().year
+    current_month = datetime.now().month
+    capitals = []
+    months = []
+    for month in range(1, 13):
+        if month == current_month:
+            capital = float(get_monthly_capital(current_year, month))
+        else:
+            mc = MonthlyCapital.objects.filter(year=current_year, month=month).first()
+            capital = float(mc.capital) if mc else 0
+        capitals.append(capital)
+        months.append(datetime(current_year, month, 1).strftime('%B'))
+    return JsonResponse({"months": months, "capitals": capitals})
 
+def get_monthly_capital(year, month):
+    last_day = monthrange(year, month)[1]
+    dt_end = timezone.make_aware(datetime(year, month, last_day, 23, 59, 59))
+
+    equipment = BalanceData.objects.filter(
+        name="Оборудование",
+        created_at__lte=dt_end
+    ).aggregate(total=Sum("amount"))["total"] or Decimal(0)
+    credit = BalanceData.objects.filter(
+        name="Кредит",
+        created_at__lte=dt_end
+    ).aggregate(total=Sum("amount"))["total"] or Decimal(0)
+    short_term = BalanceData.objects.filter(
+        name="Краткосрочные обязательства",
+        created_at__lte=dt_end
+    ).aggregate(total=Sum("amount"))["total"] or Decimal(0)
+
+    total_debtors = Decimal(0)
+    for branch in Supplier.objects.exclude(branch=None).values_list("branch__id", "branch__name").distinct():
+        branch_id, branch_name = branch
+        branch_debt = sum(
+            (t.supplier_debt or Decimal(0))
+            for t in Transaction.objects.filter(
+                supplier__branch_id=branch_id,
+                paid_amount__gt=0,
+                created_at__lte=dt_end
+            )
+        )
+        total_debtors += branch_debt
+
+    safe_amount = MoneyTransfer.objects.filter(
+        destination_account__name="Наличные",
+        created_at__lte=dt_end
+    ).aggregate(total=Sum("amount"))["total"] or Decimal(0)
+    safe_amount += MoneyTransfer.objects.filter(
+        source_account__name="Наличные",
+        created_at__lte=dt_end
+    ).aggregate(total=Sum("amount"))["total"] or Decimal(0)
+
+    investors_total = sum([
+        inv["balance"] for inv in Investor.objects.filter(
+            created_at__lte=dt_end
+        ).values("balance")
+    ], Decimal(0))
+
+    bonuses = sum(
+        (t.bonus_debt or Decimal(0))
+        for t in Transaction.objects.filter(created_at__lte=dt_end)
+    )
+    client_debts = sum(
+        (t.client_debt or Decimal(0))
+        for t in Transaction.objects.filter(paid_amount__gt=0, created_at__lte=dt_end)
+    )
+
+    assets_total = equipment + Decimal(0) + total_debtors + safe_amount + investors_total
+    liabilities_total = credit + client_debts + short_term + bonuses
+    capital = assets_total - liabilities_total
+
+    return capital
+
+def calculate_and_save_monthly_capital(year, month):
+    capital = get_monthly_capital(year, month)
+    MonthlyCapital.objects.update_or_create(
+        year=year, month=month,
+        defaults={'capital': capital, 'calculated_at': datetime.now()}
+    )
