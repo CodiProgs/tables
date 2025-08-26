@@ -273,14 +273,6 @@ def transaction_edit(request, pk=None):
                     status=400,
                 )
 
-            is_admin = request.user.user_type.name == 'Администратор' if hasattr(request.user, 'user_type') else False
-
-            if not is_admin:
-                return JsonResponse(
-                    {"status": "error", "message": "Недостаточно прав для выполнения действия"},
-                    status=403
-                )
-
             trans = get_object_or_404(Transaction, id=pk)
 
             client_id = request.POST.get("client")
