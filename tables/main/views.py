@@ -2913,7 +2913,6 @@ def company_balance_stats(request):
             mc = MonthlyCapital.objects.filter(year=current_year, month=month).first()
             capital = float(mc.capital) if mc else 0
         capitals.append(capital)
-        months.append(MONTHS_RU[month-1])
 
     data = {
         "non_current_assets": {
