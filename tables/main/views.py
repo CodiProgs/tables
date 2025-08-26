@@ -2991,14 +2991,7 @@ def get_monthly_capital(year, month):
         )
         total_debtors += branch_debt
 
-    safe_amount = MoneyTransfer.objects.filter(
-        destination_account__name="Наличные",
-        created_at__lte=dt_end
-    ).aggregate(total=Sum("amount"))["total"] or Decimal(0)
-    safe_amount += MoneyTransfer.objects.filter(
-        source_account__name="Наличные",
-        created_at__lte=dt_end
-    ).aggregate(total=Sum("amount"))["total"] or Decimal(0)
+    safe_amount = SupplierAccount.objects.filter(account__name="Наличные").aggregate(total=Sum("balance"))["total"] or Decimal(0)
 
     investors_total = sum([
         inv["balance"] for inv in Investor.objects.filter(
