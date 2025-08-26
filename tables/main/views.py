@@ -2576,7 +2576,7 @@ def debtor_detail(request, type, pk):
     if type in ["Оборудование", "Кредит", "Краткосрочные обязательства"]:
         obj = BalanceData.objects.filter(name=type).order_by('-created_at').first()
         if not obj:
-            return JsonResponse({"error": "Данные не найдены"}, status=404)
+            obj = BalanceData.objects.create(name=type, amount=0)
         data = {
             "name": obj.name,
             "amount": obj.amount
