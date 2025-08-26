@@ -23,6 +23,7 @@ from django.utils import timezone
 from users.models import User, UserType
 
 locale.setlocale(locale.LC_ALL, "ru_RU.UTF-8")
+locale.setlocale(locale.LC_TIME, "ru_RU.UTF-8")
 
 
 def forbid_supplier(view_func):
