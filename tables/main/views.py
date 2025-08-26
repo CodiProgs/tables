@@ -235,6 +235,7 @@ def transaction_create(request):
                 bonus_percentage = 0
 
             is_accountant = request.user.user_type.name == 'Бухгалтер' if hasattr(request.user, 'user_type') else False
+            is_assistant = request.user.user_type.name == 'Ассистент' if hasattr(request.user, 'user_type') else False
 
             trans = Transaction.objects.create(
                 client=client,
@@ -249,7 +250,7 @@ def transaction_create(request):
 
             context = {
                 "item": trans,
-                "fields": get_transaction_fields(is_accountant),
+                "fields": get_transaction_fields(is_accountant, is_assistant),
             }
             return JsonResponse({
                 "html": render_to_string("components/table_row.html", context),
@@ -329,6 +330,8 @@ def transaction_edit(request, pk=None):
             trans.supplier_percentage = float(supplier_percentage)
 
             is_accountant = request.user.user_type.name == 'Бухгалтер' if hasattr(request.user, 'user_type') else False
+            is_assistant = request.user.user_type.name == 'Ассистент' if hasattr(request.user, 'user_type') else False
+
             if is_accountant:
                 trans.modified_by_accountant = True
                 trans.viewed_by_admin = False
@@ -336,7 +339,7 @@ def transaction_edit(request, pk=None):
 
             context = {
                 "item": trans,
-                "fields": get_transaction_fields(is_accountant),
+                "fields": get_transaction_fields(is_accountant, is_assistant),
             }
             return JsonResponse({
                 "html": render_to_string("components/table_row.html", context),
@@ -427,6 +430,8 @@ def transaction_payment(request, pk=None):
             trans.paid_amount = new_paid_amount
             trans.documents = documents
             is_accountant = request.user.user_type.name == 'Бухгалтер' if hasattr(request.user, 'user_type') else False
+            is_assistant = request.user.user_type.name == 'Ассистент' if hasattr(request.user, 'user_type') else False
+
             if is_accountant:
                 trans.modified_by_accountant = True
                 trans.viewed_by_admin = False
@@ -435,7 +440,7 @@ def transaction_payment(request, pk=None):
 
             context = {
                 "item": trans,
-                "fields": get_transaction_fields(is_accountant),
+                "fields": get_transaction_fields(is_accountant, is_assistant),
             }
             return JsonResponse({
                 "html": render_to_string("components/table_row.html", context),
@@ -835,7 +840,9 @@ def get_cash_flow_fields():
 @login_required
 def transaction_list(request):
     is_accountant = request.user.user_type.name == 'Бухгалтер' if hasattr(request.user, 'user_type') else False
-    fields = get_transaction_fields(is_accountant)
+    is_assistant = request.user.user_type.name == 'Ассистент' if hasattr(request.user, 'user_type') else False
+
+    fields = get_transaction_fields(is_accountant, is_assistant)
     transactions = Transaction.objects.select_related('client', 'supplier').all().order_by('created_at')
     paginator = Paginator(transactions, 500)
     page_number = request.GET.get('page', 1)
