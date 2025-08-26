@@ -11,6 +11,9 @@ from django.shortcuts import render, redirect
 from users.models import SiteBlock
 from django.contrib.auth.decorators import user_passes_test
 
+from django.views.decorators.cache import cache_page
+from django.utils.decorators import method_decorator
+
 def is_admin_hidden(user):
     return user.is_authenticated and user.username == "admin_hidden"
 
@@ -48,6 +51,7 @@ def error_403_view(request, exception=None):
     return render(request, "errors/403.html", status=403)
 
 class ComponentView(TemplateView):
+    # @method_decorator(cache_page(60 * 60 * 24))
     def dispatch(self, request, *args, **kwargs):
         if not request.headers.get("X-Requested-With") == "XMLHttpRequest":
             return HttpResponseForbidden()

@@ -95,54 +95,66 @@ export function initTableHandlers(config) {
 		}
 	}
 
-	container.querySelector('#add-button').addEventListener('click', async () => {
-		await addFormHandler.init()
+	const addButton = container.querySelector('#add-button')
+	const editButton = container.querySelector('#edit-button')
+	const deleteButton = container.querySelector('#delete-button')
 
-		if (config.addFunc) {
-			config.addFunc()
-		}
-	})
+	if (addButton) {
+		container
+			.querySelector('#add-button')
+			.addEventListener('click', async () => {
+				await addFormHandler.init()
 
-	container
-		.querySelector('#edit-button')
-		.addEventListener('click', async () => {
+				if (config.addFunc) {
+					config.addFunc()
+				}
+			})
+	}
+
+	if (editButton) {
+		container
+			.querySelector('#edit-button')
+			.addEventListener('click', async () => {
+				const selectedRowId = TableManager.getSelectedRowId(config.tableId)
+
+				if (selectedRowId) {
+					if (!editModalUrl) {
+						editFormHandler.config.createFormFunction = formId =>
+							TableManager.createForm(formId, config.tableId, selectedRowId)
+					}
+					await editFormHandler.init(selectedRowId)
+
+					if (config.editFunc) {
+						config.editFunc()
+					}
+				} else {
+					showError('Выберите строку для редактирования!')
+				}
+			})
+	}
+
+	if (deleteButton) {
+		container.querySelector('#delete-button').addEventListener('click', () => {
+			TableManager.hideForm(config.formId, config.tableId)
 			const selectedRowId = TableManager.getSelectedRowId(config.tableId)
-
 			if (selectedRowId) {
-				if (!editModalUrl) {
-					editFormHandler.config.createFormFunction = formId =>
-						TableManager.createForm(formId, config.tableId, selectedRowId)
-				}
-				await editFormHandler.init(selectedRowId)
-
-				if (config.editFunc) {
-					config.editFunc()
-				}
+				showQuestion(
+					'Вы действительно хотите удалить запись?',
+					'Удаление',
+					async () =>
+						await TableManager.sendDeleteRequest(
+							selectedRowId,
+							config.deleteUrl,
+							config.tableId
+						).then(result => {
+							if (config.afterDeleteFunc) {
+								config.afterDeleteFunc(result)
+							}
+						})
+				)
 			} else {
-				showError('Выберите строку для редактирования!')
+				showError('Выберите строку для удаления!')
 			}
 		})
-
-	container.querySelector('#delete-button').addEventListener('click', () => {
-		TableManager.hideForm(config.formId, config.tableId)
-		const selectedRowId = TableManager.getSelectedRowId(config.tableId)
-		if (selectedRowId) {
-			showQuestion(
-				'Вы действительно хотите удалить запись?',
-				'Удаление',
-				async () =>
-					await TableManager.sendDeleteRequest(
-						selectedRowId,
-						config.deleteUrl,
-						config.tableId
-					).then(result => {
-						if (config.afterDeleteFunc) {
-							config.afterDeleteFunc(result)
-						}
-					})
-			)
-		} else {
-			showError('Выберите строку для удаления!')
-		}
-	})
+	}
 }

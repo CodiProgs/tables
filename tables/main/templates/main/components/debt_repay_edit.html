@@ -1,25 +1,16 @@
 {% load components %}
 {% add_style 'css/modal-form.css' %}
-<form class="modal-form" id="settle-debt-form" method="post">
+<form class="modal-form" id="debt-repay-edit-form" method="post">
     <div class="modal-form__content">
         {% csrf_token %}
-        <input type="hidden" name="type" id="type" value="" hidden>
         <div class="modal-form__group">
             <input class="modal-form__input"
                    type="text"
-                   id="amount"
-                   name="amount"
-                   spellcheck="false"
-                   placeholder="Введите оплаченную сумму">
-        </div>
-        <div class="modal-form__group">
-            <input class="modal-form__input"
-                   type="hidden"
                    id="comment"
                    name="comment"
                    spellcheck="false"
                    placeholder="Введите комментарий"
-                   hidden>
+            />
         </div>
         <div class="modal-form__buttons">
             <button class="button modal-form__button" type="submit">Сохранить</button>

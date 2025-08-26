@@ -471,6 +471,7 @@ const addMenuHandler = () => {
 	const paymentButton = document.getElementById('payment-button')
 	const hideButton = document.getElementById('hide-button')
 	const settleDebtButton = document.getElementById('settle-debt-button')
+	const repaymentsEditButton = document.getElementById('repayment-edit-button')
 
 	function showMenu(x, y) {
 		menu.style.display = 'block'
@@ -511,6 +512,13 @@ const addMenuHandler = () => {
 
 					settleDebtButton.dataset.type = ''
 				}
+				if (repaymentsEditButton) {
+					if (table.id && table.id.startsWith('branch-repayments-')) {
+						repaymentsEditButton.style.display = 'block'
+					} else {
+						repaymentsEditButton.style.display = 'none'
+					}
+				}
 
 				showMenu(e.pageX, e.pageY)
 				return
@@ -525,6 +533,7 @@ const addMenuHandler = () => {
 				if (paymentButton) paymentButton.style.display = 'none'
 				if (hideButton) hideButton.style.display = 'none'
 				if (settleDebtButton) settleDebtButton.style.display = 'none'
+				if (repaymentsEditButton) repaymentsEditButton.style.display = 'none'
 
 				showMenu(e.pageX, e.pageY)
 			}
@@ -1338,6 +1347,18 @@ const suppliersConfig = createConfig(SUPPLIERS, {
 	},
 })
 
+const usersConfig = createConfig('users', {
+	dataUrls: [{ id: 'user_type', url: `${BASE_URL}users/types/` }],
+	afterAddFunc: result => refreshData(`users-table`, result.id),
+	afterEditFunc: result => refreshData(`users-table`),
+	modalConfig: {
+		addModalUrl: '/components/main/add_user/',
+		editModalUrl: '/components/main/add_user/',
+		addModalTitle: 'Добавить пользователя',
+		editModalTitle: 'Редактировать пользователя',
+	},
+})
+
 const clientsConfig = createConfig(CLIENTS, {
 	editFunc: () => {
 		setupPercentInput('percentage')
@@ -1357,7 +1378,6 @@ const clientsConfig = createConfig(CLIENTS, {
 
 const cashflowConfig = createConfig(CASH_FLOW, {
 	dataUrls: [
-		{ id: 'account', url: `${BASE_URL}accounts/list/` },
 		{ id: 'purpose', url: `${BASE_URL}payment_purposes/list/` },
 		{ id: 'supplier', url: `${BASE_URL}${SUPPLIERS}/list/` },
 	],
@@ -1643,10 +1663,15 @@ const handleTransactions = async config => {
 		},
 	})
 
-	TableManager.calculateTableSummary(`${TRANSACTION}-table`, ['profit'], {
-		grouped: true,
-		total: true,
-	})
+	const table = document.getElementById(`${TRANSACTION}-table`)
+	const hasProfitColumn = table && table.querySelector('th[data-name="profit"]')
+
+	if (hasProfitColumn) {
+		TableManager.calculateTableSummary(`${TRANSACTION}-table`, ['profit'], {
+			grouped: true,
+			total: true,
+		})
+	}
 
 	const paymentButton = document.getElementById('payment-button')
 	if (paymentButton) {
@@ -1699,6 +1724,22 @@ const handleSuppliers = async config => {
 		}
 	} catch (e) {
 		console.error('Error parsing suppliers IDs data for actions column:', e)
+	}
+
+	initTableHandlers(config)
+}
+
+const handleUsers = async config => {
+	try {
+		const usersIdsData = document.getElementById('data-ids')?.textContent
+		if (usersIdsData) {
+			const usersIds = JSON.parse(usersIdsData)
+			setIds(usersIds, `users-table`)
+		} else {
+			console.warn("Element with ID 'data-ids' not found or empty.")
+		}
+	} catch (e) {
+		console.error('Error parsing users IDs data for actions column:', e)
 	}
 
 	initTableHandlers(config)
@@ -1881,8 +1922,9 @@ const handleCashFlow = async config => {
 		},
 	})
 
-	const selectSupplier = document.getElementById('supplier')
-	const select = selectSupplier.querySelector('select')
+	const selectInput = document.getElementById('supplier_stats')
+	const select = selectInput.closest('.select')
+
 	SelectHandler.setupSelects({
 		select: select,
 		url: '/suppliers/list/',
@@ -1890,7 +1932,7 @@ const handleCashFlow = async config => {
 
 	document.addEventListener('click', function (e) {
 		const option = e.target.closest('.select__option')
-		if (option) {
+		if (option && select.contains(option)) {
 			const supplierId = option.dataset.value
 			if (!supplierId) return
 
@@ -2153,6 +2195,7 @@ const handleDebtors = async () => {
 											tbody.appendChild(emptyRow)
 										} else {
 											setIds(data.data_ids, data.transactions_table_id)
+											setIds(data.repayment_ids, data.repayments_table_id)
 
 											TableManager.calculateTableSummary(
 												data.transactions_table_id,
@@ -2441,6 +2484,12 @@ const handleDebtors = async () => {
 									table
 										.querySelectorAll('tr.table__row--empty')
 										.forEach(row => row.remove())
+
+									const rows = table.querySelectorAll('tbody tr')
+									if (rows.length > 0) {
+										const newRow = rows[rows.length - 1]
+										newRow.setAttribute('data-id', result.debt_repayment_id)
+									}
 								}
 
 								break
@@ -2658,6 +2707,7 @@ const handleDebtors = async () => {
 
 			await settleDebtFormHandler.init(currentRowId)
 			setupCurrencyInput('amount')
+
 			const typeInput = document.getElementById('type')
 			if (typeInput) {
 				if (table) {
@@ -2667,6 +2717,15 @@ const handleDebtors = async () => {
 						typeInput.value = 'remaining'
 					} else if (table.id.startsWith('branch-transactions')) {
 						typeInput.value = 'branch'
+
+						const comment = document.getElementById('comment')
+
+						if (comment) {
+							if (comment.tagName.toLowerCase() === 'input') {
+								comment.type = 'text'
+							}
+							comment.removeAttribute('hidden')
+						}
 					} else if (table.id === 'investors-table') {
 						typeInput.value = 'investors'
 					} else if (table.id === 'summary-profit') {
@@ -2676,6 +2735,41 @@ const handleDebtors = async () => {
 					typeInput.value = type
 				}
 			}
+		})
+	}
+
+	const repaymentsEditButton = document.getElementById('repayment-edit-button')
+	if (repaymentsEditButton) {
+		repaymentsEditButton.addEventListener('click', async function (e) {
+			e.preventDefault()
+			const selectedRow = document.querySelector('td.table__cell--selected')
+			const table = selectedRow ? selectedRow.closest('table') : null
+			const currentRowId = TableManager.getSelectedRowId(table.id)
+
+			const settleDebtFormHandler = createFormHandler(
+				`${BASE_URL}${SUPPLIERS}/repay-debt/edit/`,
+				table.id,
+				`debt-repay-edit-form`,
+				`${BASE_URL}${SUPPLIERS}/repay-debt/`,
+				[],
+				{
+					url: '/components/main/debt_repay_edit/',
+					title: 'Редактирование выдачи',
+					...(mainConfig.modalConfig.context
+						? { context: mainConfig.modalConfig.context }
+						: {}),
+				},
+				result => {
+					if (result.html) {
+						TableManager.updateTableRow(result, table.id)
+
+						const row = TableManager.getRowById(result.id, table.id)
+						TableManager.formatCurrencyValuesForRow(table.id, row)
+					}
+				}
+			)
+
+			await settleDebtFormHandler.init(currentRowId)
 		})
 	}
 
@@ -2737,6 +2831,9 @@ document.addEventListener('DOMContentLoaded', function () {
 				break
 			case `${SUPPLIERS}`:
 				handleSuppliers(suppliersConfig)
+				break
+			case `users`:
+				handleUsers(usersConfig)
 				break
 			case `${CLIENTS}`:
 				handleClients(clientsConfig)

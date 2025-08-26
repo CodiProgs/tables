@@ -1,0 +1,63 @@
+{% load components %}
+{% add_style 'css/modal-form.css' %}
+<form class="modal-form" id="users-form" method="post">
+    <div class="modal-form__content">
+        {% csrf_token %}
+		<div class="modal-form__group">
+            <input class="modal-form__input"
+                   type="text"
+                   id="email"
+                   name="email"
+                   spellcheck="false"
+                   placeholder="Введите почту">
+        </div>
+		<div class="modal-form__group">
+            <input class="modal-form__input"
+                   type="text"
+                   id="username"
+                   name="username"
+                   spellcheck="false"
+                   placeholder="Введите логин">
+        </div>
+        <div class="modal-form__group">
+            <input class="modal-form__input"
+                   type="password"
+                   id="password"
+                   name="password"
+                   spellcheck="false"
+                   placeholder="Введите пароль">
+        </div>
+		<div class="modal-form__group">
+            <input class="modal-form__input"
+                   type="text"
+                   id="last_name"
+                   name="last_name"
+                   spellcheck="false"
+                   placeholder="Введите фамилию">
+        </div>
+		<div class="modal-form__group">
+			<input class="modal-form__input"
+				   type="text"
+				   id="first_name"
+				   name="first_name"
+				   spellcheck="false"
+				   placeholder="Введите имя">
+		</div>
+		<div class="modal-form__group">
+			<input class="modal-form__input"
+				   type="text"
+				   id="patronymic"
+				   name="patronymic"
+				   spellcheck="false"
+				   placeholder="Введите отчество">
+		</div>
+		<div class="modal-form__group">
+            {% include "components/select.html" with id="user_type" placeholder="Выберите тип пользователя" %}
+        </div>
+        <div class="modal-form__group">{% include "components/checkbox.html" with value="true" id="is_active" label="Активен" %}</div>
+        <div class="modal-form__buttons">
+            <button class="button modal-form__button" type="submit">Сохранить</button>
+            <button class="button modal-form__button button--cancel" type="button">Отменить</button>
+        </div>
+    </div>
+</form>

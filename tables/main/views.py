@@ -17,7 +17,10 @@ from functools import wraps
 from django.core.exceptions import PermissionDenied
 from datetime import datetime
 from calendar import monthrange
+from django.core.cache import cache
+from django.contrib.admin.views.decorators import staff_member_required
 from django.utils import timezone
+from users.models import User, UserType
 
 locale.setlocale(locale.LC_ALL, "ru_RU.UTF-8")
 
@@ -57,14 +60,20 @@ def clean_percentage(value):
 
 @login_required
 def index(request):
-    if getattr(getattr(request.user, 'user_type', None), 'name', None) == 'Поставщик':
+    user_type = getattr(getattr(request.user, 'user_type', None), 'name', None)
+    if user_type == 'Поставщик':
         return redirect('main:debtors')
 
-    is_accountant = request.user.user_type.name == 'Бухгалтер' if hasattr(request.user, 'user_type') else False
-    fields = get_transaction_fields(is_accountant)
+    is_accountant = user_type == 'Бухгалтер'
+    is_assistant = user_type == 'Ассистент'
 
-    transactions = Transaction.objects.select_related('client', 'supplier').all().order_by('created_at')
-    paginator = Paginator(transactions, 500)
+    fields = get_transaction_fields(is_accountant, is_assistant)
+
+    transactions_qs = Transaction.objects.select_related('client', 'supplier').all().order_by('created_at')
+    if is_assistant:
+        transactions_qs = transactions_qs.filter(supplier__visible_for_assistant=True)
+
+    paginator = Paginator(transactions_qs, 500)
     page_number = request.GET.get('page', 1)
     page = paginator.get_page(page_number)
 
@@ -79,7 +88,7 @@ def index(request):
                 'supplier_percentage': supplier_changed
             }
 
-    is_admin = request.user.user_type.name == 'Администратор' if hasattr(request.user, 'user_type') else False
+    is_admin = user_type == 'Администратор'
 
     supplier_debts = [getattr(t, 'supplier_debt', 0) for t in page.object_list]
     client_debts = [getattr(t, 'client_debt', 0) for t in page.object_list]
@@ -103,7 +112,7 @@ def index(request):
 
     return render(request, "main/main.html", context)
 
-def get_transaction_fields(is_accountant):
+def get_transaction_fields(is_accountant, is_assistant=False):
     excluded = [
         "id", "amount", "client_percentage", "bonus_percentage",
         "supplier_percentage", "paid_amount", "modified_by_accountant",
@@ -118,6 +127,11 @@ def get_transaction_fields(is_accountant):
         field_order.extend(["supplier_percentage", "profit"])
     field_order.extend(["paid_amount", "debt", "documents"])
 
+    if is_assistant:
+        field_order = [
+            "created_at", "client", "supplier", "amount", "paid_amount", "documents"
+        ]
+
     fields = get_model_fields(
         Transaction,
         excluded_fields=excluded,
@@ -131,6 +145,7 @@ def get_transaction_fields(is_accountant):
         (6, {"name": "bonus_percentage", "verbose_name": "%", "is_percent": True, }),
         (7, {"name": "bonus", "verbose_name": "Бонус", "is_amount": True}),
     ]
+
     if not is_accountant:
         insertions.extend([
             (8, {"name": "supplier_percentage", "verbose_name": "%", "is_percent": True, }),
@@ -141,6 +156,12 @@ def get_transaction_fields(is_accountant):
         (10 if not is_accountant else 8, {"name": "paid_amount", "verbose_name": "Оплачено", "is_amount": True}),
         (11 if not is_accountant else 9, {"name": "debt", "verbose_name": "Долг", "is_amount": True}),
     ])
+
+    if is_assistant:
+        insertions = [
+            (3, {"name": "amount", "verbose_name": "Сумма", "is_amount": True, }),
+            (4, {"name": "paid_amount", "verbose_name": "Оплачено", "is_amount": True}),
+        ]
 
     for pos, field in insertions:
         fields.insert(pos, field)
@@ -558,6 +579,11 @@ def prepare_accounts_data(accounts):
         data.setdefault(acc_type, []).append(acc_data)
     return data
 
+@staff_member_required
+def clear_cache_view(request):
+    cache.clear()
+    return JsonResponse({"status": "success"})
+
 @forbid_supplier
 @login_required
 def suppliers(request):
@@ -566,7 +592,6 @@ def suppliers(request):
         raise PermissionDenied
 
     suppliers = Supplier.objects.all()
-
 
     context = {
         "fields": get_supplier_fields(),
@@ -581,6 +606,7 @@ def get_supplier_fields():
         "id",
         "cost_percentage",
         "user",
+        "visible_for_assistant"
     ]
     fields = get_model_fields(
         Supplier,
@@ -932,6 +958,7 @@ def supplier_create(request):
             branch_id = request.POST.get("branch")
             cost_percentage = clean_percentage(request.POST.get("cost_percentage"))
             account_id = request.POST.get("default_account")
+            visible_for_assistant = request.POST.get("visible_for_assistant") == "on"
 
             username = request.POST.get("username")
             password = request.POST.get("password")
@@ -950,6 +977,7 @@ def supplier_create(request):
                 branch=branch,
                 cost_percentage=float(cost_percentage),
                 default_account=account,
+                visible_for_assistant=visible_for_assistant,
             )
 
             if username and password:
@@ -997,6 +1025,7 @@ def supplier_edit(request, pk=None):
             branch_id = request.POST.get("branch")
             cost_percentage = clean_percentage(request.POST.get("cost_percentage"))
             account_id = request.POST.get("default_account")
+            visible_for_assistant = request.POST.get("visible_for_assistant") == "on"
 
             username = request.POST.get("username")
             password = request.POST.get("password")
@@ -1017,6 +1046,7 @@ def supplier_edit(request, pk=None):
             supplier.branch = branch
             supplier.cost_percentage = float(cost_percentage)
             supplier.default_account = account
+            supplier.visible_for_assistant = visible_for_assistant
 
             from users.models import User, UserType
             supplier_type = UserType.objects.filter(name="Поставщик").first()
@@ -2151,6 +2181,7 @@ def settle_supplier_debt(request, pk: int):
         with transaction.atomic():
             amount = clean_currency(request.POST.get("amount"))
             type_ = request.POST.get("type")
+            comment = request.POST.get("comment", "").strip()
             
             if not amount:
                 return JsonResponse({"status": "error", "message": "Сумма обязательна"}, status=400)
@@ -2179,7 +2210,8 @@ def settle_supplier_debt(request, pk: int):
                 debtRepayment = SupplierDebtRepayment.objects.create(
                     supplier=trans.supplier,
                     transaction=trans,
-                    amount=amount_value
+                    amount=amount_value,
+                    comment=comment
                 )
 
                 branch = trans.supplier.branch if trans.supplier and trans.supplier.branch else None
@@ -2212,12 +2244,15 @@ def settle_supplier_debt(request, pk: int):
                 html = render_to_string("components/table_row.html", {"item": row, "fields": fields})
 
                 debtRepayment.created_at = debtRepayment.created_at.strftime("%d.%m.%Y %H:%M") if debtRepayment.created_at else ""
+                debtRepayment.cost_percentage = debtRepayment.transaction.supplier_percentage if debtRepayment.transaction else ""
 
                 html_debt_repayments = render_to_string("components/table_row.html", {
                     "item": debtRepayment,
                     "fields": [
                         {"name": "created_at", "verbose_name": "Дата"},
                         {"name": "amount", "verbose_name": "Сумма", "is_amount": True},
+                        {"name": "cost_percentage", "verbose_name": "%", "is_percent": True},
+                        {"name": "comment", "verbose_name": "Комментарий"}
                     ]
                 })
 
@@ -2227,6 +2262,7 @@ def settle_supplier_debt(request, pk: int):
                 return JsonResponse({
                     "html": html,
                     "html_debt_repayments": html_debt_repayments,
+                    "debt_repayment_id": debtRepayment.id,
                     "id": trans.id,
                     "branch": trans.supplier.branch.name.replace(" ", "_") if trans.supplier and trans.supplier.branch else None,
                     "total_debt": float(branch_total_debt) if branch else 0,
@@ -2296,6 +2332,23 @@ def settle_supplier_debt(request, pk: int):
 
                 if amount_value > trans.client_debt_paid:
                     return JsonResponse({"status": "error", "message": "Сумма не может превышать долг по выдачам"}, status=400)
+
+                cash_account = Account.objects.filter(name="Наличные").first()
+                if not cash_account:
+                    return JsonResponse({"status": "error", "message": 'Счет "Наличные" не найден'}, status=400)
+
+                supplier_account = SupplierAccount.objects.filter(
+                    supplier=trans.supplier,
+                    account=cash_account
+                ).first()
+
+                if not supplier_account or supplier_account.balance < amount_value:
+                    return JsonResponse({"status": "error", "message": "Недостаточно средств на счете 'Наличные' у поставщика"}, status=400)
+
+                supplier_account.balance -= amount_value
+                supplier_account.save()
+                cash_account.balance -= amount_value
+                cash_account.save()
 
                 trans.returned_to_client += amount_value
                 trans.save()
@@ -2606,12 +2659,16 @@ def debtor_details(request):
         repayment_fields = [
             {"name": "created_at", "verbose_name": "Дата"},
             {"name": "amount", "verbose_name": "Сумма", "is_amount": True},
+            {"name": "cost_percentage", "verbose_name": "%", "is_percent": True},
+            {"name": "comment", "verbose_name": "Комментарий"}
         ]
         repayment_data = []
         for r in repayments:
             repayment_data.append(type("Row", (), {
                 "created_at": r.created_at.strftime("%d.%m.%Y %H:%M") if r.created_at else "",
                 "amount": r.amount,
+                "cost_percentage": r.transaction.supplier_percentage if r.transaction else "",
+                "comment": r.comment or "",
             })())
 
         html_transactions = render_to_string(
@@ -2626,6 +2683,7 @@ def debtor_details(request):
             "html_transactions": html_transactions,
             "html_repayments": html_repayments,
             "data_ids": [t.id for t in transactions],
+            "repayment_ids": [r.id for r in repayments],
             "transactions_table_id": transactions_table_id,
             "repayments_table_id": repayments_table_id
         })
@@ -2804,8 +2862,7 @@ def company_balance_stats(request):
         debtors.append({"branch": branch_name, "amount": branch_debt})
         total_debtors += branch_debt
 
-    safe_amount = MoneyTransfer.objects.filter(destination_account__name="Наличные").aggregate(total=Sum("amount"))["total"] or Decimal(0)
-    safe_amount += MoneyTransfer.objects.filter(source_account__name="Наличные").aggregate(total=Sum("amount"))["total"] or Decimal(0)
+    safe_amount = SupplierAccount.objects.filter(account__name="Наличные").aggregate(total=Sum("balance"))["total"] or Decimal(0)
 
     investors = list(Investor.objects.values("name", "balance"))
     investors = [{"name": inv["name"], "amount": inv["balance"]} for inv in investors]
@@ -2834,7 +2891,6 @@ def company_balance_stats(request):
         capitals.append(capital)
         months.append(datetime(current_year, month, 1).strftime('%B'))
 
-    
     data = {
         "non_current_assets": {
             "total": equipment,
@@ -2948,3 +3004,243 @@ def calculate_and_save_monthly_capital(year, month):
         year=year, month=month,
         defaults={'capital': capital, 'calculated_at': datetime.now()}
     )
+
+@forbid_supplier
+@login_required
+def users(request):
+    is_admin = request.user.user_type.name == 'Администратор' if hasattr(request.user, 'user_type') else False
+    if not is_admin:
+        raise PermissionDenied
+
+    users = User.objects.all()
+
+    context = {
+        "fields": get_user_fields(),
+        "data": users,
+        "data_ids": [t.id for t in users],
+    }
+
+    return render(request, "main/users.html", context)
+
+def get_user_fields():
+    excluded = [
+        "id",
+        "data_joined",
+        "supplier",
+        "password",
+        "last_login",
+        "is_superuser",
+        "is_staff",
+        "email",
+    ]
+    fields = get_model_fields(
+        User,
+        excluded_fields=excluded,
+    )
+
+    insertions = [
+        (0, {"name": "email", "verbose_name": "Почта", }),
+    ]
+
+    for pos, field in insertions:
+        fields.insert(pos, field)
+
+    return fields
+
+@forbid_supplier
+@login_required
+def user_detail(request, pk: int):
+    user = get_object_or_404(User, id=pk)
+    data = model_to_dict(user)
+    
+    return JsonResponse({"data": data})
+
+@forbid_supplier
+@login_required
+@require_http_methods(["POST"])
+def user_create(request):
+    try:
+        with transaction.atomic():
+            email = request.POST.get("email")
+            username = request.POST.get("username")
+            password = request.POST.get("password")
+            last_name = request.POST.get("last_name")
+            first_name = request.POST.get("first_name")
+            patronymic = request.POST.get("patronymic")
+            user_type_id = request.POST.get("user_type")
+            is_active = request.POST.get("is_active") == "on"
+
+            if not all([username, password, user_type_id]):
+                return JsonResponse(
+                    {"status": "error", "message": "Логин, пароль и тип пользователя обязательны"},
+                    status=400,
+                )
+
+            if User.objects.filter(username=username).exists():
+                return JsonResponse(
+                    {"status": "error", "message": "Пользователь с таким логином уже существует"},
+                    status=400,
+                )
+
+            user_type = get_object_or_404(UserType, id=user_type_id)
+
+            user = User.objects.create(
+                email=email,
+                username=username,
+                first_name=first_name,
+                last_name=last_name,
+                patronymic=patronymic,
+                user_type=user_type,
+                is_active=is_active,
+            )
+            user.set_password(password)
+            user.save()
+
+            context = {
+                "item": user,
+                "fields": get_user_fields(),
+            }
+            return JsonResponse({
+                "html": render_to_string("components/table_row.html", context),
+                "id": user.id,
+            })
+    except Exception as e:
+        return JsonResponse({"status": "error", "message": str(e)}, status=400)
+
+@forbid_supplier
+@login_required
+@require_http_methods(["POST"])
+def user_edit(request, pk=None):
+    try:
+        with transaction.atomic():
+            pk = pk or request.POST.get("id")
+            if not pk:
+                return JsonResponse(
+                    {"status": "error", "message": "ID пользователя не указан"},
+                    status=400,
+                )
+
+            user = get_object_or_404(User, id=pk)
+
+            email = request.POST.get("email")
+            username = request.POST.get("username")
+            password = request.POST.get("password")
+            last_name = request.POST.get("last_name")
+            first_name = request.POST.get("first_name")
+            patronymic = request.POST.get("patronymic")
+            user_type_id = request.POST.get("user_type")
+            is_active = request.POST.get("is_active") == "on"
+
+            if not all([username, user_type_id]):
+                return JsonResponse(
+                    {"status": "error", "message": "Логин и тип пользователя обязательны"},
+                    status=400,
+                )
+
+            if User.objects.exclude(pk=user.pk).filter(username=username).exists():
+                return JsonResponse(
+                    {"status": "error", "message": "Пользователь с таким логином уже существует"},
+                    status=400,
+                )
+
+            user_type = get_object_or_404(UserType, id=user_type_id)
+
+            user.email = email
+            user.username = username
+            if password:
+                user.set_password(password)
+            user.first_name = first_name
+            user.last_name = last_name
+            user.patronymic = patronymic
+            user.user_type = user_type
+            user.is_active = is_active
+            user.save()
+
+            context = {
+                "item": user,
+                "fields": get_user_fields(),
+            }
+            return JsonResponse({
+                "html": render_to_string("components/table_row.html", context),
+                "id": user.id,
+            })
+    except Exception as e:
+        return JsonResponse({"status": "error", "message": str(e)}, status=400)
+
+@forbid_supplier
+@login_required
+@require_http_methods(["POST"])
+def user_delete(request, pk=None):
+    try:
+        with transaction.atomic():
+            pk = pk or request.POST.get("id")
+            if not pk:
+                return JsonResponse(
+                    {"status": "error", "message": "ID пользователя не указан"},
+                    status=400,
+                )
+
+            user = get_object_or_404(User, id=pk)
+            user.delete()
+
+            return JsonResponse({
+                "status": "success",
+                "message": "Пользователь успешно удален",
+            })
+    except Exception as e:
+        return JsonResponse({"status": "error", "message": str(e)}, status=400)
+
+@forbid_supplier
+@login_required
+def user_types(request):
+    types = UserType.objects.all()
+
+    type_data = [
+        {"id": acc.id, "name": acc.name} for acc in types
+    ]
+    return JsonResponse(type_data, safe=False)
+
+@forbid_supplier
+@login_required
+def repay_supplier_debt(request, pk: int):
+    supplier_debt_repay = get_object_or_404(SupplierDebtRepayment, id=pk)
+    data = model_to_dict(supplier_debt_repay)
+    return JsonResponse({"data": data})
+
+@forbid_supplier
+@login_required
+@require_http_methods(["POST"])
+def edit_supplier_debt_repayment(request, pk=None):
+    try:
+        with transaction.atomic():
+            pk = pk or request.POST.get("id")
+            if not pk:
+                return JsonResponse(
+                    {"status": "error", "message": "ID выдачи не указано"},
+                    status=400,
+                )
+
+            debt_repay = get_object_or_404(SupplierDebtRepayment, id=pk)
+
+            comment = request.POST.get("comment", "").strip()
+
+            debt_repay.comment = comment
+            debt_repay.save()
+
+            debt_repay.cost_percentage = debt_repay.transaction.supplier_percentage if debt_repay.transaction else None
+
+            context = {
+                "item": debt_repay,
+                "fields": [
+                    {"name": "created_at", "verbose_name": "Дата"},
+                    {"name": "amount", "verbose_name": "Сумма", "is_amount": True},
+                    {"name": "cost_percentage", "verbose_name": "%", "is_percent": True},
+                    {"name": "comment", "verbose_name": "Комментарий"}
+                ]
+            }
+            return JsonResponse({
+                "html": render_to_string("components/table_row.html", context),
+                "id": debt_repay.id,
+            })
+    except Exception as e:
+        return JsonResponse({"status": "error", "message": str(e)}, status=400)

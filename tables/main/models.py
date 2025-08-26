@@ -66,6 +66,10 @@ class Supplier(models.Model):
         unique=True,
         related_name="supplier_profile"
     )
+    visible_for_assistant = models.BooleanField(
+        default=True,
+        verbose_name="Видим для ассистента"
+    )
 
     def __str__(self):
         return self.name
@@ -463,6 +467,11 @@ class SupplierDebtRepayment(models.Model):
     created_at = models.DateTimeField(
         auto_now_add=True,
         verbose_name="Дата и время создания"
+    )
+    comment = models.TextField(
+        blank=True,
+        null=True,
+        verbose_name="Комментарий"
     )
 
     def __str__(self):

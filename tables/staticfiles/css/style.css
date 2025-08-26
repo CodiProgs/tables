@@ -747,8 +747,8 @@ textarea::placeholder {
 }
 
 .stats-container {
-	min-height: 300px;
-	max-height: 300px;
+	min-height: 301px;
+	max-height: 301px;
 	overflow-y: auto;
 	border-top: 1px solid var(--color-border-window);
 	flex: 0 0 auto;

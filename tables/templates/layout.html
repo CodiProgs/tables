@@ -30,7 +30,7 @@
     </head>
     <body>
         <div class="container">
-            {% if not request.user.user_type.name == "Поставщик" %}
+            {% if not request.user.user_type.name == "Поставщик" and request.user.user_type.name != "Ассистент" %}
                 <nav class="sidebar-nav">
                     <ul class="nav-list">
                         <li class="nav-item {% if request.path == '/' %}active{% endif %}">
@@ -55,6 +55,9 @@
                         </li>
                         <li class="nav-item {% if request.resolver_match.url_name == 'cash_flow_report' %}active{% endif %}">
                             <a href="{% url 'main:cash_flow_report' %}">Отчет ДДС</a>
+                        </li>
+                        <li class="nav-item {% if request.resolver_match.url_name == 'users' %}active{% endif %}">
+                            <a href="{% url 'main:users' %}">Пользователи</a>
                         </li>
                         {% comment %} <li class="nav-item {% if request.resolver_match.url_name == 'money_transfers' %}active{% endif %}">
                             <a href="{% url 'main:money_transfers' %}">Перемещение ₽</a>
