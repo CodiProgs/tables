@@ -2879,6 +2879,7 @@ def debtor_details(request):
                 and getattr(t, 'client_debt', 0) == 0
                 # and getattr(t, 'supplier_debt', 0) == 0 TODO:
                 and getattr(t, 'profit', 0) > 0
+                and (getattr(t, 'profit', 0) - getattr(t, 'returned_to_investor', 0)) > 0
             ]
             fields = [
                 {"name": "created_at", "verbose_name": "Дата"},
