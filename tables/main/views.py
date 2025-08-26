@@ -117,7 +117,7 @@ def get_transaction_fields(is_accountant, is_assistant=False):
     excluded = [
         "id", "amount", "client_percentage", "bonus_percentage",
         "supplier_percentage", "paid_amount", "modified_by_accountant",
-        "viewed_by_admin", "returned_date", "returned_by_supplier", "returned_bonus", "returned_to_client"
+        "viewed_by_admin", "returned_date", "returned_by_supplier", "returned_bonus", "returned_to_client", "returned_to_investor",
     ]
 
     field_order = [
