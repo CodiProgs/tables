@@ -1297,26 +1297,44 @@ const mainConfig = createConfig(TRANSACTION, {
 		const row = TableManager.getRowById(`${TRANSACTION}-table`, result.id)
 		TableManager.formatCurrencyValuesForRow(`${TRANSACTION}-table`, row)
 
-		TableManager.calculateTableSummary(`${TRANSACTION}-table`, ['profit'], {
-			grouped: true,
-			total: true,
-		})
+		const table = document.getElementById(`${TRANSACTION}-table`)
+		const hasProfitColumn =
+			table && table.querySelector('th[data-name="profit"]')
+
+		if (hasProfitColumn) {
+			TableManager.calculateTableSummary(`${TRANSACTION}-table`, ['profit'], {
+				grouped: true,
+				total: true,
+			})
+		}
 	},
 	afterEditFunc: result => {
 		refreshData(`${TRANSACTION}-table`)
 		const row = TableManager.getRowById(`${TRANSACTION}-table`, result.id)
 		TableManager.formatCurrencyValuesForRow(`${TRANSACTION}-table`, row)
 
-		TableManager.calculateTableSummary(`${TRANSACTION}-table`, ['profit'], {
-			grouped: true,
-			total: true,
-		})
+		const table = document.getElementById(`${TRANSACTION}-table`)
+		const hasProfitColumn =
+			table && table.querySelector('th[data-name="profit"]')
+
+		if (hasProfitColumn) {
+			TableManager.calculateTableSummary(`${TRANSACTION}-table`, ['profit'], {
+				grouped: true,
+				total: true,
+			})
+		}
 	},
 	afterDeleteFunc: () => {
-		TableManager.calculateTableSummary(`${TRANSACTION}-table`, ['profit'], {
-			grouped: true,
-			total: true,
-		})
+		const table = document.getElementById(`${TRANSACTION}-table`)
+		const hasProfitColumn =
+			table && table.querySelector('th[data-name="profit"]')
+
+		if (hasProfitColumn) {
+			TableManager.calculateTableSummary(`${TRANSACTION}-table`, ['profit'], {
+				grouped: true,
+				total: true,
+			})
+		}
 	},
 	modalConfig: {
 		addModalUrl: '/components/main/add_transaction/',
@@ -1656,10 +1674,16 @@ const handleTransactions = async config => {
 			}
 			highlightModifiedRows()
 			TableManager.formatCurrencyValues(`${TRANSACTION}-table`)
-			TableManager.calculateTableSummary(`${TRANSACTION}-table`, ['profit'], {
-				grouped: true,
-				total: true,
-			})
+			const table = document.getElementById(`${TRANSACTION}-table`)
+			const hasProfitColumn =
+				table && table.querySelector('th[data-name="profit"]')
+
+			if (hasProfitColumn) {
+				TableManager.calculateTableSummary(`${TRANSACTION}-table`, ['profit'], {
+					grouped: true,
+					total: true,
+				})
+			}
 		},
 	})
 
