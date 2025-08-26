@@ -1423,8 +1423,12 @@ def cash_flow_report(request):
 
     purposes = PaymentPurpose.objects.all().order_by('operation_type', 'name')
 
+    MONTHS_RU = [
+    "январь", "февраль", "март", "апрель", "май", "июнь",
+    "июль", "август", "сентябрь", "октябрь", "ноябрь", "декабрь"
+    ]
     months = [
-        {"num": i, "name": datetime(current_year, i, 1).strftime('%B')}
+        {"num": i, "name": MONTHS_RU[i-1]}
         for i in range(1, 13)
     ]
 
