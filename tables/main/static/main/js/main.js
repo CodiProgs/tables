@@ -615,7 +615,7 @@ const markAllAsViewed = async () => {
 			{ ids }
 		)
 
-		if (response.ok) {
+		if (response) {
 			blinkingRows.forEach(row => {
 				row.classList.remove('table__row--blinking')
 				const markReadBtn = row.querySelector('.mark-read-btn')
@@ -627,8 +627,9 @@ const markAllAsViewed = async () => {
 			const markAllBtn = document.getElementById('mark-all-read-btn')
 			if (markAllBtn) markAllBtn.remove()
 		} else {
-			const data = await response.json()
-			showError(data.message || 'Ошибка при отметке транзакций как прочитанных')
+			showError(
+				response.message || 'Ошибка при отметке транзакций как прочитанных'
+			)
 		}
 	} catch (error) {
 		console.error('Ошибка при отметке всех транзакций:', error)
@@ -1176,7 +1177,7 @@ export class TablePaginator {
 			const response = await fetchData(
 				`${this.baseUrl}${this.entityName}/list/?page=${page}`
 			)
-			const data = await response.json()
+			const data = await response
 
 			if (response.ok && data.html && data.context) {
 				this.updateTable(data.html)
