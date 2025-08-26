@@ -2464,6 +2464,13 @@ const handleDebtors = async () => {
 								],
 							},
 					  ]
+					: table.id === 'summary-profit'
+					? [
+							{
+								id: 'investor_select',
+								url: `${BASE_URL}investors/list/`,
+							},
+					  ]
 					: [],
 				{
 					url:
@@ -2533,6 +2540,54 @@ const handleDebtors = async () => {
 									table_investors
 										.querySelectorAll('tr.table__row--empty')
 										.forEach(row => row.remove())
+								}
+
+								break
+							case 'Инвесторам':
+								tableId = 'summary-profit'
+
+								TableManager.addTableRow(
+									{ html: result.html_investor_debt_operation },
+									`investor-operations-table`
+								)
+
+								const table_profit = document.getElementById(
+									`investor-operations-table`
+								)
+								if (table_profit) {
+									table_profit
+										.querySelectorAll('tr.table__row--empty')
+										.forEach(row => row.remove())
+
+									const rows = table_profit.querySelectorAll('tbody tr')
+									if (rows.length > 0) {
+										const newRow = rows[rows.length - 1]
+										newRow.setAttribute('data-id', result.debt_repayment_id)
+									}
+								}
+
+								if (result.html_investors) {
+									const investorsTable =
+										document.getElementById('investors-table')
+									if (investorsTable) {
+										const container = investorsTable.closest('.table-container')
+										if (container) {
+											const wrapper = document.createElement('div')
+											wrapper.innerHTML = result.html_investors
+											const newContainer =
+												wrapper.querySelector('.table-container')
+											if (newContainer) {
+												container.replaceWith(newContainer)
+											}
+											setIds(result.data_ids, 'investors-table')
+
+											TableManager.initTable('investors-table')
+
+											TableManager.calculateTableSummary(`investors-table`, [
+												'balance',
+											])
+										}
+									}
 								}
 
 								break
@@ -2631,6 +2686,12 @@ const handleDebtors = async () => {
 									result.type === 'remaining'
 								) {
 									branchKey = 'Выдачи клиентам'
+								} else if (
+									result.type === 'Инвесторам' ||
+									result.type === 'investors' ||
+									result.type === 'profit'
+								) {
+									branchKey = 'Инвесторам'
 								}
 							}
 
@@ -2764,6 +2825,17 @@ const handleDebtors = async () => {
 						typeInput.value = 'investors'
 					} else if (table.id === 'summary-profit') {
 						typeInput.value = 'profit'
+
+						const investor_select = document.getElementById('investor_select')
+						const investorSelectContainer = investor_select
+							? investor_select.closest('.modal-form__group')
+							: null
+
+						if (investorSelectContainer) {
+							investorSelectContainer.removeAttribute('hidden')
+						}
+					} else {
+						typeInput.value = 'transactions'
 					}
 				} else {
 					typeInput.value = type

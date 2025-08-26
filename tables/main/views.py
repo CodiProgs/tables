@@ -807,6 +807,11 @@ def branch_list(request):
     branch_data = Branch.objects.values('id', 'name')
     return JsonResponse(list(branch_data), safe=False)
 
+@forbid_supplier
+@login_required
+def investor_list(request):
+    investor_data = Investor.objects.values('id', 'name')
+    return JsonResponse(list(investor_data), safe=False)
 
 def get_cash_flow_fields():
     excluded = [
@@ -2153,7 +2158,7 @@ def debtors(request):
         and getattr(t, 'profit', 0) > 0
     ]
 
-    total_profit = sum(float(t.profit) for t in transactionsInvestors)
+    total_profit = sum(float(t.profit - t.returned_to_investor) for t in transactionsInvestors)
 
     summary = [
         {"name": "Бонусы", "amount": total_bonuses},
@@ -2312,7 +2317,7 @@ def settle_supplier_debt(request, pk: int):
                     and getattr(t, 'profit', 0) > 0
                 ]
 
-                total_profit = sum(float(t.profit) for t in transactionsInvestors)
+                total_profit = sum(float(t.profit - t.returned_to_investor) for t in transactionsInvestors)
 
                 is_admin = request.user.user_type.name == 'Администратор' if hasattr(request.user, 'user_type') else False
 
@@ -2391,13 +2396,17 @@ def settle_supplier_debt(request, pk: int):
                     and getattr(t, 'profit', 0) > 0
                 ]
 
-                total_profit = sum(float(t.profit) for t in transactionsInvestors)
+                total_profit = sum(float(t.profit - t.returned_to_investor) for t in transactionsInvestors)
 
                 summary = [
                     {"name": "Бонусы", "amount": total_bonuses},
                     {"name": "Выдачи клиентам", "amount": total_remaining},
-                    {"name": "Инвесторам", "amount": total_profit},
                 ]
+
+                is_admin = request.user.user_type.name == 'Администратор' if hasattr(request.user, 'user_type') else False
+
+                if is_admin:
+                    summary.append({"name": "Инвесторам", "amount": total_profit})
 
                 total_summary_debts = sum(item['amount'] for item in summary)
 
@@ -2551,6 +2560,116 @@ def settle_supplier_debt(request, pk: int):
                 }
                 return JsonResponse(data, safe=False)
 
+            elif type_ == "profit":
+                if amount_value == 0:
+                    return JsonResponse({"status": "error", "message": "Сумма должна быть больше нуля"}, status=400)
+
+                if amount_value > (trans.profit - trans.returned_to_investor):
+                    return JsonResponse({"status": "error", "message": "Сумма не может превышать долг инвестору"}, status=400)
+
+                investor_id = request.POST.get("investor_select")
+
+                if not investor_id:
+                    return JsonResponse({"status": "error", "message": "Инвестор обязателен"}, status=400)
+                
+                investor = get_object_or_404(Investor, id=investor_id)
+
+                investor.balance += amount_value
+                investor.save()
+
+                investorDebtOperation = InvestorDebtOperation.objects.create(
+                    investor=investor,
+                    amount=amount_value,
+                    operation_type="deposit",
+                )
+
+                trans.returned_to_investor += amount_value
+                trans.save()
+
+                row = type("Row", (), {
+                    "created_at": trans.created_at.strftime("%d.%m.%Y") if trans.created_at else "",
+                    "client": str(trans.client) if trans.client else "",
+                    "amount": trans.amount,
+                    "profit": trans.profit - trans.returned_to_investor
+                })()
+                fields = [
+                    {"name": "created_at", "verbose_name": "Дата"},
+                    {"name": "client", "verbose_name": "Клиент"},
+                    {"name": "amount", "verbose_name": "Сумма", "is_amount": True},
+                    {"name": "profit", "verbose_name": "Прибыль", "is_amount": True},
+                ]
+                html = render_to_string("components/table_row.html", {"item": row, "fields": fields})
+
+                investorDebtOperation.created_at = investorDebtOperation.created_at.strftime("%d.%m.%Y %H:%M") if investorDebtOperation.created_at else ""
+                investorDebtOperation.operation_type = "Внесение" if investorDebtOperation.operation_type == "deposit" else "Забор"
+
+                html_investor_debt_operation = render_to_string("components/table_row.html", {
+                    "item": investorDebtOperation,
+                    "fields": [
+                        {"name": "created_at", "verbose_name": "Дата"},
+                        {"name": "investor", "verbose_name": "Инвестор"},
+                        {"name": "operation_type", "verbose_name": "Тип операции"},
+                        {"name": "amount", "verbose_name": "Сумма", "is_amount": True},
+                    ]
+                })
+
+                transactions = Transaction.objects.filter(paid_amount__gt=0)
+
+                total_bonuses = sum(float(t.bonus_debt) for t in transactions)
+                total_remaining = sum(float(t.client_debt_paid) for t in transactions)
+                transactionsInvestors = [
+                    t for t in Transaction.objects.filter(paid_amount__gt=0)
+                    if getattr(t, 'bonus_debt', 0) == 0
+                    and getattr(t, 'client_debt', 0) == 0
+                    # and getattr(t, 'supplier_debt', 0) == 0
+                    and getattr(t, 'profit', 0) > 0
+                ]
+
+                total_debt = sum(float(t.profit - t.returned_to_investor) for t in transactionsInvestors)
+                total_profit = sum(float(t.profit - t.returned_to_investor) for t in transactionsInvestors)
+
+                is_admin = request.user.user_type.name == 'Администратор' if hasattr(request.user, 'user_type') else False
+
+                summary = [
+                    {"name": "Бонусы", "amount": total_bonuses},
+                    {"name": "Выдачи клиентам", "amount": total_remaining},
+                ]
+
+                if is_admin:
+                    summary.append({"name": "Инвесторам", "amount": total_profit})
+
+                total_summary_debts = sum(item['amount'] for item in summary)
+
+                investor_fields = [
+                    {"name": "name", "verbose_name": "Инвестор"},
+                    {"name": "balance", "verbose_name": "Сумма", "is_amount": True},
+                ]
+                investors = Investor.objects.all()
+                investor_data = []
+                for inv in investors:
+                    investor_data.append(type("InvestorRow", (), {
+                        "name": inv.name,
+                        "balance": inv.balance,
+                    })())
+                investor_ids = [inv.id for inv in investors]
+
+                html_investors = render_to_string(
+                    "components/table.html",
+                    {"id": "investors-table", "fields": investor_fields, "data": investor_data}
+                )
+
+                return JsonResponse({
+                    "html": html,
+                    "id": trans.id,
+                    "type": "Инвесторам",
+                    "total_debt": total_debt,
+                    "total_summary_debts": total_summary_debts,
+                    "total_profit": total_profit,
+                    "html_investor_debt_operation": html_investor_debt_operation,
+                    "html_investors": html_investors,
+                    "investor_ids": investor_ids,
+                })
+
             else:
                 return JsonResponse({"status": "error", "message": "Некорректный тип"}, status=400)
     except Exception as e:
@@ -2585,6 +2704,7 @@ def debtor_detail(request, type, pk):
         data = model_to_dict(transaction)
         if "amount" in data:
             del data["amount"]
+    
     else:
         return JsonResponse({"error": "Unknown type"}, status=400)
 
@@ -2772,7 +2892,7 @@ def debtor_details(request):
                     "created_at": t.created_at.strftime("%d.%m.%Y") if t.created_at else "",
                     "client": str(t.client) if t.client else "",
                     "amount": t.amount,
-                    "profit": getattr(t, 'profit', 0),
+                    "profit": t.profit - t.returned_to_investor,
                 })())
             table_id = "summary-profit"
             data_ids = [t.id for t in transactions]

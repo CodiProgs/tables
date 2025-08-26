@@ -77,4 +77,5 @@ urlpatterns = [
     path("users/edit/<int:pk>/", views.user_edit, name="user_edit"),
     path("users/delete/<int:pk>/", views.user_delete, name="user_delete"),
     path("users/types/", views.user_types, name="user_types"),
+    path("investors/list/", views.investor_list, name="investor_list"),
 ]

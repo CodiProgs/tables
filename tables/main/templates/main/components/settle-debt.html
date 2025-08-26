@@ -21,6 +21,9 @@
                    placeholder="Введите комментарий"
                    hidden>
         </div>
+        <div class="modal-form__group" hidden>
+            {% include "components/select.html" with id="investor_select" placeholder="Выберите инвестора" %}
+        </div>
         <div class="modal-form__buttons">
             <button class="button modal-form__button" type="submit">Сохранить</button>
             <button class="button modal-form__button button--cancel" type="button">Отменить</button>

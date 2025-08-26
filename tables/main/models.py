@@ -156,6 +156,14 @@ class Transaction(models.Model):
         null=True,
         blank=True
     )
+    returned_to_investor = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=0,
+        verbose_name="Возвращено инвестору",
+        null=True,
+        blank=True
+    )
 
     modified_by_accountant = models.BooleanField(default=False, verbose_name="Изменено бухгалтером")
     viewed_by_admin = models.BooleanField(default=False, verbose_name="Просмотрено администратором")

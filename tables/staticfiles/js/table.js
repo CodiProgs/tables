@@ -945,6 +945,15 @@ export const TableManager = {
 		this.attachGlobalCellClickHandler()
 	},
 
+	initTable(tableId) {
+		const tableEl = document.getElementById(tableId)
+		if (tableEl) {
+			this.tables.set(tableId, new ResizableTable(tableEl))
+			this.formatCurrencyValues(tableId)
+			this.setInitialSelectionForTable(tableId)
+		}
+	},
+
 	sortTable(tableId, columnIndex, direction, columnType = 'default') {
 		const table = document.getElementById(tableId)
 		if (!table) {
