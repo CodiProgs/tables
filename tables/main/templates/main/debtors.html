@@ -3,12 +3,14 @@
 {% block content %}
     <div class="page-table-container" id="debtors-container">
         <div id="context-menu" class="dropdown-menu">
+            {% if not is_supplier %}
             <a class="dropdown-item context-action"
                 id="settle-debt-button"
                 data-action="settle-debt">Погасить долг</a>
             <a class="dropdown-item context-action"
                 id="repayment-edit-button"
                 data-action="repayment-edit">Изменить</a>
+            {% endif %}
             <a class="dropdown-item context-action"
                id="hide-button"
                data-action="hide">Скрыть</a>

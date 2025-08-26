@@ -2166,6 +2166,7 @@ def debtors(request):
 
     context = {
         "is_admin": is_admin,
+        "is_supplier": is_supplier,
         "branch_debts": branch_debts_list,
         "summary": summary,
         "total_branch_debts": total_branch_debts,
@@ -2309,11 +2310,16 @@ def settle_supplier_debt(request, pk: int):
 
                 total_profit = sum(float(t.profit) for t in transactionsInvestors)
 
+                is_admin = request.user.user_type.name == 'Администратор' if hasattr(request.user, 'user_type') else False
+
                 summary = [
                     {"name": "Бонусы", "amount": total_bonuses},
                     {"name": "Выдачи клиентам", "amount": total_remaining},
-                    {"name": "Инвесторам", "amount": total_profit},
+                    
                 ]
+
+                if is_admin:
+                    summary.append({"name": "Инвесторам", "amount": total_profit})
 
                 total_summary_debts = sum(item['amount'] for item in summary)
 

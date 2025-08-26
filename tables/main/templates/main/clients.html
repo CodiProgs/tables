@@ -10,9 +10,11 @@
             <a class="dropdown-item context-action"
                id="edit-button"
                data-action="edit">Редактировать</a>
+            {% if request.user.is_authenticated and request.user.user_type.name == "Администратор" %}
             <a class="dropdown-item context-action"
                id="delete-button"
                data-action="delete">Удалить</a>
+            {% endif %}
         </div>
     </div>
 {% endblock content %}
