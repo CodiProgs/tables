@@ -2899,7 +2899,13 @@ def company_balance_stats(request):
     current_year = datetime.now().year
     current_month = datetime.now().month
     capitals = []
-    months = []
+    
+    MONTHS_RU = [
+        "январь", "февраль", "март", "апрель", "май", "июнь",
+        "июль", "август", "сентябрь", "октябрь", "ноябрь", "декабрь"
+    ]
+    months = [MONTHS_RU[month-1] for month in range(1, 13)]
+
     for month in range(1, 13):
         if month == current_month:
             capital = float(get_monthly_capital(current_year, month))
@@ -2907,7 +2913,7 @@ def company_balance_stats(request):
             mc = MonthlyCapital.objects.filter(year=current_year, month=month).first()
             capital = float(mc.capital) if mc else 0
         capitals.append(capital)
-        months.append(datetime(current_year, month, 1).strftime('%B'))
+        months.append(MONTHS_RU[month-1])
 
     data = {
         "non_current_assets": {
