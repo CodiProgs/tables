@@ -2526,6 +2526,15 @@ const handleDebtors = async () => {
 									`investor-operations-table`
 								)
 
+								const table_investors = document.getElementById(
+									`investor-operations-table`
+								)
+								if (table_investors) {
+									table_investors
+										.querySelectorAll('tr.table__row--empty')
+										.forEach(row => row.remove())
+								}
+
 								break
 							default:
 								tableId = `branch-transactions-${result.branch}`
