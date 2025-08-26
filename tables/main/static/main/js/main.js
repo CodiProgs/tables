@@ -2464,7 +2464,7 @@ const handleDebtors = async () => {
 								],
 							},
 					  ]
-					: table.id === 'summary-profit'
+					: table && table.id === 'summary-profit'
 					? [
 							{
 								id: 'investor_select',
