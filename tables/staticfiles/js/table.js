@@ -2087,26 +2087,36 @@ document.addEventListener('DOMContentLoaded', function () {
 		}
 	}
 
-	function resizeCharts() {
-		const statsChart = document.getElementById('statsChart')
-		const profitChart = document.getElementById('profitChart')
-		console.log(statsChart, profitChart)
-		if (!statsChart || !profitChart) return
-		console.log('resizeCharts')
-		const w = statsChart.parentElement.offsetWidth
-		let h = 264
-		let profitW = 40
-		if (window.innerWidth <= 600) {
-			h = 200
-			profitW = 35
-		} else if (window.innerWidth <= 1024) {
-			h = 180
-		}
-		statsChart.width = w
-		statsChart.height = h
-		profitChart.width = profitW
-		profitChart.height = h
-	}
-	window.addEventListener('resize', resizeCharts)
-	resizeCharts()
+	// function resizeCharts() {
+	// 	const statsChart = document.getElementById('statsChart')
+	// 	const profitChart = document.getElementById('profitChart')
+	// 	if (!statsChart || !profitChart) return
+	// 	const w = statsChart.parentElement.offsetWidth
+	// 	let h = 264
+	// 	let profitW = 40
+	// 	if (window.innerWidth <= 600) {
+	// 		h = 200
+	// 		profitW = 35
+	// 	} else if (window.innerWidth <= 1024) {
+	// 		h = 180
+	// 	}
+	// 	statsChart.width = w
+	// 	statsChart.height = h
+	// 	profitChart.width = profitW
+	// 	profitChart.height = h
+
+	// 	if (window.capitalChart) {
+	// 		window.capitalChart.destroy()
+	// 		window.capitalChart = null
+	// 	}
+	// 	if (window.profitChartInstance) {
+	// 		window.profitChartInstance.destroy()
+	// 		window.profitChartInstance = null
+	// 	}
+	// 	if (window.drawCharts) {
+	// 		window.drawCharts()
+	// 	}
+	// }
+	// window.addEventListener('resize', resizeCharts)
+	// resizeCharts()
 })

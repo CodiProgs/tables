@@ -173,7 +173,10 @@ def get_transaction_fields(is_accountant, is_assistant=False):
 @login_required
 def transaction_detail(request, pk: int):
     transaction = get_object_or_404(Transaction, id=pk)
-    return JsonResponse({"data": model_to_dict(transaction)})
+    data = model_to_dict(transaction)
+    if data.get("paid_amount", 0) == 0:
+        data["paid_amount"] = data.get("amount", 0)
+    return JsonResponse({"data": data})
 
 @forbid_supplier
 @login_required
@@ -356,32 +359,38 @@ def transaction_payment(request, pk=None):
 
             trans = get_object_or_404(Transaction, id=pk)
 
-            paid_amount = clean_currency(request.POST.get("paid_amount"))
+            is_assistant = request.user.user_type.name == 'Ассистент' if hasattr(request.user, 'user_type') else False
+
+            if not is_assistant:
+                paid_amount = clean_currency(request.POST.get("paid_amount"))
+
+                if not paid_amount:
+                    return JsonResponse(
+                        {"status": "error", "message": "Сумма оплаты не может быть пустой"},
+                        status=400,
+                    )
+
+                try:
+                    amount_float = float(paid_amount)
+                    if amount_float <= 0:
+                        return JsonResponse(
+                            {"status": "error", "message": "Сумма должна быть больше нуля"},
+                            status=400,
+                        )
+                    if amount_float > trans.amount:
+                        return JsonResponse(
+                            {"status": "error", "message": "Сумма оплаты не может превышать общую сумму транзакции"},
+                            status=400,
+                        )
+                except ValueError:
+                    return JsonResponse(
+                        {"status": "error", "message": "Некорректное значение суммы"},
+                        status=400,
+                    )
+            else:
+                paid_amount = trans.paid_amount
+
             documents = request.POST.get("documents") == "on"
-
-            if not paid_amount:
-                return JsonResponse(
-                    {"status": "error", "message": "Сумма оплаты не может быть пустой"},
-                    status=400,
-                )
-
-            try:
-                amount_float = float(paid_amount)
-                if amount_float <= 0:
-                    return JsonResponse(
-                        {"status": "error", "message": "Сумма должна быть больше нуля"},
-                        status=400,
-                    )
-                if amount_float > trans.amount:
-                    return JsonResponse(
-                        {"status": "error", "message": "Сумма оплаты не может превышать общую сумму транзакции"},
-                        status=400,
-                    )
-            except ValueError:
-                return JsonResponse(
-                    {"status": "error", "message": "Некорректное значение суммы"},
-                    status=400,
-                )
 
             previous_paid_amount = trans.paid_amount or 0
             new_paid_amount = int(float(paid_amount))
@@ -2697,13 +2706,24 @@ def debtor_detail(request, type, pk):
             return JsonResponse({"error": "ID инвестора не указан"}, status=400)
         obj = get_object_or_404(Investor, id=pk)
         data = model_to_dict(obj)
-    elif type == "transactions":
+    elif type.startswith("transactions"):
         if pk == -1:
             return JsonResponse({"error": "ID транзакции не указан"}, status=400)
         transaction = get_object_or_404(Transaction, id=pk)
         data = model_to_dict(transaction)
         if "amount" in data:
-            del data["amount"]
+            if "." in type:
+                suffix = type.split(".")[1]
+                if suffix == "bonus":
+                    data["amount"] = float(getattr(transaction, "bonus_debt", 0))
+                elif suffix == "remaining":
+                    data["amount"] = float(getattr(transaction, "client_debt_paid", 0))
+                elif suffix == "investors":
+                    data["amount"] = float(getattr(transaction, "investor_debt", 0))
+                else:
+                    data["amount"] = float(getattr(transaction, "supplier_debt", 0))
+            else:
+                data["amount"] = float(getattr(transaction, "supplier_debt", 0))
     
     else:
         return JsonResponse({"error": "Unknown type"}, status=400)

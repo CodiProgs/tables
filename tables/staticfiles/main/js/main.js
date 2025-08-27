@@ -2373,127 +2373,163 @@ const handleDebtors = async () => {
 					})
 				})
 
-			if (data.capitals_by_month) {
+			let lastBalanceData = null
+
+			function drawCharts() {
 				const statsChart = document.getElementById('statsChart')
-				if (statsChart) {
-					const ctx = statsChart.getContext('2d')
-					if (window.capitalChart) {
-						window.capitalChart.destroy()
-					}
-					window.capitalChart = new Chart(ctx, {
-						type: 'bar',
-						data: {
-							labels: data.capitals_by_month.months,
-							datasets: [
-								{
-									label: '',
-									data: data.capitals_by_month.capitals,
-									backgroundColor: 'rgba(54, 162, 235, 0.5)',
-									borderColor: 'rgba(54, 162, 235, 1)',
-									borderWidth: 1,
-									stepped: true,
-								},
-							],
-						},
-						options: {
-							scales: {
-								y: { beginAtZero: true },
-							},
-							plugins: {
-								legend: { display: false },
-								tooltip: {
-									enabled: true,
-									position: 'nearest',
-									yAlign: 'center',
-									xAlign: 'center',
-									padding: 10,
-									displayColors: false,
-								},
-							},
-						},
-					})
-				}
-
 				const profitChart = document.getElementById('profitChart')
-				if (profitChart && data.capitals_by_month) {
-					const ctx = profitChart.getContext('2d')
-					if (window.profitChartInstance) {
-						window.profitChartInstance.destroy()
-					}
-					window.profitChartInstance = new Chart(ctx, {
-						type: 'bar',
-						data: {
-							labels: ['Итого'],
-							datasets: [
-								{
-									label: 'Итого',
-									data: [data.capitals_by_month.total],
-									backgroundColor: 'rgba(255, 99, 132, 0.5)',
-									borderColor: 'rgba(255, 99, 132, 1)',
-									borderWidth: 1,
-								},
-							],
-						},
-						options: {
-							scales: {
-								y: { beginAtZero: true, display: false },
-							},
-							plugins: {
-								legend: { display: false },
-								tooltip: {
-									enabled: false,
-									external: function (context) {
-										const tooltipModel = context.tooltip
-										let tooltipEl = document.getElementById('chartjs-tooltip')
-										if (!tooltipEl) {
-											tooltipEl = document.createElement('div')
-											tooltipEl.id = 'chartjs-tooltip'
-											tooltipEl.style.position = 'absolute'
-											tooltipEl.style.background = 'rgba(0,0,0,0.8)'
-											tooltipEl.style.color = '#fff'
-											tooltipEl.style.borderRadius = '6px'
-											tooltipEl.style.padding = '8px 14px'
-											tooltipEl.style.pointerEvents = 'none'
-											tooltipEl.style.fontSize = '12px'
-											tooltipEl.style.zIndex = '1000'
-											tooltipEl.style.boxShadow = '0 2px 8px rgba(0,0,0,0.2)'
-											document.body.appendChild(tooltipEl)
-										}
-										if (tooltipModel.opacity === 0) {
-											tooltipEl.style.opacity = 0
-											return
-										}
-										if (tooltipModel.title && tooltipModel.body) {
-											const title = tooltipModel.title[0] || ''
-											let value = tooltipModel.body[0].lines[0] || ''
-											value = value.replace(/^Итого:\s*/, '')
+				if (
+					!statsChart ||
+					!profitChart ||
+					!lastBalanceData ||
+					!lastBalanceData.capitals_by_month
+				)
+					return
 
-											tooltipEl.innerHTML = `
-						<div style="font-weight:600; font-size:12px; margin-bottom:2px;">${title}</div>
-						<div style="font-size:12px; font-weight:500;">${value}</div>
-    `
-										}
-										const canvas = context.chart.canvas
-										const rect = canvas.getBoundingClientRect()
-										tooltipEl.style.opacity = 1
-										tooltipEl.style.left =
-											rect.left +
-											window.pageXOffset +
-											tooltipModel.caretX -
-											tooltipEl.offsetWidth +
-											'px'
-										tooltipEl.style.top =
-											rect.top +
-											window.pageYOffset +
-											tooltipModel.caretY -
-											tooltipEl.offsetHeight / 2 +
-											'px'
-									},
+				const data = lastBalanceData
+				const statsCtx = statsChart.getContext('2d')
+				const profitCtx = profitChart.getContext('2d')
+
+				window.capitalChart = new Chart(statsCtx, {
+					type: 'bar',
+					data: {
+						labels: data.capitals_by_month.months,
+						datasets: [
+							{
+								label: '',
+								data: data.capitals_by_month.capitals,
+								backgroundColor: 'rgba(54, 162, 235, 0.5)',
+								borderColor: 'rgba(54, 162, 235, 1)',
+								borderWidth: 1,
+								stepped: true,
+							},
+						],
+					},
+					options: {
+						scales: { y: { beginAtZero: true } },
+						plugins: {
+							legend: { display: false },
+							tooltip: {
+								enabled: true,
+								position: 'nearest',
+								yAlign: 'center',
+								xAlign: 'center',
+								padding: 10,
+								displayColors: false,
+							},
+						},
+					},
+				})
+
+				window.profitChartInstance = new Chart(profitCtx, {
+					type: 'bar',
+					data: {
+						labels: ['Итого'],
+						datasets: [
+							{
+								label: 'Итого',
+								data: [data.capitals_by_month.total],
+								backgroundColor: 'rgba(255, 99, 132, 0.5)',
+								borderColor: 'rgba(255, 99, 132, 1)',
+								borderWidth: 1,
+							},
+						],
+					},
+					options: {
+						scales: { y: { beginAtZero: true, display: false } },
+						plugins: {
+							legend: { display: false },
+							tooltip: {
+								enabled: false,
+								external: function (context) {
+									const tooltipModel = context.tooltip
+									let tooltipEl = document.getElementById('chartjs-tooltip')
+									if (!tooltipEl) {
+										tooltipEl = document.createElement('div')
+										tooltipEl.id = 'chartjs-tooltip'
+										tooltipEl.style.position = 'absolute'
+										tooltipEl.style.background = 'rgba(0,0,0,0.8)'
+										tooltipEl.style.color = '#fff'
+										tooltipEl.style.borderRadius = '6px'
+										tooltipEl.style.padding = '8px 14px'
+										tooltipEl.style.pointerEvents = 'none'
+										tooltipEl.style.fontSize = '12px'
+										tooltipEl.style.zIndex = '1000'
+										tooltipEl.style.boxShadow = '0 2px 8px rgba(0,0,0,0.2)'
+										document.body.appendChild(tooltipEl)
+									}
+									if (tooltipModel.opacity === 0) {
+										tooltipEl.style.opacity = 0
+										return
+									}
+									if (tooltipModel.title && tooltipModel.body) {
+										const title = tooltipModel.title[0] || ''
+										let value = tooltipModel.body[0].lines[0] || ''
+										value = value.replace(/^Итого:\s*/, '')
+										tooltipEl.innerHTML = `
+                                <div style="font-weight:600; font-size:12px; margin-bottom:2px;">${title}</div>
+                                <div style="font-size:12px; font-weight:500;">${value}</div>
+                            `
+									}
+									const canvas = context.chart.canvas
+									const rect = canvas.getBoundingClientRect()
+									tooltipEl.style.opacity = 1
+									tooltipEl.style.left =
+										rect.left +
+										window.pageXOffset +
+										tooltipModel.caretX -
+										tooltipEl.offsetWidth +
+										'px'
+									tooltipEl.style.top =
+										rect.top +
+										window.pageYOffset +
+										tooltipModel.caretY -
+										tooltipEl.offsetHeight / 2 +
+										'px'
 								},
 							},
 						},
-					})
+					},
+				})
+			}
+
+			function resizeCharts() {
+				const statsChart = document.getElementById('statsChart')
+				const profitChart = document.getElementById('profitChart')
+				if (!statsChart || !profitChart) return
+				const w = statsChart.parentElement.offsetWidth
+				let h = 264
+				let profitW = 40
+				if (window.innerWidth <= 600) {
+					h = 200
+					profitW = 35
+				} else if (window.innerWidth <= 1024) {
+					h = 180
 				}
+				statsChart.width = w
+				statsChart.height = h
+
+				profitChart.width = profitW
+				profitChart.height = h
+
+				if (window.capitalChart) {
+					window.capitalChart.destroy()
+					window.capitalChart = null
+				}
+				if (window.profitChartInstance) {
+					window.profitChartInstance.destroy()
+					window.profitChartInstance = null
+				}
+				if (window.drawCharts) {
+					window.drawCharts()
+				}
+			}
+			window.drawCharts = drawCharts
+			window.addEventListener('resize', resizeCharts)
+
+			if (data.capitals_by_month) {
+				lastBalanceData = data
+				resizeCharts()
 			}
 		} catch (error) {
 			console.error('Ошибка при загрузке данных:', error)
@@ -2528,6 +2564,10 @@ const handleDebtors = async () => {
 					type = 'investors'
 				} else {
 					type = 'transactions'
+					if (table && table.id === 'summary-bonus') type += '.bonus'
+					else if (table && table.id === 'summary-remaining')
+						type += '.remaining'
+					else if (table && table.id === 'summary-profit') type += '.investors'
 				}
 			} else {
 				if (type === 'Оборудование') type = 'equipment'

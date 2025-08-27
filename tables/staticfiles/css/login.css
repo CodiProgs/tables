@@ -98,11 +98,13 @@
 @media (max-width: 768px) {
 	.login {
 		max-width: 60%;
+		transform: translate(-50%, -30%);
 	}
 }
 
 @media (max-width: 425px) {
 	.login {
 		max-width: 90%;
+		transform: translate(-50%, -20%);
 	}
 }

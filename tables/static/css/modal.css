@@ -125,6 +125,10 @@
 	.modal__message {
 		max-width: 90vw;
 	}
+
+	.modal__content {
+		transform: translate(-50%, -20%);
+	}
 }
 
 @media (max-width: 560px) {

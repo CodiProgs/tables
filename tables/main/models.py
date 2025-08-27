@@ -236,6 +236,13 @@ class Transaction(models.Model):
         """
         result = math.floor(self.paid_amount * (100 - self.client_percentage) / 100)
         return Decimal(result) - self.returned_to_client
+    
+    @property
+    def investor_debt(self):
+        """
+        Долг инвестора = прибыль - возвращено инвестору
+        """
+        return self.profit - self.returned_to_investor
 
 class AccountType(models.Model):
     name = models.CharField(max_length=100, verbose_name="Тип счета")

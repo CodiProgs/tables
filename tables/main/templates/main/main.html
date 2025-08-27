@@ -6,6 +6,7 @@
         <div id="context-menu"
              class="dropdown-menu"
              data-is-admin="{{ is_admin|yesno:'true,false' }}">
+            {% if request.user.is_authenticated and request.user.user_type.name != "Ассистент" %}
             <a class="dropdown-item context-action"
                id="add-button"
                data-action="add">Добавить</a>
@@ -17,9 +18,16 @@
                    id="delete-button"
                    data-action="delete">Удалить</a>
             {% endif %}
+            {% endif %}
             <a class="dropdown-item context-action"
                id="payment-button"
-               data-action="payment">Оплата</a>
+               data-action="payment">
+               {% if request.user.is_authenticated and request.user.user_type.name == "Ассистент" %}
+               Редактировать
+               {% else %}
+               Оплата
+               {% endif %}
+               </a>
             <a class="dropdown-item context-action"
                id="hide-button"
                data-action="hide">Скрыть</a>
