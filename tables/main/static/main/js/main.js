@@ -2352,6 +2352,7 @@ const handleDebtors = async () => {
 		})
 
 	const balanceContainer = document.getElementById('balance-container')
+
 	if (balanceContainer) {
 		try {
 			const response = await fetch('/company_balance_stats/')
@@ -2547,6 +2548,16 @@ const handleDebtors = async () => {
 		} catch (error) {
 			console.error('Ошибка при загрузке данных:', error)
 			balanceContainer.innerHTML = '<p>Ошибка при загрузке данных.</p>'
+		}
+	} else {
+		const debtorsData = document.querySelector('.debtors-data')
+		const statsContainer = document.querySelector('.stats-container')
+		if (statsContainer) {
+			statsContainer.style.display = 'none'
+		}
+		if (debtorsData) {
+			debtorsData.style.maxHeight = '100%'
+			debtorsData.style.border = 'none'
 		}
 	}
 

