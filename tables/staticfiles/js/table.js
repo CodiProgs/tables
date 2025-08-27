@@ -2091,7 +2091,7 @@ document.addEventListener('DOMContentLoaded', function () {
 		const statsChart = document.getElementById('statsChart')
 		const profitChart = document.getElementById('profitChart')
 
-		if (!statsChart || !profitChart) return
+		if (!statsChart && !profitChart) return
 		const w = statsChart.parentElement.offsetWidth
 		let h = 264
 		let profitW = 40
