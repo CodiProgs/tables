@@ -2090,8 +2090,9 @@ document.addEventListener('DOMContentLoaded', function () {
 	function resizeCharts() {
 		const statsChart = document.getElementById('statsChart')
 		const profitChart = document.getElementById('profitChart')
-
-		if (!statsChart && !profitChart) return
+		console.log(statsChart, profitChart)
+		if (!statsChart || !profitChart) return
+		console.log('resizeCharts')
 		const w = statsChart.parentElement.offsetWidth
 		let h = 264
 		let profitW = 40

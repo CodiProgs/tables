@@ -755,6 +755,15 @@ textarea::placeholder {
 	flex: 0 0 auto;
 }
 
+#cash_flow-container #statsChart {
+	max-height: 260px;
+	padding-right: 10px;
+}
+
+#cash_flow-container .stats-container {
+	border: 1px solid var(--color-border-window);
+}
+
 #debtors-container {
 	max-height: 100%;
 }
@@ -767,12 +776,22 @@ textarea::placeholder {
 
 @media (max-width: 600px) {
 	.stats-container .select {
-		max-width: 100vw;
-		width: 100vw;
+		max-width: 100%;
+		width: 100%;
+	}
+
+	#cash_flow-container #statsChart {
+		max-height: 220px;
 	}
 
 	.stats-container {
 		min-height: 220px;
+	}
+}
+
+@media (max-width: 600px) {
+	#cash_flow-container #statsChart {
+		max-height: 200px;
 	}
 }
 
