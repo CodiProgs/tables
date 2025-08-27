@@ -1451,7 +1451,7 @@ const mainConfig = createConfig(TRANSACTION, {
 		setupPercentInput('supplier_percentage')
 		setupPercentInput('bonus_percentage')
 
-		// нужно слушатель на поставщика и при изменении очищать счет и подгружать новые счета
+		// нужно слушатель на поставщика и при изменении очищать счет и подгружать новые счета поменять transaction_create и transaction_edit
 		// const accountSupplierInput = document.getElementById('account_supplier')
 		// if (accountSupplierInput) {
 		// 	const accountSupplierSelect = accountSupplierInput.closest('.select')
