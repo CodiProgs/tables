@@ -1,5 +1,5 @@
 {% load static %}
-<div class="select">
+<div class="select" data-multiple="{{ multiple|default:'false' }}">
     <input type="text"
            hidden
            class="select__input"
@@ -10,13 +10,11 @@
         <span class="select__text{% if placeholder %} select__placeholder {% endif %}">
             {% if placeholder %}{{ placeholder }}{% endif %}
         </span>
-        <!--<i class="far fa-chevron-down select__arrow"></i>-->
         <img src="{% static 'images/chevron-down.svg' %}"
              alt="Close"
              class="select__arrow"
              height="28"
              width="28">
-        <!--<i class="far fa-times select__clear"></i>-->
         <img src="{% static 'images/close.svg' %}"
              alt="Close"
              class="select__clear"

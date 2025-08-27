@@ -4,11 +4,12 @@ export default class SelectHandler {
 	static setupSelects({ data = null, url = null, select = null }) {
 		if (select) {
 			if (data) {
+				const multiple = select.dataset.multiple === 'true'
 				const dropdown = select.querySelector('.select__dropdown')
 
 				if (dropdown) {
-					dropdown.replaceChildren(...this.createSelectOptions(data))
-					this.attachOptionHandlers(select)
+					dropdown.replaceChildren(...this.createSelectOptions(data, multiple))
+					this.attachOptionHandlers(select, multiple)
 				}
 			}
 			this.setupSelectBehavior(select, url)
@@ -19,10 +20,14 @@ export default class SelectHandler {
 
 			selects.forEach(select => {
 				if (data) {
+					const multiple = select.dataset.multiple === 'true'
+
 					const dropdown = select.querySelector('.select__dropdown')
 					if (dropdown) {
-						dropdown.replaceChildren(...this.createSelectOptions(data))
-						this.attachOptionHandlers(select)
+						dropdown.replaceChildren(
+							...this.createSelectOptions(data, multiple)
+						)
+						this.attachOptionHandlers(select, multiple)
 					}
 				}
 				this.setupSelectBehavior(select, url)
@@ -38,10 +43,12 @@ export default class SelectHandler {
 
 		dropdown.innerHTML = ''
 
-		const options = this.createSelectOptions(data)
+		const multiple = select.dataset.multiple === 'true'
+
+		const options = this.createSelectOptions(data, multiple)
 		dropdown.append(...options)
 
-		this.attachOptionHandlers(select)
+		this.attachOptionHandlers(select, multiple)
 
 		const input = select.querySelector('.select__input')
 		const text = select.querySelector('.select__text')
@@ -52,13 +59,21 @@ export default class SelectHandler {
 		return dropdown
 	}
 
-	static createSelectOptions(data) {
+	static createSelectOptions(data, multiple = false, selectedValues = []) {
 		return data.map(item => {
 			const option = document.createElement('div')
 			option.className = 'select__option'
 			option.tabIndex = 0
 			option.dataset.value = item.id
 			option.textContent = item.name
+
+			if (multiple) {
+				const checkbox = document.createElement('span')
+				checkbox.className = 'select__checkbox'
+				checkbox.innerHTML = selectedValues.includes(item.id) ? '✔️' : ''
+				option.prepend(checkbox)
+			}
+
 			return option
 		})
 	}
@@ -87,9 +102,10 @@ export default class SelectHandler {
 		if (!dropdown) return
 
 		const data = await this.fetchSelectOptions(url)
+		const multiple = select.dataset.multiple === 'true'
 
-		dropdown.replaceChildren(...this.createSelectOptions(data))
-		this.attachOptionHandlers(select)
+		dropdown.replaceChildren(...this.createSelectOptions(data, multiple))
+		this.attachOptionHandlers(select, multiple)
 	}
 
 	static setupSelectBehavior(select, url) {
@@ -138,25 +154,60 @@ export default class SelectHandler {
 		updateClearButton()
 	}
 
-	static attachOptionHandlers(select) {
+	static attachOptionHandlers(select, multiple = false) {
 		const input = select.querySelector('.select__input')
 		const text = select.querySelector('.select__text')
 
-		select.querySelectorAll('.select__option').forEach(option => {
-			const handleSelect = () => {
-				text.textContent = option.textContent
-				input.value = option.dataset.value
-
-				select.classList.remove('active')
-				select.classList.add('has-value')
-
-				text.classList.remove('select__placeholder')
-			}
-
-			option.addEventListener('click', handleSelect)
-			option.addEventListener('keydown', e => {
-				if (e.key === 'Enter') handleSelect()
+		if (multiple) {
+			select.querySelectorAll('.select__option').forEach(option => {
+				option.addEventListener('click', () => {
+					let selectedValues = input.value
+						? input.value
+								.split(',')
+								.map(v => v.trim())
+								.filter(Boolean)
+						: []
+					const value = option.dataset.value
+					const checkbox = option.querySelector('.select__checkbox')
+					if (selectedValues.includes(value)) {
+						selectedValues = selectedValues.filter(v => v !== value)
+						checkbox.innerHTML = ''
+					} else {
+						selectedValues.push(value)
+						checkbox.innerHTML = '✔️'
+					}
+					select.querySelectorAll('.select__option').forEach(opt => {
+						const cb = opt.querySelector('.select__checkbox')
+						if (cb)
+							cb.innerHTML = selectedValues.includes(opt.dataset.value)
+								? '✔️'
+								: ''
+					})
+					input.value = selectedValues.join(',')
+					text.textContent = selectedValues.length
+						? `Выбрано: ${selectedValues.length}`
+						: input.getAttribute('placeholder') || ''
+					text.classList.toggle(
+						'select__placeholder',
+						selectedValues.length === 0
+					)
+					select.classList.toggle('has-value', selectedValues.length > 0)
+				})
 			})
-		})
+		} else {
+			select.querySelectorAll('.select__option').forEach(option => {
+				const handleSelect = () => {
+					text.textContent = option.textContent
+					input.value = option.dataset.value
+					select.classList.remove('active')
+					select.classList.add('has-value')
+					text.classList.remove('select__placeholder')
+				}
+				option.addEventListener('click', handleSelect)
+				option.addEventListener('keydown', e => {
+					if (e.key === 'Enter') handleSelect()
+				})
+			})
+		}
 	}
 }

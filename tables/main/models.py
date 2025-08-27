@@ -499,6 +499,12 @@ class SupplierDebtRepayment(models.Model):
 
 class Investor(models.Model):
     name = models.CharField(max_length=255, verbose_name="Инвестор")
+    initial_balance = models.DecimalField(
+        max_digits=15,
+        decimal_places=2,
+        default=0,
+        verbose_name="Изначальный баланс"
+    )
     balance = models.DecimalField(
         max_digits=15,
         decimal_places=2,

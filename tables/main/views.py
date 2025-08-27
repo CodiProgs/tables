@@ -189,11 +189,11 @@ def client_list(request):
 @forbid_supplier
 @login_required
 def supplier_list(request):
-    suppliers_data = Supplier.objects.select_related('default_account').values('id', 'name', 'default_account__name')
+    suppliers_data = Supplier.objects.values('id', 'name')
     result = [
         {
             'id': s['id'],
-            'name': f"{s['name']} {s['default_account__name']}" if s['default_account__name'] else s['name']
+            'name': s['name']
         }
         for s in suppliers_data
     ]
@@ -561,6 +561,7 @@ def supplier_detail(request, pk: int):
     supplier = get_object_or_404(Supplier, id=pk)
     data = model_to_dict(supplier)
     data["username"] = supplier.user.username if supplier.user else None
+    data["account_ids"] = ",".join(str(acc.id) for acc in supplier.accounts.all())
     return JsonResponse({"data": data})
 
 @forbid_supplier
@@ -665,8 +666,17 @@ def suppliers(request):
 
     suppliers = Supplier.objects.all()
 
+    for supplier in suppliers:
+        supplier.accounts_display = ", ".join(acc.name for acc in supplier.accounts.all())
+
+    fields = get_supplier_fields()
+    
+    for field in fields:
+        if field.get("name") == "accounts":
+            field["name"] = "accounts_display"
+
     context = {
-        "fields": get_supplier_fields(),
+        "fields": fields,
         "data": suppliers,
         "data_ids": [t.id for t in suppliers],
     }
@@ -678,7 +688,8 @@ def get_supplier_fields():
         "id",
         "cost_percentage",
         "user",
-        "visible_for_assistant"
+        "visible_for_assistant",
+        "default_account",
     ]
     fields = get_model_fields(
         Supplier,
@@ -687,6 +698,7 @@ def get_supplier_fields():
 
     insertions = [
         (2, {"name": "cost_percentage", "verbose_name": "%", "is_percent": True, }),
+        (3, {"name": "accounts", "verbose_name": "Счета"}),
     ]
 
     for pos, field in insertions:
@@ -1036,28 +1048,28 @@ def supplier_create(request):
             name = request.POST.get("name")
             branch_id = request.POST.get("branch")
             cost_percentage = clean_percentage(request.POST.get("cost_percentage"))
-            account_id = request.POST.get("default_account")
+            account_ids = request.POST.get("account_ids")
             visible_for_assistant = request.POST.get("visible_for_assistant") == "on"
 
             username = request.POST.get("username")
             password = request.POST.get("password")
 
-            if not all([name, branch_id, cost_percentage, account_id]):
+            if not all([name, branch_id, cost_percentage, account_ids]):
                 return JsonResponse(
                     {"status": "error", "message": "Все поля должны быть заполнены"},
                     status=400,
                 )
 
-            account = get_object_or_404(Account, id=account_id)
             branch = get_object_or_404(Branch, id=branch_id)
 
             supplier = Supplier.objects.create(
                 name=name,
                 branch=branch,
                 cost_percentage=float(cost_percentage),
-                default_account=account,
                 visible_for_assistant=visible_for_assistant,
             )
+
+            supplier.accounts.set(Account.objects.filter(id__in=account_ids.split(',')))
 
             if username and password:
                 from users.models import User, UserType
@@ -1103,19 +1115,18 @@ def supplier_edit(request, pk=None):
             name = request.POST.get("name")
             branch_id = request.POST.get("branch")
             cost_percentage = clean_percentage(request.POST.get("cost_percentage"))
-            account_id = request.POST.get("default_account")
+            account_ids = request.POST.get("account_ids")
             visible_for_assistant = request.POST.get("visible_for_assistant") == "on"
 
             username = request.POST.get("username")
             password = request.POST.get("password")
 
-            if not all([name, branch_id, cost_percentage, account_id]):
+            if not all([name, branch_id, cost_percentage, account_ids]):
                 return JsonResponse(
                     {"status": "error", "message": "Все поля должны быть заполнены"},
                     status=400,
                 )
 
-            account = get_object_or_404(Account, id=account_id)
             branch = get_object_or_404(Branch, id=branch_id)
 
             old_cost_percentage = float(supplier.cost_percentage)
@@ -1124,8 +1135,8 @@ def supplier_edit(request, pk=None):
             supplier.name = name
             supplier.branch = branch
             supplier.cost_percentage = float(cost_percentage)
-            supplier.default_account = account
             supplier.visible_for_assistant = visible_for_assistant
+            supplier.accounts.set(Account.objects.filter(id__in=account_ids.split(',')))
 
             from users.models import User, UserType
             supplier_type = UserType.objects.filter(name="Поставщик").first()
@@ -1164,9 +1175,17 @@ def supplier_edit(request, pk=None):
 
             supplier.save()
 
+            supplier.accounts_display = ", ".join(acc.name for acc in supplier.accounts.all())
+
+            fields = get_supplier_fields()
+            
+            for field in fields:
+                if field.get("name") == "accounts":
+                    field["name"] = "accounts_display"
+
             context = {
                 "item": supplier,
-                "fields": get_supplier_fields(),
+                "fields": fields,
             }
             return JsonResponse({
                 "html": render_to_string("components/table_row.html", context),
@@ -1465,7 +1484,15 @@ def cash_flow_delete(request, pk=None):
 @forbid_supplier
 @login_required
 def account_list(request):
+    supplier_id = request.GET.get('supplier_id')
     accounts = Account.objects.all()
+
+    if supplier_id:
+        try:
+            supplier = Supplier.objects.get(id=supplier_id)
+            accounts = supplier.accounts.all()
+        except Supplier.DoesNotExist:
+            accounts = Account.objects.none()
 
     is_collection = request.GET.get('collection') == 'true'
     if is_collection:
@@ -2276,7 +2303,7 @@ def settle_supplier_debt(request, pk: int):
             except Exception:
                 return JsonResponse({"status": "error", "message": "Некорректная сумма"}, status=400)
 
-            if type_ != "investors" and type_ != "short_term_liabilities" and type_ != "credit" and type_ != "equipment":
+            if type_ != "balance" and type_ != "initial" and type_ != "short_term_liabilities" and type_ != "credit" and type_ != "equipment":
                 trans = get_object_or_404(Transaction, id=pk)
 
             if type_ == "branch":
@@ -2491,7 +2518,7 @@ def settle_supplier_debt(request, pk: int):
                     "total_profit": total_profit,
                 })
 
-            elif type_ == "investors":
+            elif type_ == "balance":
                 operation_type = request.POST.get("operation_type")
                 if operation_type not in ["withdrawal", "deposit"]:
                     return JsonResponse({"status": "error", "message": "Некорректный тип операции"}, status=400)
@@ -2515,11 +2542,13 @@ def settle_supplier_debt(request, pk: int):
 
                 row = type("InvestorRow", (), {
                     "name": investor.name,
+                    "initial_balance": investor.initial_balance,
                     "balance": investor.balance,
                 })()
                 fields = [
                     {"name": "name", "verbose_name": "Инвестор"},
-                    {"name": "balance", "verbose_name": "Сумма", "is_amount": True},
+                    {"name": "initial_balance", "verbose_name": "Изначальные инвест", "is_amount": True},
+                    {"name": "balance", "verbose_name": "Фактические инвест", "is_amount": True},
                 ]
                 html = render_to_string("components/table_row.html", {"item": row, "fields": fields})
 
@@ -2561,9 +2590,56 @@ def settle_supplier_debt(request, pk: int):
                 return JsonResponse({
                     "html": html,
                     "id": investor.id,
-                    "type": "Инвесторы",
+                    "type": "balance_investor",
                     "total_summary_debts": total_summary_debts,
                     "html_investor_debt_operation": html_investor_debt_operation,
+                })
+
+            elif type_ == "initial":
+                investor = get_object_or_404(Investor, id=pk)
+                investor.initial_balance = amount_value
+
+                investor.save()
+
+                row = type("InvestorRow", (), {
+                    "name": investor.name,
+                    "initial_balance": investor.initial_balance,
+                    "balance": investor.balance,
+                })()
+                fields = [
+                    {"name": "name", "verbose_name": "Инвестор"},
+                    {"name": "initial_balance", "verbose_name": "Изначальные инвест", "is_amount": True},
+                    {"name": "balance", "verbose_name": "Фактические инвест", "is_amount": True},
+                ]
+                html = render_to_string("components/table_row.html", {"item": row, "fields": fields})
+
+                transactions = Transaction.objects.filter(paid_amount__gt=0)
+
+                total_bonuses = sum(float(t.bonus_debt) for t in transactions)
+                total_remaining = sum(float(t.client_debt_paid) for t in transactions)
+                transactionsInvestors = [
+                    t for t in Transaction.objects.filter(paid_amount__gt=0)
+                    if getattr(t, 'bonus_debt', 0) == 0
+                    and getattr(t, 'client_debt', 0) == 0
+                    # and getattr(t, 'supplier_debt', 0) == 0
+                    and getattr(t, 'profit', 0) > 0
+                ]
+
+                total_profit = sum(float(t.profit) for t in transactionsInvestors)
+
+                summary = [
+                    {"name": "Бонусы", "amount": total_bonuses},
+                    {"name": "Выдачи клиентам", "amount": total_remaining},
+                    {"name": "Инвесторам", "amount": total_profit},
+                ]
+
+                total_summary_debts = sum(item['amount'] for item in summary)
+
+                return JsonResponse({
+                    "html": html,
+                    "id": investor.id,
+                    "type": "initial",
+                    "total_summary_debts": total_summary_debts,
                 })
 
             elif type_ in ["short_term_liabilities", "credit", "equipment"]:
@@ -2714,13 +2790,15 @@ def settle_supplier_debt(request, pk: int):
 
                 investor_fields = [
                     {"name": "name", "verbose_name": "Инвестор"},
-                    {"name": "balance", "verbose_name": "Сумма", "is_amount": True},
+                    {"name": "initial_balance", "verbose_name": "Изначальные инвест", "is_amount": True},
+                    {"name": "balance", "verbose_name": "Фактические инвест", "is_amount": True},
                 ]
                 investors = Investor.objects.all()
                 investor_data = []
                 for inv in investors:
                     investor_data.append(type("InvestorRow", (), {
                         "name": inv.name,
+                        "initial_balance": inv.initial_balance,
                         "balance": inv.balance,
                     })())
                 investor_ids = [inv.id for inv in investors]
@@ -2764,11 +2842,14 @@ def debtor_detail(request, type, pk):
             "name": obj.name,
             "amount": obj.amount
         }
-    elif type == "investors":
+    elif type == "investors" or type == "balance" or type == "initial":
         if pk == -1:
             return JsonResponse({"error": "ID инвестора не указан"}, status=400)
         obj = get_object_or_404(Investor, id=pk)
         data = model_to_dict(obj)
+
+        if type == "initial" and obj.initial_balance != 0:
+            data["amount"] = float(getattr(obj, "initial_balance", 0))
     elif type.startswith("transactions"):
         if pk == -1:
             return JsonResponse({"error": "ID транзакции не указан"}, status=400)
@@ -2787,7 +2868,7 @@ def debtor_detail(request, type, pk):
                     data["amount"] = float(getattr(transaction, "supplier_debt", 0))
             else:
                 data["amount"] = float(getattr(transaction, "supplier_debt", 0))
-    
+
     else:
         return JsonResponse({"error": "Unknown type"}, status=400)
 
@@ -2983,13 +3064,15 @@ def debtor_details(request):
 
             investor_fields = [
                 {"name": "name", "verbose_name": "Инвестор"},
-                {"name": "balance", "verbose_name": "Сумма", "is_amount": True},
+                {"name": "initial_balance", "verbose_name": "Изначальные инвест", "is_amount": True},
+                {"name": "balance", "verbose_name": "Фактические инвест", "is_amount": True},
             ]
             investors = Investor.objects.all()
             investor_data = []
             for inv in investors:
                 investor_data.append(type("InvestorRow", (), {
                     "name": inv.name,
+                    "initial_balance": inv.initial_balance,
                     "balance": inv.balance,
                 })())
             investor_ids = [inv.id for inv in investors]

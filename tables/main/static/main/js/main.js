@@ -500,17 +500,38 @@ const addMenuHandler = () => {
 						table.id === 'investor-operations-table'
 					) {
 						settleDebtButton.style.display = 'none'
+					} else if (table.id === 'investors-table') {
+						const selectedCell = document.querySelector(
+							'td.table__cell--selected'
+						)
+						if (selectedCell) {
+							const cellIndex = Array.from(
+								selectedCell.parentNode.children
+							).indexOf(selectedCell)
+							const th = table.querySelectorAll('thead th')[cellIndex]
+							const colName = th ? th.dataset.name : null
+
+							if (colName === 'initial_balance') {
+								settleDebtButton.style.display = 'block'
+								settleDebtButton.textContent = 'Изменить сумму'
+								settleDebtButton.dataset.type = 'initial'
+							} else if (colName === 'balance') {
+								settleDebtButton.style.display = 'block'
+								settleDebtButton.textContent = 'Изменить сумму'
+								settleDebtButton.dataset.type = 'balance'
+							} else {
+								settleDebtButton.style.display = 'none'
+								settleDebtButton.dataset.type = ''
+							}
+						} else {
+							settleDebtButton.style.display = 'none'
+							settleDebtButton.dataset.type = ''
+						}
 					} else {
 						settleDebtButton.style.display = 'block'
-					}
-
-					if (table.id && table.id === 'investors-table') {
-						settleDebtButton.textContent = 'Изменить сумму'
-					} else {
 						settleDebtButton.textContent = 'Погасить долг'
+						settleDebtButton.dataset.type = ''
 					}
-
-					settleDebtButton.dataset.type = ''
 				}
 				if (repaymentsEditButton) {
 					if (table.id && table.id.startsWith('branch-repayments-')) {
@@ -1429,6 +1450,43 @@ const mainConfig = createConfig(TRANSACTION, {
 		setupPercentInput('client_percentage')
 		setupPercentInput('supplier_percentage')
 		setupPercentInput('bonus_percentage')
+
+		// нужно слушатель на поставщика и при изменении очищать счет и подгружать новые счета
+		// const accountSupplierInput = document.getElementById('account_supplier')
+		// if (accountSupplierInput) {
+		// 	const accountSupplierSelect = accountSupplierInput.closest('.select')
+		// 	const control = accountSupplierSelect.querySelector('.select__control')
+
+		// 	control.addEventListener('click', async function () {
+		// 		const supplierInput = document.getElementById('supplier')
+		// 		const supplierId = supplierInput ? supplierInput.value : ''
+
+		// 		if (!supplierId) {
+		// 			showError('Не выбран Поставщик')
+		// 			return
+		// 		}
+
+		// 		let isDataLoaded = accountSupplierSelect.dataset.loaded === 'true'
+		// 		if (isDataLoaded) return
+
+		// 		accountSupplierSelect.dataset.loaded = 'true'
+
+		// 		try {
+		// 			const url = `/accounts/list/?supplier_id=${supplierId}`
+		// 			await SelectHandler.setupSelects({
+		// 				url,
+		// 				select: accountSupplierSelect,
+		// 			})
+		// 			const control =
+		// 				accountSupplierSelect.querySelector('.select__control')
+		// 			if (control) {
+		// 				control.click()
+		// 			}
+		// 		} catch (e) {
+		// 			showError('Ошибка загрузки счетов поставщика')
+		// 		}
+		// 	})
+		// }
 	},
 	afterAddFunc: result => {
 		refreshData(`${TRANSACTION}-table`, result.id)
@@ -1490,7 +1548,7 @@ const mainConfig = createConfig(TRANSACTION, {
 
 const suppliersConfig = createConfig(SUPPLIERS, {
 	dataUrls: [
-		{ id: 'default_account', url: `${BASE_URL}accounts/list/` },
+		{ id: 'account_ids', url: `${BASE_URL}accounts/list/` },
 		{ id: 'branch', url: `${BASE_URL}branches/list/` },
 	],
 	editFunc: () => {
@@ -1793,6 +1851,7 @@ const handleTransactions = async config => {
 	}
 
 	initTableHandlers(config)
+
 	setupSelectListener()
 	highlightModifiedRows()
 
@@ -2728,20 +2787,22 @@ const handleDebtors = async () => {
 			let selectedRow
 			let table
 			let currentRowId = -1
-
-			if (!type) {
+			if (!type || type === 'balance' || type === 'initial') {
 				selectedRow = document.querySelector('td.table__cell--selected')
 				table = selectedRow ? selectedRow.closest('table') : null
 				currentRowId = TableManager.getSelectedRowId(table.id)
 
-				if (table.id === 'investors-table') {
-					type = 'investors'
-				} else {
-					type = 'transactions'
-					if (table && table.id === 'summary-bonus') type += '.bonus'
-					else if (table && table.id === 'summary-remaining')
-						type += '.remaining'
-					else if (table && table.id === 'summary-profit') type += '.investors'
+				if (!type) {
+					if (table.id === 'investors-table') {
+						type = 'investors'
+					} else {
+						type = 'transactions'
+						if (table && table.id === 'summary-bonus') type += '.bonus'
+						else if (table && table.id === 'summary-remaining')
+							type += '.remaining'
+						else if (table && table.id === 'summary-profit')
+							type += '.investors'
+					}
 				}
 			} else {
 				if (type === 'Оборудование') type = 'equipment'
@@ -2757,7 +2818,7 @@ const handleDebtors = async () => {
 				`debtors-table`,
 				`settle-debt-form`,
 				getUrl,
-				type === 'investors'
+				type === 'investors' || type === 'initial' || type === 'balance'
 					? [
 							{
 								id: 'operation_type',
@@ -2777,7 +2838,7 @@ const handleDebtors = async () => {
 					: [],
 				{
 					url:
-						type === 'investors'
+						type === 'investors' || type === 'initial' || type === 'balance'
 							? '/components/main/debt_operation_investor/'
 							: '/components/main/settle-debt/',
 					title: [
@@ -2828,7 +2889,7 @@ const handleDebtors = async () => {
 								}
 
 								break
-							case 'Инвесторы':
+							case 'balance_investor':
 								tableId = 'investors-table'
 
 								TableManager.addTableRow(
@@ -2844,6 +2905,10 @@ const handleDebtors = async () => {
 										.querySelectorAll('tr.table__row--empty')
 										.forEach(row => row.remove())
 								}
+
+								break
+							case 'initial':
+								tableId = 'investors-table'
 
 								break
 							case 'Инвесторам':
@@ -2940,7 +3005,9 @@ const handleDebtors = async () => {
 							)
 						} else if (
 							result.type === 'Инвесторы' ||
-							result.type === 'investors'
+							result.type === 'investors' ||
+							result.type === 'balance_investor' ||
+							result.type === 'initial'
 						) {
 							TableManager.calculateTableSummary('investors-table', ['balance'])
 						}
@@ -3106,6 +3173,15 @@ const handleDebtors = async () => {
 			await settleDebtFormHandler.init(currentRowId)
 			setupCurrencyInput('amount')
 
+			if (type === 'initial') {
+				const operation_type = document.getElementById('operation_type')
+				if (operation_type) {
+					const container = operation_type.closest('.modal-form__group')
+
+					container.setAttribute('hidden', 'true')
+				}
+			}
+
 			const typeInput = document.getElementById('type')
 			if (typeInput) {
 				if (table) {
@@ -3125,7 +3201,11 @@ const handleDebtors = async () => {
 							comment.removeAttribute('hidden')
 						}
 					} else if (table.id === 'investors-table') {
-						typeInput.value = 'investors'
+						if (type === 'balance') {
+							typeInput.value = 'balance'
+						} else {
+							typeInput.value = 'initial'
+						}
 					} else if (table.id === 'summary-profit') {
 						typeInput.value = 'profit'
 

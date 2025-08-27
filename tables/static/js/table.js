@@ -1184,8 +1184,8 @@ export const TableManager = {
 		if (amountColumnIndexes.length !== 0) {
 			amountColumnIndexes.forEach(colIndex => {
 				const cell = row.querySelector(`td:nth-child(${colIndex + 1})`)
-				cell.style.textAlign = 'right'
 				if (cell && !cell.classList.contains('table__cell--summary')) {
+					cell.style.textAlign = 'right'
 					const text = cell.textContent.trim()
 
 					if (text && /^[\d\s,.-]+(\s?р\.)?$/.test(text)) {
