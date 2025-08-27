@@ -2401,6 +2401,95 @@ const handleDebtors = async () => {
 							},
 							plugins: {
 								legend: { display: false },
+								tooltip: {
+									enabled: true,
+									position: 'nearest',
+									yAlign: 'center',
+									xAlign: 'center',
+									padding: 10,
+									displayColors: false,
+								},
+							},
+						},
+					})
+				}
+
+				const profitChart = document.getElementById('profitChart')
+				if (profitChart && data.capitals_by_month) {
+					const ctx = profitChart.getContext('2d')
+					if (window.profitChartInstance) {
+						window.profitChartInstance.destroy()
+					}
+					window.profitChartInstance = new Chart(ctx, {
+						type: 'bar',
+						data: {
+							labels: ['Итого'],
+							datasets: [
+								{
+									label: 'Итого',
+									data: [data.capitals_by_month.total],
+									backgroundColor: 'rgba(255, 99, 132, 0.5)',
+									borderColor: 'rgba(255, 99, 132, 1)',
+									borderWidth: 1,
+								},
+							],
+						},
+						options: {
+							scales: {
+								y: { beginAtZero: true, display: false },
+							},
+							plugins: {
+								legend: { display: false },
+								tooltip: {
+									enabled: false,
+									external: function (context) {
+										const tooltipModel = context.tooltip
+										let tooltipEl = document.getElementById('chartjs-tooltip')
+										if (!tooltipEl) {
+											tooltipEl = document.createElement('div')
+											tooltipEl.id = 'chartjs-tooltip'
+											tooltipEl.style.position = 'absolute'
+											tooltipEl.style.background = 'rgba(0,0,0,0.8)'
+											tooltipEl.style.color = '#fff'
+											tooltipEl.style.borderRadius = '6px'
+											tooltipEl.style.padding = '8px 14px'
+											tooltipEl.style.pointerEvents = 'none'
+											tooltipEl.style.fontSize = '12px'
+											tooltipEl.style.zIndex = '1000'
+											tooltipEl.style.boxShadow = '0 2px 8px rgba(0,0,0,0.2)'
+											document.body.appendChild(tooltipEl)
+										}
+										if (tooltipModel.opacity === 0) {
+											tooltipEl.style.opacity = 0
+											return
+										}
+										if (tooltipModel.title && tooltipModel.body) {
+											const title = tooltipModel.title[0] || ''
+											let value = tooltipModel.body[0].lines[0] || ''
+											value = value.replace(/^Итого:\s*/, '')
+
+											tooltipEl.innerHTML = `
+						<div style="font-weight:600; font-size:12px; margin-bottom:2px;">${title}</div>
+						<div style="font-size:12px; font-weight:500;">${value}</div>
+    `
+										}
+										const canvas = context.chart.canvas
+										const rect = canvas.getBoundingClientRect()
+										tooltipEl.style.opacity = 1
+										tooltipEl.style.left =
+											rect.left +
+											window.pageXOffset +
+											tooltipModel.caretX -
+											tooltipEl.offsetWidth +
+											'px'
+										tooltipEl.style.top =
+											rect.top +
+											window.pageYOffset +
+											tooltipModel.caretY -
+											tooltipEl.offsetHeight / 2 +
+											'px'
+									},
+								},
 							},
 						},
 					})

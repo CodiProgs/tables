@@ -2081,9 +2081,29 @@ document.addEventListener('DOMContentLoaded', function () {
 	if (navList) {
 		const itemsCount = navList.children.length
 		if (itemsCount === 6) {
-			navList.style.gridTemplateColumns = 'repeat(3, minmax(150px, 1fr))'
+			navList.style.gridTemplateColumns = 'repeat(3, minmax(0, 1fr))'
 		} else {
-			navList.style.gridTemplateColumns = 'repeat(4, minmax(150px, 1fr))'
+			navList.style.gridTemplateColumns = 'repeat(4, minmax(0, 1fr))'
 		}
 	}
+
+	function resizeCharts() {
+		const statsChart = document.getElementById('statsChart')
+		const profitChart = document.getElementById('profitChart')
+		const w = statsChart.parentElement.offsetWidth
+		let h = 264
+		let profitW = 40
+		if (window.innerWidth <= 600) {
+			h = 200
+			profitW = 35
+		} else if (window.innerWidth <= 1024) {
+			h = 180
+		}
+		statsChart.width = w
+		statsChart.height = h
+		profitChart.width = profitW
+		profitChart.height = h
+	}
+	window.addEventListener('resize', resizeCharts)
+	resizeCharts()
 })
