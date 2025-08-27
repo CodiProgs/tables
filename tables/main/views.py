@@ -3012,6 +3012,7 @@ def company_balance_stats(request):
     current_year = datetime.now().year
     current_month = datetime.now().month
     capitals = []
+    total_capital = 0
     
     MONTHS_RU = [
         "январь", "февраль", "март", "апрель", "май", "июнь",
@@ -3026,6 +3027,7 @@ def company_balance_stats(request):
             mc = MonthlyCapital.objects.filter(year=current_year, month=month).first()
             capital = float(mc.capital) if mc else 0
         capitals.append(capital)
+        total_capital += capital
 
     data = {
         "non_current_assets": {
@@ -3051,7 +3053,8 @@ def company_balance_stats(request):
         "capital": current_capital,
         "capitals_by_month": {
             "months": months,
-            "capitals": capitals
+            "capitals": capitals,
+            "total": total_capital
         },
     }
     return JsonResponse(data, safe=False)

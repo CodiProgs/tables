@@ -76,7 +76,14 @@
             <h2 class="debtors-office-list__header debtors-office__header">Баланс</h2>
             <div id="balance-container"></div>
             <h2 class="debtors-office-list__header debtors-office__header debtors-office__header--top">Рентабельность капитала</h2>
-            <canvas id="statsChart">таблица</canvas>
+            <div class="charts-container">
+            <div class="chart-stats">
+            <canvas id="statsChart" width="800" height="264"></canvas>
+            </div>
+            <div class="chart-profit">
+            <canvas id="profitChart" width="40" height="264"></canvas>
+            </div>
+            </div>
             {% endif %}
         </div>
     </div>
