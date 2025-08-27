@@ -191,7 +191,7 @@ body {
 	height: 100dvh;
 	padding: var(--padding-default);
 	overflow: hidden;
-	flex-direction: column-reverse;
+	flex-direction: column;
 }
 
 .container.container--without-menu {
@@ -641,10 +641,15 @@ textarea::placeholder {
 .debtors-office-list__item:last-child {
 	border-bottom: none;
 }
+.debtors-office-list__row.row-focused {
+	border-left: 4px solid #2b579a;
+}
+
 .debtors-office-list__row {
 	display: flex;
 	align-items: center;
-	padding: 0 8px;
+	padding: 0 4px;
+	border-left: 4px solid transparent;
 	height: 28px;
 	cursor: pointer;
 	background: var(--color-background-window, #fff);

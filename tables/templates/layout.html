@@ -30,6 +30,10 @@
     </head>
     <body>
         <div class="container">
+            <main class="content">
+                {% block content %}
+                {% endblock content %}
+            </main>
             {% if not request.user.user_type.name == "Поставщик" and request.user.user_type.name != "Ассистент" %}
                 <nav class="sidebar-nav">
                     <ul class="nav-list">
@@ -70,10 +74,6 @@
                     </ul>
                 </nav>
             {% endif %}
-            <main class="content">
-                {% block content %}
-                {% endblock content %}
-            </main>
         </div>
     </body>
 </html>

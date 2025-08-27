@@ -47,7 +47,7 @@
                 {% endfor %}
             </ul>
             <div class="debtors-header" id="summary-header">
-                {% if total_summary_debts%}
+                {% if summary|length > 1 %}
                 <h2 class="debtors-office-list__header">Кредиторка</h2>
                 <span class="debtors-total {% if total_summary_debts != 0 %}text-red{% else %}text-green{% endif %}">{{ total_summary_debts|floatformat:2 }}</span>
                 {% endif %}

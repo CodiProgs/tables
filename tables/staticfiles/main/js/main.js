@@ -973,6 +973,7 @@ const colorizeRemainingAmountByDebts = (debts = {}) => {
 	let remainingAmountCol = -1
 	let bonusCol = -1
 	let clientPercentageCol = -1
+	let profitCol = -1
 
 	headers.forEach((header, idx) => {
 		if (header.dataset.name === 'supplier_percentage') {
@@ -984,8 +985,11 @@ const colorizeRemainingAmountByDebts = (debts = {}) => {
 		if (header.dataset.name === 'remaining_amount') {
 			clientPercentageCol = idx
 		}
-	})
 
+		if (header.dataset.name === 'profit') {
+			profitCol = idx
+		}
+	})
 	const rows = table.querySelectorAll('tbody tr:not(.table__row--summary)')
 	rows.forEach((row, idx) => {
 		if (remainingAmountCol !== -1 && debts.supplier_debts) {
@@ -1041,7 +1045,140 @@ const colorizeRemainingAmountByDebts = (debts = {}) => {
 				}
 			}
 		}
+		if (profitCol !== -1 && debts.investor_debt) {
+			const cell = row.querySelectorAll('td')[profitCol]
+			const debt = debts.investor_debt[idx]
+
+			if (cell) {
+				if (
+					debt === 0 ||
+					debt === '0' ||
+					debt === '0 р.' ||
+					debt === '0,00 р.' ||
+					debt === '0.00'
+				) {
+					cell.classList.add('back-green')
+				} else {
+					cell.classList.remove('back-green')
+				}
+			}
+		}
 	})
+}
+
+function colorizeRemainingAmountByDebtsRow(row, debts = {}) {
+	if (!row || typeof debts !== 'object') return
+
+	const table = row.closest('table')
+	if (!table) return
+
+	const headers = table.querySelectorAll('thead th')
+	let remainingAmountCol = -1
+	let bonusCol = -1
+	let clientPercentageCol = -1
+	let profitCol = -1
+
+	headers.forEach((header, idx) => {
+		if (header.dataset.name === 'supplier_percentage') {
+		}
+		if (header.dataset.name === 'bonus') {
+			bonusCol = idx
+		}
+		if (header.dataset.name === 'remaining_amount') {
+			clientPercentageCol = idx
+		}
+		if (header.dataset.name === 'profit') {
+			profitCol = idx
+		}
+	})
+
+	const cells = row.querySelectorAll('td')
+	if (bonusCol !== -1 && debts.bonus_debt !== undefined) {
+		const cell = cells[bonusCol]
+		const debt = debts.bonus_debt
+		if (cell) {
+			if (
+				debt === 0 ||
+				debt === '0' ||
+				debt === '0 р.' ||
+				debt === '0,00 р.' ||
+				debt === '0.00'
+			) {
+				cell.classList.add('back-green')
+			} else {
+				cell.classList.remove('back-green')
+			}
+		}
+	}
+	if (clientPercentageCol !== -1 && debts.client_debt !== undefined) {
+		const cell = cells[clientPercentageCol]
+		const debt = debts.client_debt
+		if (cell) {
+			if (
+				debt === 0 ||
+				debt === '0' ||
+				debt === '0 р.' ||
+				debt === '0,00 р.' ||
+				debt === '0.00'
+			) {
+				cell.classList.add('back-green')
+			} else {
+				cell.classList.remove('back-green')
+			}
+		}
+	}
+	if (profitCol !== -1 && debts.investor_debt !== undefined) {
+		const cell = cells[profitCol]
+		const debt = debts.investor_debt
+		if (cell) {
+			if (
+				debt === 0 ||
+				debt === '0' ||
+				debt === '0 р.' ||
+				debt === '0,00 р.' ||
+				debt === '0.00'
+			) {
+				cell.classList.add('back-green')
+			} else {
+				cell.classList.remove('back-green')
+			}
+		}
+	}
+}
+
+function showChangedCellsRow(row, changedCells) {
+	const headers = row.closest('table').querySelectorAll('thead th')
+	const columnIndexes = {}
+
+	headers.forEach((header, index) => {
+		const name = header.dataset.name
+		if (name) {
+			columnIndexes[name] = index
+		}
+	})
+
+	const rowId = row.dataset.id
+	const cellInfo = changedCells[rowId]
+	const cells = row.querySelectorAll('td')
+
+	if (cellInfo) {
+		if (
+			cellInfo.client_percentage &&
+			columnIndexes.client_percentage !== undefined
+		) {
+			cells[columnIndexes.client_percentage].classList.add(
+				'table__cell--changed'
+			)
+		}
+		if (
+			cellInfo.supplier_percentage &&
+			columnIndexes.supplier_percentage !== undefined
+		) {
+			cells[columnIndexes.supplier_percentage].classList.add(
+				'table__cell--changed'
+			)
+		}
+	}
 }
 
 export class TablePaginator {
@@ -1295,7 +1432,7 @@ const mainConfig = createConfig(TRANSACTION, {
 	},
 	afterAddFunc: result => {
 		refreshData(`${TRANSACTION}-table`, result.id)
-		const row = TableManager.getRowById(`${TRANSACTION}-table`, result.id)
+		const row = TableManager.getRowById(result.id, `${TRANSACTION}-table`)
 		TableManager.formatCurrencyValuesForRow(`${TRANSACTION}-table`, row)
 
 		const table = document.getElementById(`${TRANSACTION}-table`)
@@ -1308,10 +1445,13 @@ const mainConfig = createConfig(TRANSACTION, {
 				total: true,
 			})
 		}
+
+		colorizeRemainingAmountByDebtsRow(row, result.debts)
+		showChangedCellsRow(row, result.changed_cells)
 	},
 	afterEditFunc: result => {
 		refreshData(`${TRANSACTION}-table`)
-		const row = TableManager.getRowById(`${TRANSACTION}-table`, result.id)
+		const row = TableManager.getRowById(result.id, `${TRANSACTION}-table`)
 		TableManager.formatCurrencyValuesForRow(`${TRANSACTION}-table`, row)
 
 		const table = document.getElementById(`${TRANSACTION}-table`)
@@ -1324,6 +1464,9 @@ const mainConfig = createConfig(TRANSACTION, {
 				total: true,
 			})
 		}
+
+		colorizeRemainingAmountByDebtsRow(row, result.debts)
+		showChangedCellsRow(row, result.changed_cells)
 	},
 	afterDeleteFunc: () => {
 		const table = document.getElementById(`${TRANSACTION}-table`)
@@ -1487,8 +1630,15 @@ const paymentFormHandler = createFormHandler(
 	result => {
 		TableManager.updateTableRow(result, mainConfig.tableId)
 		refreshData(`${TRANSACTION}-table`)
-		const row = TableManager.getRowById(`${TRANSACTION}-table`, result.id)
+		const row = TableManager.getRowById(result.id, `${TRANSACTION}-table`)
 		TableManager.formatCurrencyValuesForRow(`${TRANSACTION}-table`, row)
+
+		if (result.changed_cells) {
+			showChangedCellsRow(row, result.changed_cells)
+		}
+		if (result.debts) {
+			colorizeRemainingAmountByDebtsRow(row, result.debts)
+		}
 	}
 )
 
@@ -3069,6 +3219,18 @@ const handleDebtors = async () => {
 			}
 		})
 	}
+
+	const toggles = document.querySelectorAll('.debtors-office-list__toggle')
+	toggles.forEach(btn => {
+		btn.addEventListener('focus', function () {
+			const row = btn.closest('.debtors-office-list__row')
+			if (row) row.classList.add('row-focused')
+		})
+		btn.addEventListener('blur', function () {
+			const row = btn.closest('.debtors-office-list__row')
+			if (row) row.classList.remove('row-focused')
+		})
+	})
 }
 
 document.addEventListener('DOMContentLoaded', function () {

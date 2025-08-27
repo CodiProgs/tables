@@ -94,6 +94,7 @@ def index(request):
     supplier_debts = [getattr(t, 'supplier_debt', 0) for t in page.object_list]
     client_debts = [getattr(t, 'client_debt', 0) for t in page.object_list]
     bonus_debts = [getattr(t, 'bonus_debt', 0) for t in page.object_list]
+    investor_debts = [getattr(t, 'investor_debt', 0) for t in page.object_list]
 
     context = {
         "fields": fields,
@@ -108,6 +109,7 @@ def index(request):
             "supplier_debts": supplier_debts,
             "client_debt": client_debts,
             "bonus_debt": bonus_debts,
+            "investor_debt": investor_debts,
         },
     }
 
@@ -252,6 +254,22 @@ def transaction_create(request):
                 viewed_by_admin=not is_accountant
             )
 
+            client_changed = trans.client and trans.client_percentage != trans.client.percentage
+            supplier_changed = trans.supplier and trans.supplier_percentage != trans.supplier.cost_percentage
+            changed_cells = {
+                trans.id: {
+                    'client_percentage': client_changed,
+                    'supplier_percentage': supplier_changed
+                }
+            }
+
+            debts = {
+                "supplier_debt": getattr(trans, "supplier_debt", 0),
+                "client_debt": getattr(trans, "client_debt", 0),
+                "bonus_debt": getattr(trans, "bonus_debt", 0),
+                "investor_debt": getattr(trans, "investor_debt", 0),
+            }
+
             context = {
                 "item": trans,
                 "fields": get_transaction_fields(is_accountant, is_assistant),
@@ -259,6 +277,8 @@ def transaction_create(request):
             return JsonResponse({
                 "html": render_to_string("components/table_row.html", context),
                 "id": trans.id,
+                "changed_cells": changed_cells,
+                "debts": debts,
             })
     except Exception as e:
         return JsonResponse({"status": "error", "message": str(e)}, status=400)
@@ -333,6 +353,22 @@ def transaction_edit(request, pk=None):
                 trans.viewed_by_admin = False
             trans.save()
 
+            client_changed = trans.client and trans.client_percentage != trans.client.percentage
+            supplier_changed = trans.supplier and trans.supplier_percentage != trans.supplier.cost_percentage
+            changed_cells = {
+                trans.id: {
+                    'client_percentage': client_changed,
+                    'supplier_percentage': supplier_changed
+                }
+            }
+
+            debts = {
+                "supplier_debt": getattr(trans, "supplier_debt", 0),
+                "client_debt": getattr(trans, "client_debt", 0),
+                "bonus_debt": getattr(trans, "bonus_debt", 0),
+                "investor_debt": getattr(trans, "investor_debt", 0),
+            }
+
             context = {
                 "item": trans,
                 "fields": get_transaction_fields(is_accountant, is_assistant),
@@ -340,6 +376,8 @@ def transaction_edit(request, pk=None):
             return JsonResponse({
                 "html": render_to_string("components/table_row.html", context),
                 "id": trans.id,
+                "changed_cells": changed_cells,
+                "debts": debts,
             })
     except Exception as e:
         return JsonResponse({"status": "error", "message": str(e)}, status=400)
@@ -440,6 +478,22 @@ def transaction_payment(request, pk=None):
 
             trans.save()
 
+            client_changed = trans.client and trans.client_percentage != trans.client.percentage
+            supplier_changed = trans.supplier and trans.supplier_percentage != trans.supplier.cost_percentage
+            changed_cells = {
+                trans.id: {
+                    'client_percentage': client_changed,
+                    'supplier_percentage': supplier_changed
+                }
+            }
+
+            debts = {
+                "supplier_debt": getattr(trans, "supplier_debt", 0),
+                "client_debt": getattr(trans, "client_debt", 0),
+                "bonus_debt": getattr(trans, "bonus_debt", 0),
+                "investor_debt": getattr(trans, "investor_debt", 0),
+            }
+
             context = {
                 "item": trans,
                 "fields": get_transaction_fields(is_accountant, is_assistant),
@@ -447,6 +501,8 @@ def transaction_payment(request, pk=None):
             return JsonResponse({
                 "html": render_to_string("components/table_row.html", context),
                 "id": trans.id,
+                "changed_cells": changed_cells,
+                "debts": debts,
             })
     except Exception as e:
         return JsonResponse({"status": "error", "message": str(e)}, status=400)
@@ -2217,8 +2273,6 @@ def settle_supplier_debt(request, pk: int):
             if type_ == "branch":
                 if (amount_value > trans.supplier_debt):
                     return JsonResponse({"status": "error", "message": "Сумма не может превышать долг поставщика"}, status=400)
-
-                from django.utils import timezone
 
                 trans.returned_by_supplier += amount_value
                 trans.returned_date = timezone.now()
