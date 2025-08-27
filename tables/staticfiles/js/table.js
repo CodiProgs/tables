@@ -1194,7 +1194,13 @@ export const TableManager = {
 							numText.replace(/\s/g, '').replace(',', '.')
 						)
 						if (!isNaN(number)) {
-							cell.textContent = this.formatNumber(number) + ' р.'
+							const hadSuffix = /\s?р\.$/.test(text)
+							cell.textContent =
+								number === 0
+									? hadSuffix
+										? '0 р.'
+										: '0'
+									: this.formatNumber(number) + ' р.'
 						}
 					} else if (text !== null && text !== '') {
 						try {

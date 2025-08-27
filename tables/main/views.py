@@ -263,11 +263,14 @@ def transaction_create(request):
                 }
             }
 
+            def debt_value(debt, base):
+                return -1 if base == 0 or base == "0" or base == 0.0 else debt
+
             debts = {
-                "supplier_debt": getattr(trans, "supplier_debt", 0),
-                "client_debt": getattr(trans, "client_debt", 0),
-                "bonus_debt": getattr(trans, "bonus_debt", 0),
-                "investor_debt": getattr(trans, "investor_debt", 0),
+                "supplier_debt": debt_value(getattr(trans, "supplier_debt", 0), getattr(trans, "paid_amount", 0)),
+                "client_debt": debt_value(getattr(trans, "client_debt", 0), getattr(trans, "remaining_amount", 0)),
+                "bonus_debt": debt_value(getattr(trans, "bonus_debt", 0), getattr(trans, "bonus", 0)),
+                "investor_debt": debt_value(getattr(trans, "investor_debt", 0), getattr(trans, "profit", 0)),
             }
 
             context = {
@@ -362,11 +365,14 @@ def transaction_edit(request, pk=None):
                 }
             }
 
+            def debt_value(debt, base):
+                return -1 if base == 0 or base == "0" or base == 0.0 else debt
+
             debts = {
-                "supplier_debt": getattr(trans, "supplier_debt", 0),
-                "client_debt": getattr(trans, "client_debt", 0),
-                "bonus_debt": getattr(trans, "bonus_debt", 0),
-                "investor_debt": getattr(trans, "investor_debt", 0),
+                "supplier_debt": debt_value(getattr(trans, "supplier_debt", 0), getattr(trans, "paid_amount", 0)),
+                "client_debt": debt_value(getattr(trans, "client_debt", 0), getattr(trans, "remaining_amount", 0)),
+                "bonus_debt": debt_value(getattr(trans, "bonus_debt", 0), getattr(trans, "bonus", 0)),
+                "investor_debt": debt_value(getattr(trans, "investor_debt", 0), getattr(trans, "profit", 0)),
             }
 
             context = {
@@ -487,11 +493,14 @@ def transaction_payment(request, pk=None):
                 }
             }
 
+            def debt_value(debt, base):
+                return -1 if base == 0 or base == "0" or base == 0.0 else debt
+
             debts = {
-                "supplier_debt": getattr(trans, "supplier_debt", 0),
-                "client_debt": getattr(trans, "client_debt", 0),
-                "bonus_debt": getattr(trans, "bonus_debt", 0),
-                "investor_debt": getattr(trans, "investor_debt", 0),
+                "supplier_debt": debt_value(getattr(trans, "supplier_debt", 0), getattr(trans, "paid_amount", 0)),
+                "client_debt": debt_value(getattr(trans, "client_debt", 0), getattr(trans, "remaining_amount", 0)),
+                "bonus_debt": debt_value(getattr(trans, "bonus_debt", 0), getattr(trans, "bonus", 0)),
+                "investor_debt": debt_value(getattr(trans, "investor_debt", 0), getattr(trans, "profit", 0)),
             }
 
             context = {
