@@ -2406,7 +2406,20 @@ const handleDebtors = async () => {
 						],
 					},
 					options: {
-						scales: { y: { beginAtZero: true } },
+						scales: {
+							x: {
+								ticks: {
+									font: {
+										size: 10,
+									},
+									maxRotation: 45,
+									minRotation: 0,
+									autoSkip: true,
+									autoSkipPadding: 2,
+								},
+							},
+							y: { beginAtZero: true },
+						},
 						plugins: {
 							legend: { display: false },
 							tooltip: {

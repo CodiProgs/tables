@@ -662,6 +662,10 @@ textarea::placeholder {
 	cursor: pointer;
 	transition: background 0.15s;
 }
+.debtors-office-list__row-item,
+.debtors-office-list__row-item * {
+	user-select: none;
+}
 .debtors-office-list__row-item:hover {
 	background: #fff;
 }

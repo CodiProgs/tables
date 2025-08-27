@@ -1146,7 +1146,7 @@ def cash_flow_detail(request, pk: int):
     data['operation_type'] = cashflow.operation_type
     data['formatted_amount'] = cashflow.formatted_amount
 
-    data['created_at_formatted'] = cashflow.created_at.strftime("%d.%m.%Y %H:%M") if cashflow.created_at else ""
+    data['created_at_formatted'] = timezone.localtime(cashflow.created_at).strftime("%d.%m.%Y %H:%M") if cashflow.created_at else ""
 
     return JsonResponse({"data": data})
 
@@ -1720,7 +1720,7 @@ def money_transfer_detail(request, pk: int):
 
     data['formatted_amount'] = format_currency(money_transfer.amount)
 
-    data['created_at_formatted'] = money_transfer.created_at.strftime("%d.%m.%Y %H:%M") if hasattr(money_transfer, 'created_at') else ""
+    data['created_at_formatted'] = timezone.localtime(money_transfer.created_at).strftime("%d.%m.%Y %H:%M") if money_transfer.created_at else ""
 
     return JsonResponse({"data": data})
 
@@ -2244,7 +2244,7 @@ def settle_supplier_debt(request, pk: int):
                     branch_total_debt = sum(float(t.supplier_debt) for t in branch_transactions)
                 import math
                 row = type("DebtorRow", (), {})()
-                row.created_at = trans.created_at.strftime("%d.%m.%Y") if trans.created_at else ""
+                row.created_at = timezone.localtime(trans.created_at).strftime("%d.%m.%Y") if trans.created_at else ""
                 row.supplier = str(trans.supplier) if trans.supplier else ""
                 row.supplier_percentage = trans.supplier_percentage
 
@@ -2262,7 +2262,7 @@ def settle_supplier_debt(request, pk: int):
 
                 html = render_to_string("components/table_row.html", {"item": row, "fields": fields})
 
-                debtRepayment.created_at = debtRepayment.created_at.strftime("%d.%m.%Y %H:%M") if debtRepayment.created_at else ""
+                debtRepayment.created_at = timezone.localtime(debtRepayment.created_at).strftime("%d.%m.%Y %H:%M") if debtRepayment.created_at else ""
                 debtRepayment.cost_percentage = debtRepayment.transaction.supplier_percentage if debtRepayment.transaction else ""
 
                 html_debt_repayments = render_to_string("components/table_row.html", {
@@ -2299,7 +2299,7 @@ def settle_supplier_debt(request, pk: int):
                 trans.returned_bonus += amount_value
                 trans.save()
                 row = type("Row", (), {
-                    "created_at": trans.created_at.strftime("%d.%m.%Y") if trans.created_at else "",
+                    "created_at": timezone.localtime(trans.created_at).strftime("%d.%m.%Y") if trans.created_at else "",
                     "client": str(trans.client) if trans.client else "",
                     "bonus_percentage": trans.bonus_percentage,
                     "bonus_debt": trans.bonus_debt,
@@ -2378,7 +2378,7 @@ def settle_supplier_debt(request, pk: int):
                 trans.save()
 
                 row = type("Row", (), {
-                    "created_at": trans.created_at.strftime("%d.%m.%Y") if trans.created_at else "",
+                    "created_at": timezone.localtime(trans.created_at).strftime("%d.%m.%Y") if trans.created_at else "",
                     "client": str(trans.client) if trans.client else "",
                     "client_percentage": trans.client_percentage,
                     "client_debt_paid": trans.client_debt_paid,
@@ -2474,7 +2474,7 @@ def settle_supplier_debt(request, pk: int):
 
                 total_profit = sum(float(t.profit) for t in transactionsInvestors)
 
-                investorDebtOperation.created_at = investorDebtOperation.created_at.strftime("%d.%m.%Y %H:%M") if investorDebtOperation.created_at else ""
+                investorDebtOperation.created_at = timezone.localtime(investorDebtOperation.created_at).strftime("%d.%m.%Y %H:%M") if investorDebtOperation.created_at else ""
                 investorDebtOperation.operation_type = "Внесение" if investorDebtOperation.operation_type == "deposit" else "Забор"
 
                 html_investor_debt_operation = render_to_string("components/table_row.html", {
@@ -2596,7 +2596,7 @@ def settle_supplier_debt(request, pk: int):
                 trans.save()
 
                 row = type("Row", (), {
-                    "created_at": trans.created_at.strftime("%d.%m.%Y") if trans.created_at else "",
+                    "created_at": timezone.localtime(trans.created_at).strftime("%d.%m.%Y") if trans.created_at else "",
                     "client": str(trans.client) if trans.client else "",
                     "amount": trans.amount,
                     "profit": trans.profit - trans.returned_to_investor
@@ -2609,7 +2609,7 @@ def settle_supplier_debt(request, pk: int):
                 ]
                 html = render_to_string("components/table_row.html", {"item": row, "fields": fields})
 
-                investorDebtOperation.created_at = investorDebtOperation.created_at.strftime("%d.%m.%Y %H:%M") if investorDebtOperation.created_at else ""
+                investorDebtOperation.created_at = timezone.localtime(investorDebtOperation.created_at).strftime("%d.%m.%Y %H:%M") if investorDebtOperation.created_at else ""
                 investorDebtOperation.operation_type = "Внесение" if investorDebtOperation.operation_type == "deposit" else "Забор"
 
                 html_investor_debt_operation = render_to_string("components/table_row.html", {
@@ -2737,7 +2737,7 @@ def profit_distribution(request):
 
     class ProfitRow:
         def __init__(self, t):
-            self.created_at = t.created_at.strftime("%d.%m.%Y") if t.created_at else ""
+            self.created_at = timezone.localtime(t.created_at).strftime("%d.%m.%Y") if t.created_at else ""
             self.client = str(t.client) if t.client else ""
             self.supplier = str(t.supplier) if t.supplier else ""
             self.amount = t.amount
@@ -2799,7 +2799,7 @@ def debtor_details(request):
         transaction_data = []
         for t in transactions:
             transaction_data.append(type("Row", (), {
-                "created_at": t.created_at.strftime("%d.%m.%Y") if t.created_at else "",
+                "created_at": timezone.localtime(t.created_at).strftime("%d.%m.%Y") if t.created_at else "",
                 "supplier": str(t.supplier) if t.supplier else "",
                 "supplier_debt": t.supplier_debt,
                 "supplier_percentage": t.supplier_percentage,
@@ -2815,7 +2815,7 @@ def debtor_details(request):
         repayment_data = []
         for r in repayments:
             repayment_data.append(type("Row", (), {
-                "created_at": r.created_at.strftime("%d.%m.%Y %H:%M") if r.created_at else "",
+                "created_at": timezone.localtime(r.created_at).strftime("%d.%m.%Y %H:%M") if r.created_at else "",
                 "amount": r.amount,
                 "cost_percentage": r.transaction.supplier_percentage if r.transaction else "",
                 "comment": r.comment or "",
@@ -2853,7 +2853,7 @@ def debtor_details(request):
             data = []
             for t in transactions:
                 data.append(type("Row", (), {
-                    "created_at": t.created_at.strftime("%d.%m.%Y") if t.created_at else "",
+                    "created_at": timezone.localtime(t.created_at).strftime("%d.%m.%Y") if t.created_at else "",
                     "client": str(t.client) if t.client else "",
                     "client_percentage": t.client_percentage,
                     "client_debt_paid": t.client_debt_paid,
@@ -2878,7 +2878,7 @@ def debtor_details(request):
             data = []
             for t in transactions:
                 data.append(type("Row", (), {
-                    "created_at": t.created_at.strftime("%d.%m.%Y") if t.created_at else "",
+                    "created_at": timezone.localtime(t.created_at).strftime("%d.%m.%Y") if t.created_at else "",
                     "client": str(t.client) if t.client else "",
                     "bonus_percentage": t.bonus_percentage,
                     "bonus_debt": t.bonus_debt,
@@ -2910,7 +2910,7 @@ def debtor_details(request):
             data = []
             for t in transactions:
                 data.append(type("Row", (), {
-                    "created_at": t.created_at.strftime("%d.%m.%Y") if t.created_at else "",
+                    "created_at": timezone.localtime(t.created_at).strftime("%d.%m.%Y") if t.created_at else "",
                     "client": str(t.client) if t.client else "",
                     "amount": t.amount,
                     "profit": t.profit - t.returned_to_investor,
@@ -2945,7 +2945,7 @@ def debtor_details(request):
             operation_data = []
             for op in investor_operations:
                 operation_data.append(type("OperationRow", (), {
-                    "created_at": op.created_at.strftime("%d.%m.%Y %H:%M") if op.created_at else "",
+                    "created_at": timezone.localtime(op.created_at).strftime("%d.%m.%Y %H:%M") if op.created_at else "",
                     "investor": str(op.investor) if op.investor else "",
                     "amount": op.amount,
                     "operation_type": dict(InvestorDebtOperation.OPERATION_TYPES).get(op.operation_type, ""),
