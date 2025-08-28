@@ -3,16 +3,19 @@ from django.db.models.signals import post_migrate
 
 
 class MainConfig(AppConfig):
-    default_auto_field = 'django.db.models.BigAutoField'
-    name = 'main'
+    default_auto_field = "django.db.models.BigAutoField"
+    name = "main"
 
     def ready(self):
-        from .models import Investor, PaymentPurpose, AccountType, Account, Branch
         from django.apps import apps
 
         def create_initial_data(sender, **kwargs):
-            if sender.label != "main":
-                return
+            # Импорты моделей внутри обработчика (иначе при ready может быть слишком рано)
+            Investor = apps.get_model("main", "Investor")
+            PaymentPurpose = apps.get_model("main", "PaymentPurpose")
+            AccountType = apps.get_model("main", "AccountType")
+            Account = apps.get_model("main", "Account")
+            Branch = apps.get_model("main", "Branch")
 
             for name in ["Инвестор 1", "Инвестор 2"]:
                 Investor.objects.get_or_create(name=name)
@@ -40,7 +43,4 @@ class MainConfig(AppConfig):
             for name in ["Филиал 1", "Филиал 2"]:
                 Branch.objects.get_or_create(name=name)
 
-        post_migrate.connect(
-            create_initial_data,
-            sender=apps.get_app_config("main"), 
-        )
+        post_migrate.connect(create_initial_data, sender=self)
