@@ -2024,7 +2024,13 @@ const handleTransactions = async config => {
 
 	TableManager.createColumnsForTable(
 		'transactions-table',
-		[{ name: 'created_at' }],
+		[
+			{ name: 'created_at' },
+			{ name: 'client', url: '/clients/list/' },
+			{ name: 'supplier', url: '/suppliers/list/' },
+			{ name: 'account', url: '/accounts/list/' },
+			{ name: 'amount' },
+		],
 		['profit']
 	)
 

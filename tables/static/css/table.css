@@ -50,6 +50,14 @@
 	height: 24px;
 }
 
+.table__filter-cell .select__control {
+	height: 24px;
+}
+
+.table__filter-cell .select__arrow {
+	top: 5px;
+}
+
 .table__resize-handle {
 	position: absolute;
 	top: 0;
