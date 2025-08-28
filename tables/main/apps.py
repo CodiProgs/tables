@@ -11,7 +11,7 @@ class MainConfig(AppConfig):
         )
 
         def create_initial_data(sender, **kwargs):
-            if sender.label != "main":
+            if sender.name != "main":
                 return
 
             for name in ["Инвестор 1", "Инвестор 2"]:
