@@ -2892,8 +2892,7 @@ def settle_supplier_debt(request, pk: int):
                     
                     total_debtors += branch_debt
                 
-                safe_amount = MoneyTransfer.objects.filter(destination_account__name="Наличные").aggregate(total=Sum("amount"))["total"] or Decimal(0)
-                safe_amount += MoneyTransfer.objects.filter(source_account__name="Наличные").aggregate(total=Sum("amount"))["total"] or Decimal(0)
+                safe_amount = SupplierAccount.objects.filter(account__name="Наличные").aggregate(total=Sum("balance"))["total"] or Decimal(0)
 
                 investors = list(Investor.objects.values("name", "balance"))
                 investors = [{"name": inv["name"], "amount": inv["balance"]} for inv in investors]
