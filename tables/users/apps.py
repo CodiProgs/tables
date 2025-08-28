@@ -6,12 +6,13 @@ class UsersConfig(AppConfig):
     name = 'users'
 
     def ready(self):
-        from django.contrib.auth import get_user_model
-        from .models import UserType
         def create_default_usertypes(sender, **kwargs):
-            UserType = sender.get_model("UserType")
+            apps = kwargs.get("apps")
+            UserType = apps.get_model("users", "UserType")
+
             defaults = ['Администратор', 'Поставщик', 'Ассистент', 'Бухгалтер']
             for name in defaults:
                 UserType.objects.get_or_create(name=name)
+
 
         post_migrate.connect(create_default_usertypes, sender=self)

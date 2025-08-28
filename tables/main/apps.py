@@ -7,10 +7,9 @@ class MainConfig(AppConfig):
     name = "main"
 
     def ready(self):
-        from django.apps import apps
-
         def create_initial_data(sender, **kwargs):
-            # Импорты моделей внутри обработчика (иначе при ready может быть слишком рано)
+            apps = kwargs["apps"]
+
             Investor = apps.get_model("main", "Investor")
             PaymentPurpose = apps.get_model("main", "PaymentPurpose")
             AccountType = apps.get_model("main", "AccountType")
