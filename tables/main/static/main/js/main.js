@@ -1737,11 +1737,71 @@ const cashflowConfig = createConfig(CASH_FLOW, {
 		setupCurrencyInput('amount')
 		checkOperationType()
 		setupSupplierAccountSelects()
+
+		const purposeInput = document.getElementById('purpose')
+		if (purposeInput) {
+			const selectContainer = purposeInput.closest('.select')
+			const control = selectContainer?.querySelector('.select__control')
+			if (control) {
+				control.addEventListener('click', async () => {
+					try {
+						const response = await fetch('/payment_purpose/types/')
+						if (!response.ok) return
+						const types = await response.json()
+						const options = selectContainer.querySelectorAll('.select__option')
+						options.forEach(option => {
+							option.classList.remove('text-red', 'text-green')
+							const typeObj = types.find(
+								t => String(t.id) === option.dataset.value
+							)
+
+							if (typeObj) {
+								if (typeObj.operation_type === 'expense') {
+									option.classList.add('text-red')
+								} else if (typeObj.operation_type === 'income') {
+									option.classList.add('text-green')
+								}
+							}
+						})
+					} catch (e) {}
+				})
+			}
+		}
 	},
 	addFunc: () => {
 		setupCurrencyInput('amount')
 		checkOperationType()
 		setupSupplierAccountSelects()
+
+		const purposeInput = document.getElementById('purpose')
+		if (purposeInput) {
+			const selectContainer = purposeInput.closest('.select')
+			const control = selectContainer?.querySelector('.select__control')
+			if (control) {
+				control.addEventListener('click', async () => {
+					try {
+						const response = await fetch('/payment_purpose/types/')
+						if (!response.ok) return
+						const types = await response.json()
+						const options = selectContainer.querySelectorAll('.select__option')
+						options.forEach(option => {
+							option.classList.remove('text-red', 'text-green')
+							const typeObj = types.find(
+								t => String(t.id) === option.dataset.value
+							)
+
+							if (typeObj) {
+								if (typeObj.operation_type === 'expense') {
+									option.classList.add('text-red')
+								} else if (typeObj.operation_type === 'income') {
+									option.classList.add('text-green')
+								}
+							}
+						})
+					} catch (e) {}
+				})
+			}
+		}
 	},
 	afterAddFunc: result => {
 		refreshData(`${CASH_FLOW}-table`, result.id)
@@ -2040,6 +2100,12 @@ const handleTransactions = async config => {
 		})
 	}
 
+	TableManager.createColumnsForTable(
+		'transactions-table',
+		[{ name: 'created_at' }],
+		['profit']
+	)
+
 	const paymentButton = document.getElementById('payment-button')
 	if (paymentButton) {
 		paymentButton.addEventListener('click', async function (e) {
@@ -2322,6 +2388,20 @@ const handleCashFlow = async config => {
 					if (window.supplierChart) {
 						window.supplierChart.destroy()
 					}
+
+					function getNiceMax(value) {
+						if (value <= 10) return 10
+						if (value <= 100) return Math.ceil(value / 10) * 10
+						if (value <= 1000) return Math.ceil(value / 100) * 100
+						if (value <= 10000) return Math.ceil(value / 500) * 500
+						if (value <= 100000) return Math.ceil(value / 1000) * 1000
+						if (value <= 1000000) return Math.ceil(value / 50000) * 50000
+						return Math.ceil(value / 100000) * 100000
+					}
+
+					const maxValue = Math.max(...data.values)
+					const yMax = getNiceMax(maxValue * 1.1)
+
 					window.supplierChart = new Chart(ctx, {
 						type: 'bar',
 						data: {
@@ -2339,12 +2419,26 @@ const handleCashFlow = async config => {
 						},
 						options: {
 							scales: {
-								y: { beginAtZero: true },
+								y: {
+									beginAtZero: true,
+									max: yMax,
+								},
 							},
 							plugins: {
 								legend: { display: false },
+								tooltip: {
+									enabled: false,
+								},
+								datalabels: {
+									anchor: 'end',
+									align: 'end',
+									font: { size: 10, weight: 'bold' },
+									color: '#000',
+									formatter: value => value,
+								},
 							},
 						},
+						plugins: [ChartDataLabels],
 					})
 				})
 		}
@@ -2726,22 +2820,33 @@ const handleDebtors = async () => {
 					})
 				})
 
-			let lastBalanceData = null
-
 			function drawCharts() {
 				const statsChart = document.getElementById('statsChart')
 				const profitChart = document.getElementById('profitChart')
 				if (
 					!statsChart ||
 					!profitChart ||
-					!lastBalanceData ||
-					!lastBalanceData.capitals_by_month
+					!window.lastBalanceData ||
+					!window.lastBalanceData.capitals_by_month
 				)
 					return
 
-				const data = lastBalanceData
+				const data = window.lastBalanceData
 				const statsCtx = statsChart.getContext('2d')
 				const profitCtx = profitChart.getContext('2d')
+
+				function getNiceMax(value) {
+					if (value <= 10) return 10
+					if (value <= 100) return Math.ceil(value / 10) * 10
+					if (value <= 1000) return Math.ceil(value / 100) * 100
+					if (value <= 10000) return Math.ceil(value / 500) * 500
+					if (value <= 100000) return Math.ceil(value / 1000) * 1000
+					if (value <= 1000000) return Math.ceil(value / 50000) * 50000
+					return Math.ceil(value / 100000) * 100000
+				}
+
+				const maxValue = Math.max(...data.capitals_by_month.capitals)
+				const yMax = getNiceMax(maxValue * 1.1)
 
 				window.capitalChart = new Chart(statsCtx, {
 					type: 'bar',
@@ -2771,26 +2876,34 @@ const handleDebtors = async () => {
 									autoSkipPadding: 2,
 								},
 							},
-							y: { beginAtZero: true },
+							y: {
+								beginAtZero: true,
+								max: yMax,
+							},
 						},
 						plugins: {
 							legend: { display: false },
 							tooltip: {
-								enabled: true,
-								position: 'nearest',
-								yAlign: 'center',
-								xAlign: 'center',
-								padding: 10,
-								displayColors: false,
+								enabled: false,
+							},
+							datalabels: {
+								anchor: 'end',
+								align: 'end',
+								font: { size: 10, weight: 'bold' },
+								color: '#000',
+								formatter: value => value,
 							},
 						},
 					},
+					plugins: [ChartDataLabels],
 				})
+
+				const yMaxProfit = getNiceMax((data.capitals_by_month.total || 0) * 1.1)
 
 				window.profitChartInstance = new Chart(profitCtx, {
 					type: 'bar',
 					data: {
-						labels: ['Итого'],
+						labels: ['%'],
 						datasets: [
 							{
 								label: 'Итого',
@@ -2802,60 +2915,24 @@ const handleDebtors = async () => {
 						],
 					},
 					options: {
-						scales: { y: { beginAtZero: true, display: false } },
+						scales: {
+							y: { beginAtZero: true, display: false, max: yMaxProfit },
+						},
 						plugins: {
 							legend: { display: false },
 							tooltip: {
 								enabled: false,
-								external: function (context) {
-									const tooltipModel = context.tooltip
-									let tooltipEl = document.getElementById('chartjs-tooltip')
-									if (!tooltipEl) {
-										tooltipEl = document.createElement('div')
-										tooltipEl.id = 'chartjs-tooltip'
-										tooltipEl.style.position = 'absolute'
-										tooltipEl.style.background = 'rgba(0,0,0,0.8)'
-										tooltipEl.style.color = '#fff'
-										tooltipEl.style.borderRadius = '6px'
-										tooltipEl.style.padding = '8px 14px'
-										tooltipEl.style.pointerEvents = 'none'
-										tooltipEl.style.fontSize = '12px'
-										tooltipEl.style.zIndex = '1000'
-										tooltipEl.style.boxShadow = '0 2px 8px rgba(0,0,0,0.2)'
-										document.body.appendChild(tooltipEl)
-									}
-									if (tooltipModel.opacity === 0) {
-										tooltipEl.style.opacity = 0
-										return
-									}
-									if (tooltipModel.title && tooltipModel.body) {
-										const title = tooltipModel.title[0] || ''
-										let value = tooltipModel.body[0].lines[0] || ''
-										value = value.replace(/^Итого:\s*/, '')
-										tooltipEl.innerHTML = `
-                                <div style="font-weight:600; font-size:12px; margin-bottom:2px;">${title}</div>
-                                <div style="font-size:12px; font-weight:500;">${value}</div>
-                            `
-									}
-									const canvas = context.chart.canvas
-									const rect = canvas.getBoundingClientRect()
-									tooltipEl.style.opacity = 1
-									tooltipEl.style.left =
-										rect.left +
-										window.pageXOffset +
-										tooltipModel.caretX -
-										tooltipEl.offsetWidth +
-										'px'
-									tooltipEl.style.top =
-										rect.top +
-										window.pageYOffset +
-										tooltipModel.caretY -
-										tooltipEl.offsetHeight / 2 +
-										'px'
-								},
+							},
+							datalabels: {
+								anchor: 'end',
+								align: 'end',
+								font: { size: 10, weight: 'bold' },
+								color: '#000',
+								formatter: value => value,
 							},
 						},
 					},
+					plugins: [ChartDataLabels],
 				})
 			}
 
@@ -2894,7 +2971,7 @@ const handleDebtors = async () => {
 			window.addEventListener('resize', resizeCharts)
 
 			if (data.capitals_by_month) {
-				lastBalanceData = data
+				window.lastBalanceData = data
 				resizeCharts()
 			}
 		} catch (error) {
@@ -2911,6 +2988,60 @@ const handleDebtors = async () => {
 			debtorsData.style.maxHeight = '100%'
 			debtorsData.style.border = 'none'
 		}
+	}
+
+	const refreshStatsButton = document.getElementById('refresh-stats-button')
+	if (refreshStatsButton) {
+		refreshStatsButton.addEventListener('click', async function () {
+			const balanceContainer = document.getElementById('balance-container')
+			if (!balanceContainer) return
+
+			const loader = createLoader()
+			document.body.appendChild(loader)
+
+			try {
+				const response = await fetch('/company_balance_stats/')
+				if (!response.ok) throw new Error('Ошибка запроса')
+				const data = await response.json()
+
+				balanceContainer.innerHTML = renderBalance(data)
+
+				balanceContainer
+					.querySelectorAll('.debtors-office-list__row')
+					.forEach(row => {
+						row.addEventListener('click', () => {
+							const details = row
+								.closest('.debtors-office-list__item')
+								.querySelector('.debtors-office-list__details')
+							const btn = row.querySelector('.debtors-office-list__toggle')
+							btn.classList.toggle('open')
+							details.classList.toggle('open')
+						})
+					})
+
+				if (window.capitalChart) {
+					window.capitalChart.destroy()
+					window.capitalChart = null
+				}
+				if (window.profitChartInstance) {
+					window.profitChartInstance.destroy()
+					window.profitChartInstance = null
+				}
+
+				window.lastBalanceData = data
+				if (typeof window.resizeCharts === 'function') {
+					window.resizeCharts()
+				}
+				if (typeof window.drawCharts === 'function') {
+					window.drawCharts()
+				}
+			} catch (error) {
+				console.error('Ошибка при загрузке данных:', error)
+				balanceContainer.innerHTML = '<p>Ошибка при загрузке данных.</p>'
+			} finally {
+				loader.remove()
+			}
+		})
 	}
 
 	const officeList = document.querySelector('.debtors-office-list')

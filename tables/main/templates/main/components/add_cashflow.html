@@ -26,6 +26,14 @@
         <div class="modal-form__group">
             {% include "components/select.html" with id="purpose" placeholder="Выберите назначение" %}
         </div>
+        <div class="modal-form__group">
+            <input class="modal-form__input"
+                   type="text"
+                   id="comment"
+                   name="comment"
+                   spellcheck="false"
+                   placeholder="Введите комментарий (необязательно)">
+        </div>
         <div class="modal-form__buttons">
             <button class="button modal-form__button" type="submit">Сохранить</button>
             <button class="button modal-form__button button--cancel" type="button">Отменить</button>

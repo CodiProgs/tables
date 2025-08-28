@@ -39,6 +39,7 @@
 
 .table__filter-cell {
 	overflow: visible;
+	padding: 0;
 }
 
 .table__resize-handle {

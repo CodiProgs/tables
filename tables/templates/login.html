@@ -37,7 +37,7 @@
                     </div>
                     {% if form.password.errors %}<div class="login__error">{{ form.password.errors }}</div>{% endif %}
                 </div>
-                <div class="login__footer">
+                {% comment %} <div class="login__footer">
                     {% if form.non_field_errors %}<p class="login__error" id="login__error-all">Ошибка входа</p>{% endif %}
                     <div class="login__actions">
                         <button type="submit" class="button login__submit">Войти</button>
@@ -46,7 +46,7 @@
                             <button type="button" class="button login__btn">Вход по отпечатку</button>
                         </div>
                     </div>
-                </div>
+                </div> {% endcomment %}
             </form>
         </div>
     </div>

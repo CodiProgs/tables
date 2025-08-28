@@ -73,6 +73,11 @@
         </div>
         <div class="stats-container">
             {% if is_admin %}
+            <button id="refresh-stats-button" class="stats-refresh-button" title="Обновить статистику">
+                <img src="{% static 'images/arrows-rotate.svg' %}" alt="Обновить"
+                     height="16"
+                     width="16">
+            </button>
             <h2 class="debtors-office-list__header debtors-office__header">Баланс</h2>
             <div id="balance-container"></div>
             <h2 class="debtors-office-list__header debtors-office__header debtors-office__header--top">Рентабельность капитала</h2>
@@ -91,7 +96,8 @@
 {% block extra_scripts %}
     {{ block.super }}
     <script src="{% static 'main/js/main.js' %}" type="module"></script>
-    <script src="{% static 'main/js/autonumeric.js' %}"></script>
+    <script src="{% static 'main/js/autonumeric.js' %}" defer></script>
     <script src="{% static 'main/js/chart.js' %}" type="module" defer></script>
+    <script src="{% static 'main/js/chartjs-plugin-datalabels.js' %}" type="module" defer></script>
     {{ data_ids|json_script:"data-ids" }}
 {% endblock extra_scripts %}

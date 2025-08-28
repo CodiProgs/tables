@@ -354,9 +354,24 @@ class CashFlow(models.Model):
         blank=True
     )
     
+    comment = models.TextField(
+        blank=True,
+        null=True,
+        verbose_name="Комментарий"
+    )
+
     created_at = models.DateTimeField(
         auto_now_add=True, 
         verbose_name="Дата операции"
+    )
+
+    returned_to_investor = models.DecimalField(
+        max_digits=15,
+        decimal_places=2,
+        default=0,
+        null=True,
+        blank=True,
+        verbose_name="Возвращено инвестору"
     )
     
     @property

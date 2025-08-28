@@ -161,19 +161,58 @@ export class DynamicFormHandler {
 
 	setSelectValue(selectInput, value) {
 		const selectContainer = selectInput.closest('.select')
-		const option = selectContainer?.querySelector(
-			`.select__option[data-value="${value}"]`
-		)
-		if (option) {
+		const multiple = selectContainer?.dataset.multiple === 'true'
+
+		if (multiple) {
+			let values = Array.isArray(value)
+				? value
+				: String(value)
+						.split(',')
+						.map(v => v.trim())
+						.filter(Boolean)
 			const textElement = selectContainer.querySelector('.select__text')
+			let selectedNames = []
+
+			values.forEach(val => {
+				const option = selectContainer.querySelector(
+					`.select__option[data-value="${val}"]`
+				)
+				if (option) {
+					const checkbox = option.querySelector('.select__checkbox')
+					if (checkbox) checkbox.innerHTML = '✔️'
+					selectedNames.push(option.textContent)
+				}
+			})
+
+			selectInput.value = values.join(',')
 			if (textElement) {
-				textElement.textContent = option.textContent
-				textElement.classList.remove('select__placeholder')
+				textElement.textContent = selectedNames.length
+					? `Выбрано: ${selectedNames.length}`
+					: selectInput.getAttribute('placeholder') || ''
+				textElement.classList.toggle(
+					'select__placeholder',
+					selectedNames.length === 0
+				)
 			}
-			selectInput.value = value
+			selectContainer.classList.toggle('has-value', selectedNames.length > 0)
 		} else {
-			if (selectInput.type === 'hidden' || selectInput.hasAttribute('hidden')) {
-				selectInput.setAttribute('value', value)
+			const option = selectContainer?.querySelector(
+				`.select__option[data-value="${value}"]`
+			)
+			if (option) {
+				const textElement = selectContainer.querySelector('.select__text')
+				if (textElement) {
+					textElement.textContent = option.textContent
+					textElement.classList.remove('select__placeholder')
+				}
+				selectInput.value = value
+			} else {
+				if (
+					selectInput.type === 'hidden' ||
+					selectInput.hasAttribute('hidden')
+				) {
+					selectInput.setAttribute('value', value)
+				}
 			}
 		}
 	}

@@ -28,6 +28,7 @@ urlpatterns = [
 	path("money_transfers/edit/<int:pk>/", views.money_transfer_edit, name="money_transfer_edit"),
 	path("money_transfers/delete/<int:pk>/", views.money_transfer_delete, name="money_transfer_delete"),
 	path("payment_purposes/list/", views.payment_purpose_list, name="payment_purpose_list"),
+    path('payment_purpose/types/', views.payment_purpose_types, name='payment_purpose_types'),
 	path("cash_flow/", views.cash_flow, name="cash_flow"),
 	path("cash_flow/<int:pk>/", views.cash_flow_detail, name="cash_flow_detail"),
 	path("cash_flow/add/", views.cash_flow_create, name="cash_flow_create"),
@@ -54,7 +55,7 @@ urlpatterns = [
 	path("suppliers/", views.suppliers, name="suppliers"),
 	path("suppliers/debtors/", views.debtors, name="debtors"),
 	path(
-		"suppliers/debtors/<str:type>/<signed_int:pk>/",
+		"suppliers/debtors/<str:type>/<pk>/",
 		views.debtor_detail,
 		name="debtor_detail"
 	),
@@ -64,7 +65,7 @@ urlpatterns = [
 	path("suppliers/add/", views.supplier_create, name="supplier_create"),
 	path("suppliers/edit/<int:pk>/", views.supplier_edit, name="supplier_edit"),
 	path("suppliers/delete/<int:pk>/", views.supplier_delete, name="supplier_delete"),
-	path("suppliers/settle-debt/<signed_int:pk>/", views.settle_supplier_debt, name="settle_supplier_debt"),
+	path("suppliers/settle-debt/<pk>/", views.settle_supplier_debt, name="settle_supplier_debt"),
     path("suppliers/repay-debt/<signed_int:pk>/", views.repay_supplier_debt, name="repay_supplier_debt"),
     path("suppliers/repay-debt/edit/<int:pk>/", views.edit_supplier_debt_repayment, name="edit_supplier_debt_repayment"),
 	path("branches/list/", views.branch_list, name="branch_list"),

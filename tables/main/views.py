@@ -929,7 +929,8 @@ def get_cash_flow_fields():
         "id",
         "created_at",
         "amount",
-        "transaction"
+        "transaction",
+        "returned_to_investor"
     ]
     fields = get_model_fields(
         CashFlow,
@@ -1079,7 +1080,7 @@ def supplier_create(request):
             username = request.POST.get("username")
             password = request.POST.get("password")
 
-            if not all([name, branch_id, cost_percentage, account_ids]):
+            if not all([name, branch_id, cost_percentage, account_ids]) or not branch_id or branch_id == 'null':
                 return JsonResponse(
                     {"status": "error", "message": "Все поля должны быть заполнены"},
                     status=400,
@@ -1138,7 +1139,7 @@ def supplier_edit(request, pk=None):
     try:
         with transaction.atomic():
             pk = pk or request.POST.get("id")
-            if not pk:
+            if not pk or pk == 'null':
                 return JsonResponse(
                     {"status": "error", "message": "ID поставщика не указан"},
                     status=400,
@@ -1153,8 +1154,8 @@ def supplier_edit(request, pk=None):
 
             username = request.POST.get("username")
             password = request.POST.get("password")
-
-            if not all([name, branch_id, cost_percentage, account_ids]):
+            
+            if not all([name, branch_id, cost_percentage, account_ids]) or not branch_id or branch_id == 'null':
                 return JsonResponse(
                     {"status": "error", "message": "Все поля должны быть заполнены"},
                     status=400,
@@ -1277,6 +1278,7 @@ def cash_flow_create(request):
             purpose_id = request.POST.get("purpose")
             supplier_id = request.POST.get("supplier")
             account_id = request.POST.get("account")
+            comment = request.POST.get("comment", "")
 
             if not all([amount, purpose_id, supplier_id, account_id]):
                 return JsonResponse(
@@ -1312,6 +1314,7 @@ def cash_flow_create(request):
                 amount=amount_value,
                 purpose=purpose,
                 supplier=supplier,
+                comment=comment
             )
             account.balance += amount_value
             account.save()
@@ -1355,6 +1358,7 @@ def cash_flow_edit(request, pk=None):
             new_amount = clean_currency(request.POST.get("amount"))
             new_purpose_id = request.POST.get("purpose")
             new_account_id = request.POST.get("account")
+            comment = request.POST.get("comment", "")
 
             if not all([new_supplier_id, new_amount, new_purpose_id, new_account_id]):
                 return JsonResponse({
@@ -1446,6 +1450,7 @@ def cash_flow_edit(request, pk=None):
             cashflow.supplier = new_supplier
             cashflow.amount = updated_amount
             cashflow.purpose = new_purpose
+            cashflow.comment = comment
             cashflow.save()
 
             cashflow.refresh_from_db()
@@ -1544,9 +1549,28 @@ def account_list(request):
 def payment_purpose_list(request):
     payment_purpose_data = [
         {"id": acc.id, "name": acc.name}
-        for acc in PaymentPurpose.objects.filter(operation_type=PaymentPurpose.EXPENSE)
+        for acc in PaymentPurpose.objects.all().exclude(name="Оплата").order_by('operation_type', 'name')
     ]
     return JsonResponse(payment_purpose_data, safe=False)
+
+@forbid_supplier
+@login_required
+def payment_purpose_types(request):
+    types = (
+        PaymentPurpose.objects
+        .all()
+        .exclude(name="Оплата")
+        .order_by('operation_type', 'name')
+        .values('id', 'operation_type')
+    )
+    seen = set()
+    ordered_types = []
+    for t in types:
+        key = (t['id'], t['operation_type'])
+        if key not in seen:
+            seen.add(key)
+            ordered_types.append({'id': t['id'], 'operation_type': t['operation_type']})
+    return JsonResponse(ordered_types, safe=False)
 
 @forbid_supplier
 @login_required
@@ -2302,7 +2326,11 @@ def debtors(request):
         and getattr(t, 'profit', 0) > 0
     ]
 
-    total_profit = sum(float(t.profit - t.returned_to_investor) for t in transactionsInvestors)
+    cashflows = CashFlow.objects.filter(
+        purpose__operation_type=PaymentPurpose.INCOME
+    ).exclude(purpose__name="Оплата")
+
+    total_profit = sum(float(t.profit - t.returned_to_investor) for t in transactionsInvestors) + sum(float(cf.amount - (cf.returned_to_investor or 0)) for cf in cashflows)
 
     summary = [
         {"name": "Бонусы", "amount": total_bonuses},
@@ -2346,7 +2374,7 @@ def settle_supplier_debt(request, pk: int):
             except Exception:
                 return JsonResponse({"status": "error", "message": "Некорректная сумма"}, status=400)
 
-            if type_ != "balance" and type_ != "initial" and type_ != "short_term_liabilities" and type_ != "credit" and type_ != "equipment":
+            if type_ != "balance" and type_ != "initial" and type_ != "short_term_liabilities" and type_ != "credit" and type_ != "equipment" and type_ != "profit":
                 trans = get_object_or_404(Transaction, id=pk)
 
             if type_ == "branch":
@@ -2459,7 +2487,11 @@ def settle_supplier_debt(request, pk: int):
                     and getattr(t, 'profit', 0) > 0
                 ]
 
-                total_profit = sum(float(t.profit - t.returned_to_investor) for t in transactionsInvestors)
+                cashflows = CashFlow.objects.filter(
+                    purpose__operation_type=PaymentPurpose.INCOME
+                ).exclude(purpose__name="Оплата")
+
+                total_profit = sum(float(t.profit - t.returned_to_investor) for t in transactionsInvestors) + sum(float(cf.amount - (cf.returned_to_investor or 0)) for cf in cashflows)
 
                 is_admin = request.user.user_type.name == 'Администратор' if hasattr(request.user, 'user_type') else False
 
@@ -2538,7 +2570,11 @@ def settle_supplier_debt(request, pk: int):
                     and getattr(t, 'profit', 0) > 0
                 ]
 
-                total_profit = sum(float(t.profit - t.returned_to_investor) for t in transactionsInvestors)
+                cashflows = CashFlow.objects.filter(
+                    purpose__operation_type=PaymentPurpose.INCOME
+                ).exclude(purpose__name="Оплата")
+
+                total_profit = sum(float(t.profit - t.returned_to_investor) for t in transactionsInvestors) + sum(float(cf.amount - (cf.returned_to_investor or 0)) for cf in cashflows)
 
                 summary = [
                     {"name": "Бонусы", "amount": total_bonuses},
@@ -2755,8 +2791,23 @@ def settle_supplier_debt(request, pk: int):
                 if amount_value == 0:
                     return JsonResponse({"status": "error", "message": "Сумма должна быть больше нуля"}, status=400)
 
-                if amount_value > (trans.profit - trans.returned_to_investor):
-                    return JsonResponse({"status": "error", "message": "Сумма не может превышать долг инвестору"}, status=400)
+                trans = None
+                cashflow = None
+
+                if isinstance(pk, str) and pk.startswith("cf-"):
+                    cf_id = pk.replace("cf-", "")
+                    cashflow = get_object_or_404(CashFlow, id=cf_id)
+                else:
+                    trans = get_object_or_404(Transaction, id=pk)
+
+                if trans:
+                    if amount_value > (trans.profit - trans.returned_to_investor):
+                        return JsonResponse({"status": "error", "message": "Сумма не может превышать долг инвестору"}, status=400)
+                elif cashflow:
+                    if amount_value > (cashflow.amount - (cashflow.returned_to_investor if cashflow.returned_to_investor is not None else 0)):
+                        return JsonResponse({"status": "error", "message": "Сумма не может превышать долг инвестору"}, status=400)
+                else:
+                    return JsonResponse({"status": "error", "message": "Транзакция или денежный поток не найдены"}, status=400)
 
                 investor_id = request.POST.get("investor_select")
 
@@ -2774,15 +2825,30 @@ def settle_supplier_debt(request, pk: int):
                     operation_type="deposit",
                 )
 
-                trans.returned_to_investor += amount_value
-                trans.save()
+                if trans:
+                    trans.returned_to_investor += amount_value
+                    trans.save()
 
-                row = type("Row", (), {
-                    "created_at": timezone.localtime(trans.created_at).strftime("%d.%m.%Y") if trans.created_at else "",
-                    "client": str(trans.client) if trans.client else "",
-                    "amount": trans.amount,
-                    "profit": trans.profit - trans.returned_to_investor
-                })()
+                    row = type("Row", (), {
+                        "created_at": timezone.localtime(trans.created_at).strftime("%d.%m.%Y") if trans.created_at else "",
+                        "client": str(trans.client) if trans.client else "",
+                        "amount": trans.amount,
+                        "profit": trans.profit - trans.returned_to_investor
+                    })()
+                elif cashflow:
+                    if cashflow.returned_to_investor is None:
+                        cashflow.returned_to_investor = Decimal(0)
+                    cashflow.returned_to_investor += amount_value
+                    cashflow.save()
+
+                    row = type("Row", (), {
+                        "created_at": timezone.localtime(cashflow.created_at).strftime("%d.%m.%Y") if cashflow.created_at else "",
+                        "client": None,
+                        "amount": None,
+                        "profit": cashflow.amount - (cashflow.returned_to_investor if cashflow.returned_to_investor is not None else 0)
+                    })()
+
+                
                 fields = [
                     {"name": "created_at", "verbose_name": "Дата"},
                     {"name": "client", "verbose_name": "Клиент"},
@@ -2816,8 +2882,12 @@ def settle_supplier_debt(request, pk: int):
                     and getattr(t, 'profit', 0) > 0
                 ]
 
-                total_debt = sum(float(t.profit - t.returned_to_investor) for t in transactionsInvestors)
-                total_profit = sum(float(t.profit - t.returned_to_investor) for t in transactionsInvestors)
+                cashflows = CashFlow.objects.filter(
+                    purpose__operation_type=PaymentPurpose.INCOME
+                ).exclude(purpose__name="Оплата")
+
+                total_debt = sum(float(t.profit - t.returned_to_investor) for t in transactionsInvestors) + sum(float(cf.amount - (cf.returned_to_investor or 0)) for cf in cashflows)
+                total_profit = sum(float(t.profit - t.returned_to_investor) for t in transactionsInvestors) + sum(float(cf.amount - (cf.returned_to_investor or 0)) for cf in cashflows)
 
                 is_admin = request.user.user_type.name == 'Администратор' if hasattr(request.user, 'user_type') else False
 
@@ -2853,7 +2923,7 @@ def settle_supplier_debt(request, pk: int):
 
                 return JsonResponse({
                     "html": html,
-                    "id": trans.id,
+                    "id": trans.id if trans else f"cf-{cashflow.id}",
                     "type": "Инвесторам",
                     "total_debt": total_debt,
                     "total_summary_debts": total_summary_debts,
@@ -2871,6 +2941,13 @@ def settle_supplier_debt(request, pk: int):
 @forbid_supplier
 @login_required
 def debtor_detail(request, type, pk):
+    if isinstance(pk, str) and pk.startswith("cf-"):
+        cf_id = pk.replace("cf-", "")
+        cashflow = get_object_or_404(CashFlow, id=cf_id)
+        data = model_to_dict(cashflow)
+        data['amount'] = float(cashflow.amount - (cashflow.returned_to_investor or 0))
+        return JsonResponse({"data": data})
+
     type_map = {
         "equipment": "Оборудование",
         "credit": "Кредит",
@@ -3088,6 +3165,30 @@ def debtor_details(request):
                 and getattr(t, 'profit', 0) > 0
                 and (getattr(t, 'profit', 0) - getattr(t, 'returned_to_investor', 0)) > 0
             ]
+
+            cashflows = CashFlow.objects.filter(
+                purpose__operation_type=PaymentPurpose.INCOME
+            ).exclude(purpose__name="Оплата")
+
+            class TransactionRow:
+                def __init__(self, created_at, client, amount, profit, id, returned_to_investor=0):
+                    self.created_at = created_at
+                    self.client = client
+                    self.amount = amount
+                    self.profit = profit
+                    self.id = id
+                    self.returned_to_investor = returned_to_investor 
+
+            for cf in cashflows:
+                transactions.append(TransactionRow(
+                    created_at=cf.created_at,
+                    client=None,
+                    amount=None,
+                    profit=cf.amount,
+                    id=f"cf-{cf.id}",
+                    returned_to_investor=cf.returned_to_investor if cf.returned_to_investor is not None else 0
+                ))
+
             fields = [
                 {"name": "created_at", "verbose_name": "Дата"},
                 {"name": "client", "verbose_name": "Клиент"},
@@ -3165,13 +3266,13 @@ def debtor_details(request):
 def cash_flow_payment_stats(request, supplier_id):
     current_year = datetime.now().year
     months = [i for i in range(1, 13)]
-    payment_purpose = PaymentPurpose.objects.filter(name="Оплата").first()
-    if not payment_purpose:
-        return JsonResponse({"months": [], "values": []})
+    # payment_purpose = PaymentPurpose.objects.filter(name="Оплата").first()
+    # if not payment_purpose:
+    #     return JsonResponse({"months": [], "values": []})
 
     cashflows = CashFlow.objects.filter(
         supplier_id=supplier_id,
-        purpose=payment_purpose,
+        # purpose=payment_purpose,
         created_at__year=current_year
     )
 
@@ -3204,8 +3305,8 @@ def company_balance_stats(request):
 
     safe_amount = SupplierAccount.objects.filter(account__name="Наличные").aggregate(total=Sum("balance"))["total"] or Decimal(0)
 
-    investors = list(Investor.objects.values("name", "balance"))
-    investors = [{"name": inv["name"], "amount": inv["balance"]} for inv in investors]
+    investors = list(Investor.objects.values("name", "initial_balance"))
+    investors = [{"name": inv["name"], "amount": inv["initial_balance"]} for inv in investors]
     investors_total = sum([inv["amount"] for inv in investors], Decimal(0))
 
     bonuses = sum((t.bonus_debt or Decimal(0)) for t in Transaction.objects.all())
@@ -3221,7 +3322,6 @@ def company_balance_stats(request):
     current_year = datetime.now().year
     current_month = datetime.now().month
     capitals = []
-    total_capital = 0
     
     MONTHS_RU = [
         "январь", "февраль", "март", "апрель", "май", "июнь",
@@ -3230,13 +3330,20 @@ def company_balance_stats(request):
     months = [MONTHS_RU[month-1] for month in range(1, 13)]
 
     for month in range(1, 13):
-        if month == current_month:
-            capital = float(get_monthly_capital(current_year, month))
-        else:
-            mc = MonthlyCapital.objects.filter(year=current_year, month=month).first()
-            capital = float(mc.capital) if mc else 0
+        # if month == current_month:
+        #     capital = float(get_monthly_capital(current_year, month))
+        # else:
+        #     mc = MonthlyCapital.objects.filter(year=current_year, month=month).first()
+        #     capital = float(mc.capital) if mc else 0
+
+        capital = float(get_monthly_capital(current_year, month))
+
         capitals.append(capital)
-        total_capital += capital
+
+    if capitals:
+        total_capital = round(sum(capitals) / len(capitals), 1)
+    else:
+        total_capital = 0
 
     data = {
         "non_current_assets": {
@@ -3288,56 +3395,24 @@ def company_balance_stats_by_month(request):
 
 def get_monthly_capital(year, month):
     last_day = monthrange(year, month)[1]
+    dt_start = timezone.make_aware(datetime(year, month, 1, 0, 0, 0))
     dt_end = timezone.make_aware(datetime(year, month, last_day, 23, 59, 59))
 
-    equipment = BalanceData.objects.filter(
-        name="Оборудование",
-        created_at__lte=dt_end
-    ).aggregate(total=Sum("amount"))["total"] or Decimal(0)
-    credit = BalanceData.objects.filter(
-        name="Кредит",
-        created_at__lte=dt_end
-    ).aggregate(total=Sum("amount"))["total"] or Decimal(0)
-    short_term = BalanceData.objects.filter(
-        name="Краткосрочные обязательства",
-        created_at__lte=dt_end
-    ).aggregate(total=Sum("amount"))["total"] or Decimal(0)
-
-    total_debtors = Decimal(0)
-    for branch in Supplier.objects.exclude(branch=None).values_list("branch__id", "branch__name").distinct():
-        branch_id, branch_name = branch
-        branch_debt = sum(
-            (t.supplier_debt or Decimal(0))
-            for t in Transaction.objects.filter(
-                supplier__branch_id=branch_id,
-                paid_amount__gt=0,
-                created_at__lte=dt_end
-            )
-        )
-        total_debtors += branch_debt
-
-    safe_amount = SupplierAccount.objects.filter(account__name="Наличные").aggregate(total=Sum("balance"))["total"] or Decimal(0)
-
     investors_total = sum([
-        inv["balance"] for inv in Investor.objects.filter(
+        inv["initial_balance"] for inv in Investor.objects.filter(
             created_at__lte=dt_end
-        ).values("balance")
+        ).values("initial_balance")
     ], Decimal(0))
 
-    bonuses = sum(
-        (t.bonus_debt or Decimal(0))
-        for t in Transaction.objects.filter(created_at__lte=dt_end)
-    )
-    client_debts = sum(
-        (t.client_debt or Decimal(0))
-        for t in Transaction.objects.filter(paid_amount__gt=0, created_at__lte=dt_end)
-    )
+    transactions = Transaction.objects.filter(created_at__range=(dt_start, dt_end))
+    profit_total = sum((t.profit or Decimal(0)) for t in transactions)
 
-    assets_total = equipment + Decimal(0) + total_debtors + safe_amount + investors_total
-    liabilities_total = credit + client_debts + short_term + bonuses
-    capital = assets_total - liabilities_total
+    if profit_total > 0:
+        capital_percent = float(profit_total) / float(investors_total) * 100
+    else:
+        capital_percent = 0
 
-    return capital
+    return round(capital_percent, 1)
 
 def calculate_and_save_monthly_capital(year, month):
     capital = get_monthly_capital(year, month)

@@ -500,17 +500,38 @@ const addMenuHandler = () => {
 						table.id === 'investor-operations-table'
 					) {
 						settleDebtButton.style.display = 'none'
+					} else if (table.id === 'investors-table') {
+						const selectedCell = document.querySelector(
+							'td.table__cell--selected'
+						)
+						if (selectedCell) {
+							const cellIndex = Array.from(
+								selectedCell.parentNode.children
+							).indexOf(selectedCell)
+							const th = table.querySelectorAll('thead th')[cellIndex]
+							const colName = th ? th.dataset.name : null
+
+							if (colName === 'initial_balance') {
+								settleDebtButton.style.display = 'block'
+								settleDebtButton.textContent = 'Изменить сумму'
+								settleDebtButton.dataset.type = 'initial'
+							} else if (colName === 'balance') {
+								settleDebtButton.style.display = 'block'
+								settleDebtButton.textContent = 'Изменить сумму'
+								settleDebtButton.dataset.type = 'balance'
+							} else {
+								settleDebtButton.style.display = 'none'
+								settleDebtButton.dataset.type = ''
+							}
+						} else {
+							settleDebtButton.style.display = 'none'
+							settleDebtButton.dataset.type = ''
+						}
 					} else {
 						settleDebtButton.style.display = 'block'
-					}
-
-					if (table.id && table.id === 'investors-table') {
-						settleDebtButton.textContent = 'Изменить сумму'
-					} else {
 						settleDebtButton.textContent = 'Погасить долг'
+						settleDebtButton.dataset.type = ''
 					}
-
-					settleDebtButton.dataset.type = ''
 				}
 				if (repaymentsEditButton) {
 					if (table.id && table.id.startsWith('branch-repayments-')) {
@@ -1181,6 +1202,169 @@ function showChangedCellsRow(row, changedCells) {
 	}
 }
 
+const setupSupplierAccountSelects = () => {
+	const findSelectByInput = ident => {
+		const input =
+			document.querySelector(`#${ident}`) ||
+			document.querySelector(`[name="${ident}"]`)
+		return input ? input.closest('.select') : null
+	}
+
+	const supplierSelect = findSelectByInput('supplier')
+	const accountSelect = findSelectByInput('account')
+	if (!accountSelect) return
+
+	const supplierInput = supplierSelect?.querySelector('.select__input')
+	const accountInput = accountSelect.querySelector('.select__input')
+	const accountText = accountSelect.querySelector('.select__text')
+	const accountDropdown = accountSelect.querySelector('.select__dropdown')
+	const accountControl = accountSelect.querySelector('.select__control')
+
+	if (
+		typeof SelectHandler !== 'undefined' &&
+		SelectHandler.setupSelectBehavior
+	) {
+		SelectHandler.setupSelectBehavior(accountSelect, null)
+	}
+
+	const clearAccountSelectionUI = () => {
+		if (accountInput) accountInput.value = ''
+		if (accountText) {
+			accountText.textContent = accountInput?.getAttribute('placeholder') || ''
+			accountText.classList.add('select__placeholder')
+		}
+		accountSelect.classList.remove('has-value')
+	}
+
+	let loadToken = 0
+	const loadAccountsForSupplier = async supplierId => {
+		const myToken = ++loadToken
+
+		SelectHandler.updateSelectOptions(accountSelect, [])
+
+		if (!supplierId) return
+		const url = `/accounts/list/?supplier_id=${encodeURIComponent(supplierId)}`
+		const data = await SelectHandler.fetchSelectOptions(url)
+
+		if (myToken !== loadToken) return
+		SelectHandler.updateSelectOptions(accountSelect, data)
+
+		// Восстанавливаем выбранное значение из input.value или атрибута value
+		requestAnimationFrame(() => {
+			if (accountInput) {
+				const currentVal =
+					accountInput.value || accountInput.getAttribute('value')
+				SelectHandler.restoreSelectValue(accountSelect, currentVal)
+			}
+		})
+	}
+
+	if (accountControl) {
+		accountControl.addEventListener('click', async () => {
+			if (accountDropdown?.hasChildNodes()) return
+			const sid = supplierInput?.value
+			await loadAccountsForSupplier(sid)
+		})
+	}
+
+	if (supplierInput) {
+		supplierInput.addEventListener('change', async () => {
+			const sid = supplierInput.value
+			clearAccountSelectionUI()
+			await loadAccountsForSupplier(sid)
+		})
+	}
+
+	const initialSupplierId = supplierInput?.value
+	if (initialSupplierId) {
+		loadAccountsForSupplier(initialSupplierId)
+	} else {
+		SelectHandler.updateSelectOptions(accountSelect, [])
+	}
+}
+
+const setupMultipleSupplierAccountSelects = (pairs = []) => {
+	pairs.forEach(({ supplierId, accountId }) => {
+		const supplierSelect = document
+			.querySelector(`#${supplierId}`)
+			?.closest('.select')
+		const accountSelect = document
+			.querySelector(`#${accountId}`)
+			?.closest('.select')
+		if (!accountSelect) return
+
+		const supplierInput = supplierSelect?.querySelector('.select__input')
+		const accountInput = accountSelect.querySelector('.select__input')
+		const accountText = accountSelect.querySelector('.select__text')
+		const accountDropdown = accountSelect.querySelector('.select__dropdown')
+		const accountControl = accountSelect.querySelector('.select__control')
+
+		if (
+			typeof SelectHandler !== 'undefined' &&
+			SelectHandler.setupSelectBehavior
+		) {
+			SelectHandler.setupSelectBehavior(accountSelect, null)
+		}
+
+		const clearAccountSelectionUI = () => {
+			if (accountInput) accountInput.value = ''
+			if (accountText) {
+				accountText.textContent =
+					accountInput?.getAttribute('placeholder') || ''
+				accountText.classList.add('select__placeholder')
+			}
+			accountSelect.classList.remove('has-value')
+		}
+
+		let loadToken = 0
+		const loadAccountsForSupplier = async supplierId => {
+			const myToken = ++loadToken
+
+			SelectHandler.updateSelectOptions(accountSelect, [])
+
+			if (!supplierId) return
+			const url = `/accounts/list/?supplier_id=${encodeURIComponent(
+				supplierId
+			)}`
+			const data = await SelectHandler.fetchSelectOptions(url)
+
+			if (myToken !== loadToken) return
+			SelectHandler.updateSelectOptions(accountSelect, data)
+
+			requestAnimationFrame(() => {
+				if (accountInput) {
+					const currentVal =
+						accountInput.value || accountInput.getAttribute('value')
+					SelectHandler.restoreSelectValue(accountSelect, currentVal)
+				}
+			})
+		}
+
+		if (accountControl) {
+			accountControl.addEventListener('click', async () => {
+				if (accountDropdown?.hasChildNodes()) return
+				const sid = supplierInput?.value
+				await loadAccountsForSupplier(sid)
+			})
+		}
+
+		if (supplierInput) {
+			supplierInput.addEventListener('change', async () => {
+				const sid = supplierInput.value
+				clearAccountSelectionUI()
+				await loadAccountsForSupplier(sid)
+			})
+		}
+
+		const initialSupplierId = supplierInput?.value
+		if (initialSupplierId) {
+			loadAccountsForSupplier(initialSupplierId)
+		} else {
+			SelectHandler.updateSelectOptions(accountSelect, [])
+		}
+	})
+}
+
 export class TablePaginator {
 	constructor(config) {
 		this.baseUrl = config.baseUrl || '/'
@@ -1423,13 +1607,19 @@ const mainConfig = createConfig(TRANSACTION, {
 		setupPercentInput('client_percentage')
 		setupPercentInput('supplier_percentage')
 		setupPercentInput('bonus_percentage')
+
+		setupSupplierAccountSelects()
 	},
+
 	addFunc: () => {
 		setupCurrencyInput('amount')
 		setupPercentInput('client_percentage')
 		setupPercentInput('supplier_percentage')
 		setupPercentInput('bonus_percentage')
+
+		setupSupplierAccountSelects()
 	},
+
 	afterAddFunc: result => {
 		refreshData(`${TRANSACTION}-table`, result.id)
 		const row = TableManager.getRowById(result.id, `${TRANSACTION}-table`)
@@ -1490,7 +1680,7 @@ const mainConfig = createConfig(TRANSACTION, {
 
 const suppliersConfig = createConfig(SUPPLIERS, {
 	dataUrls: [
-		{ id: 'default_account', url: `${BASE_URL}accounts/list/` },
+		{ id: 'account_ids', url: `${BASE_URL}accounts/list/` },
 		{ id: 'branch', url: `${BASE_URL}branches/list/` },
 	],
 	editFunc: () => {
@@ -1546,10 +1736,72 @@ const cashflowConfig = createConfig(CASH_FLOW, {
 	editFunc: () => {
 		setupCurrencyInput('amount')
 		checkOperationType()
+		setupSupplierAccountSelects()
+
+		const purposeInput = document.getElementById('purpose')
+		if (purposeInput) {
+			const selectContainer = purposeInput.closest('.select')
+			const control = selectContainer?.querySelector('.select__control')
+			if (control) {
+				control.addEventListener('click', async () => {
+					try {
+						const response = await fetch('/payment_purpose/types/')
+						if (!response.ok) return
+						const types = await response.json()
+						const options = selectContainer.querySelectorAll('.select__option')
+						options.forEach(option => {
+							option.classList.remove('text-red', 'text-green')
+							const typeObj = types.find(
+								t => String(t.id) === option.dataset.value
+							)
+
+							if (typeObj) {
+								if (typeObj.operation_type === 'expense') {
+									option.classList.add('text-red')
+								} else if (typeObj.operation_type === 'income') {
+									option.classList.add('text-green')
+								}
+							}
+						})
+					} catch (e) {}
+				})
+			}
+		}
 	},
 	addFunc: () => {
 		setupCurrencyInput('amount')
 		checkOperationType()
+		setupSupplierAccountSelects()
+
+		const purposeInput = document.getElementById('purpose')
+		if (purposeInput) {
+			const selectContainer = purposeInput.closest('.select')
+			const control = selectContainer?.querySelector('.select__control')
+			if (control) {
+				control.addEventListener('click', async () => {
+					try {
+						const response = await fetch('/payment_purpose/types/')
+						if (!response.ok) return
+						const types = await response.json()
+						const options = selectContainer.querySelectorAll('.select__option')
+						options.forEach(option => {
+							option.classList.remove('text-red', 'text-green')
+							const typeObj = types.find(
+								t => String(t.id) === option.dataset.value
+							)
+
+							if (typeObj) {
+								if (typeObj.operation_type === 'expense') {
+									option.classList.add('text-red')
+								} else if (typeObj.operation_type === 'income') {
+									option.classList.add('text-green')
+								}
+							}
+						})
+					} catch (e) {}
+				})
+			}
+		}
 	},
 	afterAddFunc: result => {
 		refreshData(`${CASH_FLOW}-table`, result.id)
@@ -1647,10 +1899,7 @@ const collectionFormHandler = createFormHandler(
 	'suppliers-account-table',
 	`collection-form`,
 	[],
-	[
-		{ id: 'source_account', url: `${BASE_URL}accounts/list/?collection=true` },
-		{ id: 'source_supplier', url: `${BASE_URL}${SUPPLIERS}/list/` },
-	],
+	[{ id: 'supplier', url: `${BASE_URL}${SUPPLIERS}/list/` }],
 	{
 		url: '/components/main/collection/',
 		title: 'Инкассация',
@@ -1742,6 +1991,8 @@ const moneyTransfersFormHandler = createFormHandler(
 	[
 		{ id: 'source_supplier', url: `${BASE_URL}${SUPPLIERS}/list/` },
 		{ id: 'destination_supplier', url: `${BASE_URL}${SUPPLIERS}/list/` },
+		// { id: 'source_account', url: `${BASE_URL}accounts/list/` },
+		// { id: 'destination_account', url: `${BASE_URL}accounts/list/` },
 	],
 	{
 		url: '/components/main/add_money_transfers/',
@@ -1793,6 +2044,7 @@ const handleTransactions = async config => {
 	}
 
 	initTableHandlers(config)
+
 	setupSelectListener()
 	highlightModifiedRows()
 
@@ -1847,6 +2099,12 @@ const handleTransactions = async config => {
 			total: true,
 		})
 	}
+
+	TableManager.createColumnsForTable(
+		'transactions-table',
+		[{ name: 'created_at' }],
+		['profit']
+	)
 
 	const paymentButton = document.getElementById('payment-button')
 	if (paymentButton) {
@@ -2036,14 +2294,16 @@ const handleSupplierAccounts = async () => {
 		collectionButton.addEventListener('click', async function (e) {
 			await collectionFormHandler.init(0)
 
-			const supplierId = TableManager.getSelectedRowId(
-				'suppliers-account-table'
-			)
-			const accountId = getSelectedAccountId('suppliers-account-table')
-			if (supplierId && accountId && supplierId !== 'ИТОГО') {
-				selectOptionById('source_supplier', supplierId)
-				selectOptionById('source_account', accountId)
-			}
+			// const supplierId = TableManager.getSelectedRowId(
+			// 	'suppliers-account-table'
+			// )
+			// const accountId = getSelectedAccountId('suppliers-account-table')
+			// if (supplierId && accountId && supplierId !== 'ИТОГО') {
+			// 	selectOptionById('source_supplier', supplierId)
+			// 	selectOptionById('source_account', accountId)
+			// }
+
+			setupSupplierAccountSelects()
 
 			setupCurrencyInput('amount')
 
@@ -2056,12 +2316,20 @@ const handleSupplierAccounts = async () => {
 		moneyTransfersButton.addEventListener('click', async function (e) {
 			await moneyTransfersFormHandler.init(0)
 
-			const supplierId = TableManager.getSelectedRowId(
-				'suppliers-account-table'
-			)
-			if (supplierId && supplierId !== 'ИТОГО') {
-				selectOptionById('source_supplier', supplierId)
-			}
+			// const supplierId = TableManager.getSelectedRowId(
+			// 	'suppliers-account-table'
+			// )
+			// if (supplierId && supplierId !== 'ИТОГО') {
+			// 	selectOptionById('source_supplier', supplierId)
+			// }
+
+			setupMultipleSupplierAccountSelects([
+				{ supplierId: 'source_supplier', accountId: 'source_account' },
+				{
+					supplierId: 'destination_supplier',
+					accountId: 'destination_account',
+				},
+			])
 
 			setupCurrencyInput('amount')
 
@@ -2120,6 +2388,20 @@ const handleCashFlow = async config => {
 					if (window.supplierChart) {
 						window.supplierChart.destroy()
 					}
+
+					function getNiceMax(value) {
+						if (value <= 10) return 10
+						if (value <= 100) return Math.ceil(value / 10) * 10
+						if (value <= 1000) return Math.ceil(value / 100) * 100
+						if (value <= 10000) return Math.ceil(value / 500) * 500
+						if (value <= 100000) return Math.ceil(value / 1000) * 1000
+						if (value <= 1000000) return Math.ceil(value / 50000) * 50000
+						return Math.ceil(value / 100000) * 100000
+					}
+
+					const maxValue = Math.max(...data.values)
+					const yMax = getNiceMax(maxValue * 1.1)
+
 					window.supplierChart = new Chart(ctx, {
 						type: 'bar',
 						data: {
@@ -2137,12 +2419,26 @@ const handleCashFlow = async config => {
 						},
 						options: {
 							scales: {
-								y: { beginAtZero: true },
+								y: {
+									beginAtZero: true,
+									max: yMax,
+								},
 							},
 							plugins: {
 								legend: { display: false },
+								tooltip: {
+									enabled: false,
+								},
+								datalabels: {
+									anchor: 'end',
+									align: 'end',
+									font: { size: 10, weight: 'bold' },
+									color: '#000',
+									formatter: value => value,
+								},
 							},
 						},
+						plugins: [ChartDataLabels],
 					})
 				})
 		}
@@ -2524,22 +2820,33 @@ const handleDebtors = async () => {
 					})
 				})
 
-			let lastBalanceData = null
-
 			function drawCharts() {
 				const statsChart = document.getElementById('statsChart')
 				const profitChart = document.getElementById('profitChart')
 				if (
 					!statsChart ||
 					!profitChart ||
-					!lastBalanceData ||
-					!lastBalanceData.capitals_by_month
+					!window.lastBalanceData ||
+					!window.lastBalanceData.capitals_by_month
 				)
 					return
 
-				const data = lastBalanceData
+				const data = window.lastBalanceData
 				const statsCtx = statsChart.getContext('2d')
 				const profitCtx = profitChart.getContext('2d')
+
+				function getNiceMax(value) {
+					if (value <= 10) return 10
+					if (value <= 100) return Math.ceil(value / 10) * 10
+					if (value <= 1000) return Math.ceil(value / 100) * 100
+					if (value <= 10000) return Math.ceil(value / 500) * 500
+					if (value <= 100000) return Math.ceil(value / 1000) * 1000
+					if (value <= 1000000) return Math.ceil(value / 50000) * 50000
+					return Math.ceil(value / 100000) * 100000
+				}
+
+				const maxValue = Math.max(...data.capitals_by_month.capitals)
+				const yMax = getNiceMax(maxValue * 1.1)
 
 				window.capitalChart = new Chart(statsCtx, {
 					type: 'bar',
@@ -2569,26 +2876,34 @@ const handleDebtors = async () => {
 									autoSkipPadding: 2,
 								},
 							},
-							y: { beginAtZero: true },
+							y: {
+								beginAtZero: true,
+								max: yMax,
+							},
 						},
 						plugins: {
 							legend: { display: false },
 							tooltip: {
-								enabled: true,
-								position: 'nearest',
-								yAlign: 'center',
-								xAlign: 'center',
-								padding: 10,
-								displayColors: false,
+								enabled: false,
+							},
+							datalabels: {
+								anchor: 'end',
+								align: 'end',
+								font: { size: 10, weight: 'bold' },
+								color: '#000',
+								formatter: value => value,
 							},
 						},
 					},
+					plugins: [ChartDataLabels],
 				})
+
+				const yMaxProfit = getNiceMax((data.capitals_by_month.total || 0) * 1.1)
 
 				window.profitChartInstance = new Chart(profitCtx, {
 					type: 'bar',
 					data: {
-						labels: ['Итого'],
+						labels: ['%'],
 						datasets: [
 							{
 								label: 'Итого',
@@ -2600,60 +2915,24 @@ const handleDebtors = async () => {
 						],
 					},
 					options: {
-						scales: { y: { beginAtZero: true, display: false } },
+						scales: {
+							y: { beginAtZero: true, display: false, max: yMaxProfit },
+						},
 						plugins: {
 							legend: { display: false },
 							tooltip: {
 								enabled: false,
-								external: function (context) {
-									const tooltipModel = context.tooltip
-									let tooltipEl = document.getElementById('chartjs-tooltip')
-									if (!tooltipEl) {
-										tooltipEl = document.createElement('div')
-										tooltipEl.id = 'chartjs-tooltip'
-										tooltipEl.style.position = 'absolute'
-										tooltipEl.style.background = 'rgba(0,0,0,0.8)'
-										tooltipEl.style.color = '#fff'
-										tooltipEl.style.borderRadius = '6px'
-										tooltipEl.style.padding = '8px 14px'
-										tooltipEl.style.pointerEvents = 'none'
-										tooltipEl.style.fontSize = '12px'
-										tooltipEl.style.zIndex = '1000'
-										tooltipEl.style.boxShadow = '0 2px 8px rgba(0,0,0,0.2)'
-										document.body.appendChild(tooltipEl)
-									}
-									if (tooltipModel.opacity === 0) {
-										tooltipEl.style.opacity = 0
-										return
-									}
-									if (tooltipModel.title && tooltipModel.body) {
-										const title = tooltipModel.title[0] || ''
-										let value = tooltipModel.body[0].lines[0] || ''
-										value = value.replace(/^Итого:\s*/, '')
-										tooltipEl.innerHTML = `
-                                <div style="font-weight:600; font-size:12px; margin-bottom:2px;">${title}</div>
-                                <div style="font-size:12px; font-weight:500;">${value}</div>
-                            `
-									}
-									const canvas = context.chart.canvas
-									const rect = canvas.getBoundingClientRect()
-									tooltipEl.style.opacity = 1
-									tooltipEl.style.left =
-										rect.left +
-										window.pageXOffset +
-										tooltipModel.caretX -
-										tooltipEl.offsetWidth +
-										'px'
-									tooltipEl.style.top =
-										rect.top +
-										window.pageYOffset +
-										tooltipModel.caretY -
-										tooltipEl.offsetHeight / 2 +
-										'px'
-								},
+							},
+							datalabels: {
+								anchor: 'end',
+								align: 'end',
+								font: { size: 10, weight: 'bold' },
+								color: '#000',
+								formatter: value => value,
 							},
 						},
 					},
+					plugins: [ChartDataLabels],
 				})
 			}
 
@@ -2692,7 +2971,7 @@ const handleDebtors = async () => {
 			window.addEventListener('resize', resizeCharts)
 
 			if (data.capitals_by_month) {
-				lastBalanceData = data
+				window.lastBalanceData = data
 				resizeCharts()
 			}
 		} catch (error) {
@@ -2709,6 +2988,60 @@ const handleDebtors = async () => {
 			debtorsData.style.maxHeight = '100%'
 			debtorsData.style.border = 'none'
 		}
+	}
+
+	const refreshStatsButton = document.getElementById('refresh-stats-button')
+	if (refreshStatsButton) {
+		refreshStatsButton.addEventListener('click', async function () {
+			const balanceContainer = document.getElementById('balance-container')
+			if (!balanceContainer) return
+
+			const loader = createLoader()
+			document.body.appendChild(loader)
+
+			try {
+				const response = await fetch('/company_balance_stats/')
+				if (!response.ok) throw new Error('Ошибка запроса')
+				const data = await response.json()
+
+				balanceContainer.innerHTML = renderBalance(data)
+
+				balanceContainer
+					.querySelectorAll('.debtors-office-list__row')
+					.forEach(row => {
+						row.addEventListener('click', () => {
+							const details = row
+								.closest('.debtors-office-list__item')
+								.querySelector('.debtors-office-list__details')
+							const btn = row.querySelector('.debtors-office-list__toggle')
+							btn.classList.toggle('open')
+							details.classList.toggle('open')
+						})
+					})
+
+				if (window.capitalChart) {
+					window.capitalChart.destroy()
+					window.capitalChart = null
+				}
+				if (window.profitChartInstance) {
+					window.profitChartInstance.destroy()
+					window.profitChartInstance = null
+				}
+
+				window.lastBalanceData = data
+				if (typeof window.resizeCharts === 'function') {
+					window.resizeCharts()
+				}
+				if (typeof window.drawCharts === 'function') {
+					window.drawCharts()
+				}
+			} catch (error) {
+				console.error('Ошибка при загрузке данных:', error)
+				balanceContainer.innerHTML = '<p>Ошибка при загрузке данных.</p>'
+			} finally {
+				loader.remove()
+			}
+		})
 	}
 
 	const officeList = document.querySelector('.debtors-office-list')
@@ -2728,20 +3061,22 @@ const handleDebtors = async () => {
 			let selectedRow
 			let table
 			let currentRowId = -1
-
-			if (!type) {
+			if (!type || type === 'balance' || type === 'initial') {
 				selectedRow = document.querySelector('td.table__cell--selected')
 				table = selectedRow ? selectedRow.closest('table') : null
 				currentRowId = TableManager.getSelectedRowId(table.id)
 
-				if (table.id === 'investors-table') {
-					type = 'investors'
-				} else {
-					type = 'transactions'
-					if (table && table.id === 'summary-bonus') type += '.bonus'
-					else if (table && table.id === 'summary-remaining')
-						type += '.remaining'
-					else if (table && table.id === 'summary-profit') type += '.investors'
+				if (!type) {
+					if (table.id === 'investors-table') {
+						type = 'investors'
+					} else {
+						type = 'transactions'
+						if (table && table.id === 'summary-bonus') type += '.bonus'
+						else if (table && table.id === 'summary-remaining')
+							type += '.remaining'
+						else if (table && table.id === 'summary-profit')
+							type += '.investors'
+					}
 				}
 			} else {
 				if (type === 'Оборудование') type = 'equipment'
@@ -2757,7 +3092,7 @@ const handleDebtors = async () => {
 				`debtors-table`,
 				`settle-debt-form`,
 				getUrl,
-				type === 'investors'
+				type === 'investors' || type === 'initial' || type === 'balance'
 					? [
 							{
 								id: 'operation_type',
@@ -2777,7 +3112,7 @@ const handleDebtors = async () => {
 					: [],
 				{
 					url:
-						type === 'investors'
+						type === 'investors' || type === 'initial' || type === 'balance'
 							? '/components/main/debt_operation_investor/'
 							: '/components/main/settle-debt/',
 					title: [
@@ -2828,7 +3163,7 @@ const handleDebtors = async () => {
 								}
 
 								break
-							case 'Инвесторы':
+							case 'balance_investor':
 								tableId = 'investors-table'
 
 								TableManager.addTableRow(
@@ -2844,6 +3179,10 @@ const handleDebtors = async () => {
 										.querySelectorAll('tr.table__row--empty')
 										.forEach(row => row.remove())
 								}
+
+								break
+							case 'initial':
+								tableId = 'investors-table'
 
 								break
 							case 'Инвесторам':
@@ -2940,7 +3279,9 @@ const handleDebtors = async () => {
 							)
 						} else if (
 							result.type === 'Инвесторы' ||
-							result.type === 'investors'
+							result.type === 'investors' ||
+							result.type === 'balance_investor' ||
+							result.type === 'initial'
 						) {
 							TableManager.calculateTableSummary('investors-table', ['balance'])
 						}
@@ -3106,6 +3447,15 @@ const handleDebtors = async () => {
 			await settleDebtFormHandler.init(currentRowId)
 			setupCurrencyInput('amount')
 
+			if (type === 'initial') {
+				const operation_type = document.getElementById('operation_type')
+				if (operation_type) {
+					const container = operation_type.closest('.modal-form__group')
+
+					container.setAttribute('hidden', 'true')
+				}
+			}
+
 			const typeInput = document.getElementById('type')
 			if (typeInput) {
 				if (table) {
@@ -3125,7 +3475,11 @@ const handleDebtors = async () => {
 							comment.removeAttribute('hidden')
 						}
 					} else if (table.id === 'investors-table') {
-						typeInput.value = 'investors'
+						if (type === 'balance') {
+							typeInput.value = 'balance'
+						} else {
+							typeInput.value = 'initial'
+						}
 					} else if (table.id === 'summary-profit') {
 						typeInput.value = 'profit'
 
