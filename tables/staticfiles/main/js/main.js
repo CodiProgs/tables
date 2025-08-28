@@ -138,52 +138,6 @@ const colorizeAmounts = tableId => {
 	})
 }
 
-const selectOptionById = (selectId, valueToSelect) => {
-	const selectInput = document.getElementById(selectId)
-	if (!selectInput) {
-		console.error(`Селект с ID "${selectId}" не найден`)
-		return false
-	}
-
-	const selectContainer = selectInput.closest('.select')
-	if (!selectContainer) {
-		console.error(`Контейнер .select не найден для селекта "${selectId}"`)
-		return false
-	}
-
-	const dropdown = selectContainer.querySelector('.select__dropdown')
-	if (!dropdown) {
-		console.error(
-			`Выпадающий список .select__dropdown не найден для селекта "${selectId}"`
-		)
-		return false
-	}
-
-	const option = dropdown.querySelector(
-		`.select__option[data-value="${valueToSelect}"]`
-	)
-	if (!option) {
-		console.error(
-			`Опция с data-value="${valueToSelect}" не найдена в селекте "${selectId}"`
-		)
-		return false
-	}
-
-	const selectedText = selectContainer.querySelector(
-		'.select__control .select__text'
-	)
-	selectInput.value = valueToSelect
-
-	if (selectedText) {
-		selectedText.textContent = option.textContent.trim()
-		selectedText.classList.remove('select__placeholder')
-	}
-
-	const event = new Event('change', { bubbles: true })
-	selectInput.dispatchEvent(event)
-	return true
-}
-
 const setIds = (ids, tableId) => {
 	const tableRows = document.querySelectorAll(
 		`#${tableId} tbody tr:not(.table__row--summary)`
@@ -228,38 +182,6 @@ const setColumnIds = (ids, tableId) => {
 			cells[colIndex].setAttribute('data-account-id', columnId)
 		}
 	})
-}
-
-const getSelectedAccountId = tableId => {
-	const table = document.getElementById(tableId)
-	if (!table) return null
-
-	const selectedCell = table.querySelector('.table__cell--selected')
-	if (selectedCell) {
-		return selectedCell.getAttribute('data-account-id')
-	}
-
-	const selectedRow = table.querySelector('.table__row--selected')
-	if (!selectedRow) return null
-
-	const activeCell = document.activeElement
-	if (
-		activeCell &&
-		activeCell.tagName.toLowerCase() === 'td' &&
-		selectedRow.contains(activeCell)
-	) {
-		const cellIndex = Array.from(selectedRow.cells).indexOf(activeCell)
-		if (cellIndex > 0 && cellIndex < selectedRow.cells.length - 1) {
-			return (
-				activeCell.getAttribute('data-account-id') ||
-				table
-					.querySelector(`thead th:nth-child(${cellIndex + 1})`)
-					.getAttribute('data-account-id')
-			)
-		}
-	}
-
-	return null
 }
 
 const setLastRowId = (id, tableId) => {

@@ -21,6 +21,7 @@ from django.core.cache import cache
 from django.contrib.admin.views.decorators import staff_member_required
 from django.utils import timezone
 from users.models import User, UserType
+import math
 
 locale.setlocale(locale.LC_ALL, "ru_RU.UTF-8")
 locale.setlocale(locale.LC_TIME, "ru_RU.UTF-8")
@@ -354,16 +355,79 @@ def transaction_edit(request, pk=None):
                     {"status": "error", "message": "Некорректное значение суммы"},
                     status=400,
                 )
+            
 
             client = get_object_or_404(Client, id=client_id)
             supplier = get_object_or_404(Supplier, id=supplier_id)
             account_supplier = get_object_or_404(Account, id=account_supplier_id)
+
+            new_client_percentage = Decimal(str(client_percentage or client.percentage))
+            new_bonus_percentage = Decimal(str(bonus_percentage or 0))
+            new_supplier_percentage = Decimal(str(supplier_percentage or supplier.cost_percentage))
+            new_amount = Decimal(str(amount_float))
+
+            new_bonus = Decimal(math.floor(float(new_amount * new_bonus_percentage / Decimal('100'))))
+            if trans.returned_bonus > new_bonus:
+                return JsonResponse(
+                    {"status": "error", "message": "Возвращено бонуса больше, чем новый бонус по проценту. Измените процент или уменьшите возврат."},
+                    status=400,
+                )
+
+            new_remaining_amount = Decimal(math.floor(float(new_amount * (Decimal('100') - new_client_percentage) / Decimal('100'))))
+            if trans.returned_to_client > new_remaining_amount:
+                return JsonResponse(
+                    {"status": "error", "message": "Возвращено клиенту больше, чем новая сумма по проценту клиента. Измените процент или уменьшите возврат."},
+                    status=400,
+                )
+
+            new_supplier_fee = Decimal(math.floor(float(new_amount * new_supplier_percentage / Decimal('100'))))
+            if trans.returned_by_supplier > (trans.paid_amount - new_supplier_fee):
+                return JsonResponse(
+                    {"status": "error", "message": "Возвращено поставщиком больше, чем новый долг поставщика. Измените процент или уменьшите возврат."},
+                    status=400,
+                )
 
             client_percentage = client_percentage or client.percentage
             supplier_percentage = supplier_percentage or supplier.cost_percentage
 
             if not bonus_percentage:
                 bonus_percentage = 0
+
+            old_account = trans.account
+            old_supplier = trans.supplier
+            old_paid_amount = trans.paid_amount
+
+            account_changed = old_account.id != account_supplier.id if old_account else True
+            supplier_changed = old_supplier.id != supplier.id if old_supplier else True
+
+            if (account_changed or supplier_changed) and old_paid_amount > 0:
+                if old_supplier and old_account:
+                    old_supplier_account = SupplierAccount.objects.filter(
+                        supplier=old_supplier,
+                        account=old_account
+                    ).first()
+                    if old_supplier_account:
+                        old_supplier_account.balance -= old_paid_amount
+                        old_supplier_account.save()
+                    old_account.balance -= old_paid_amount
+                    old_account.save()
+
+                new_supplier_account, _ = SupplierAccount.objects.get_or_create(
+                    supplier=supplier,
+                    account=account_supplier,
+                    defaults={'balance': 0}
+                )
+                new_supplier_account.balance += old_paid_amount
+                new_supplier_account.save()
+                account_supplier.balance += old_paid_amount
+                account_supplier.save()
+
+            if account_changed or supplier_changed:
+                cashflows = CashFlow.objects.filter(transaction=trans)
+                for cf in cashflows:
+                    cf.account = account_supplier
+                    cf.supplier = supplier
+                    cf.save()
 
             trans.client = client
             trans.supplier = supplier
@@ -433,7 +497,7 @@ def transaction_payment(request, pk=None):
             if not is_assistant:
                 paid_amount = clean_currency(request.POST.get("paid_amount"))
 
-                if not paid_amount:
+                if paid_amount is None or paid_amount == "":
                     return JsonResponse(
                         {"status": "error", "message": "Сумма оплаты не может быть пустой"},
                         status=400,
@@ -441,9 +505,9 @@ def transaction_payment(request, pk=None):
 
                 try:
                     amount_float = float(paid_amount)
-                    if amount_float <= 0:
+                    if amount_float < 0:
                         return JsonResponse(
-                            {"status": "error", "message": "Сумма должна быть больше нуля"},
+                            {"status": "error", "message": "Сумма должна быть неотрицательной"},
                             status=400,
                         )
                     if amount_float > trans.amount:
@@ -465,6 +529,43 @@ def transaction_payment(request, pk=None):
             new_paid_amount = int(float(paid_amount))
 
             payment_difference = new_paid_amount - previous_paid_amount
+
+            if payment_difference < 0 and trans.supplier:
+                if not trans.account:
+                    return JsonResponse(
+                        {"status": "error", "message": "У транзакции не указан счет для проведения оплаты"},
+                        status=400,
+                    )
+                account = trans.account
+
+                supplier_account = SupplierAccount.objects.filter(
+                    supplier=trans.supplier,
+                    account=account
+                ).first()
+
+                cashflows = CashFlow.objects.filter(transaction=trans, purpose__name="Оплата")
+                to_remove = abs(payment_difference)
+                for cf in cashflows:
+                    if to_remove <= 0:
+                        break
+                    cf_amount = cf.amount
+                    if to_remove >= cf_amount:
+                        to_remove -= cf_amount
+                        account.balance -= cf_amount
+                        account.save()
+                        if supplier_account:
+                            supplier_account.balance -= cf_amount
+                            supplier_account.save()
+                        cf.delete()
+                    else:
+                        cf.amount -= to_remove
+                        account.balance -= to_remove
+                        account.save()
+                        if supplier_account:
+                            supplier_account.balance -= to_remove
+                            supplier_account.save()
+                        cf.save()
+                        to_remove = 0
 
             if payment_difference > 0 and trans.supplier:
                 if not trans.account:
@@ -497,6 +598,21 @@ def transaction_payment(request, pk=None):
                     supplier=trans.supplier,
                     transaction=trans
                 )
+
+            if new_paid_amount == 0 and previous_paid_amount > 0 and trans.supplier and trans.account:
+                account = trans.account
+                supplier_account = SupplierAccount.objects.filter(
+                    supplier=trans.supplier,
+                    account=account
+                ).first()
+                cashflows = CashFlow.objects.filter(transaction=trans, purpose__name="Оплата")
+                for cf in cashflows:
+                    account.balance -= cf.amount
+                    account.save()
+                    if supplier_account:
+                        supplier_account.balance -= cf.amount
+                        supplier_account.save()
+                    cf.delete()
 
             trans.paid_amount = new_paid_amount
             trans.documents = documents
@@ -562,6 +678,12 @@ def transaction_delete(request, pk=None):
                     status=403
                 )
             trans = get_object_or_404(Transaction, id=pk)
+
+            if trans.paid_amount > 0:
+                return JsonResponse(
+                    {"status": "error", "message": "Нельзя удалить транзакцию с оплатой. Сначала обнулите оплаченную сумму."},
+                    status=400,
+                )
 
             trans.delete()
 
@@ -1163,6 +1285,20 @@ def supplier_edit(request, pk=None):
 
             branch = get_object_or_404(Branch, id=branch_id)
 
+            old_account_ids = set(str(acc.id) for acc in supplier.accounts.all())
+            new_account_ids = set(account_ids.split(','))
+
+            removed_account_ids = old_account_ids - new_account_ids
+            if removed_account_ids:
+                for acc_id in removed_account_ids:
+                    supplier_account = SupplierAccount.objects.filter(supplier=supplier, account_id=acc_id).first()
+                    if supplier_account and supplier_account.balance != 0:
+                        account_obj = Account.objects.get(id=acc_id)
+                        return JsonResponse(
+                            {"status": "error", "message": f"На счете '{account_obj.name}' есть остаток. Переведите баланс перед редактированием."},
+                            status=400,
+                        )
+
             old_cost_percentage = float(supplier.cost_percentage)
             new_cost_percentage = float(cost_percentage)
 
@@ -1242,6 +1378,15 @@ def supplier_delete(request, pk=None):
                 )
 
             supplier = get_object_or_404(Supplier, id=pk)
+
+            supplier_accounts = SupplierAccount.objects.filter(supplier=supplier)
+            for sa in supplier_accounts:
+                if sa.balance != 0:
+                    account_obj = sa.account
+                    return JsonResponse(
+                        {"status": "error", "message": f"На счете '{account_obj.name}' есть остаток. Переведите баланс перед удалением поставщика."},
+                        status=400,
+                    )
 
             if supplier.user:
                 supplier.user.delete()
@@ -3407,7 +3552,7 @@ def get_monthly_capital(year, month):
     transactions = Transaction.objects.filter(created_at__range=(dt_start, dt_end))
     profit_total = sum((t.profit or Decimal(0)) for t in transactions)
 
-    if profit_total > 0:
+    if profit_total > 0 and investors_total > 0:
         capital_percent = float(profit_total) / float(investors_total) * 100
     else:
         capital_percent = 0

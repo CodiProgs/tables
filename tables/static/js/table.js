@@ -1,6 +1,11 @@
 import SelectHandler from './selectHandler.js'
 import { FormBuilder } from '/static/js/form-builder.js'
-import { createLoader, getCSRFToken, showSuccess } from '/static/js/ui-utils.js'
+import {
+	createLoader,
+	getCSRFToken,
+	showError,
+	showSuccess,
+} from '/static/js/ui-utils.js'
 
 const DOM_HELPER = {
 	createElement: (tag, className = '') => {
