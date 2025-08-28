@@ -42,6 +42,14 @@
 	padding: 0;
 }
 
+.table__cell-header.table__filter-cell {
+	height: 24px;
+}
+
+.table__filter-cell .create-form__input {
+	height: 24px;
+}
+
 .table__resize-handle {
 	position: absolute;
 	top: 0;
