@@ -3,11 +3,11 @@
 <form class="modal-form" id="collection-form" method="post">
     <div class="modal-form__content">
         {% csrf_token %}
-		<div class="modal-form__group">
-            {% include "components/select.html" with id="source_supplier" placeholder="Выберите поставщика" %}
+        <div class="modal-form__group">
+            {% include "components/select.html" with id="supplier" placeholder="Выберите поставщика" %}
         </div>
-		<div class="modal-form__group">
-            {% include "components/select.html" with id="source_account" placeholder="Выберите счет" %}
+        <div class="modal-form__group">
+            {% include "components/select.html" with id="account" placeholder="Выберите счет" %}
         </div>
         <div class="modal-form__group">
             <input class="modal-form__input"

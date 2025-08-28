@@ -94,6 +94,13 @@ class Transaction(models.Model):
         null=True,
         blank=True
     )
+    account = models.ForeignKey(
+        'Account', 
+        on_delete=models.SET_NULL, 
+        verbose_name="Счет",
+        null=True,
+        blank=True
+    )
     amount = models.DecimalField(
         max_digits=10,
         decimal_places=0,

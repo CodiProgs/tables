@@ -91,10 +91,29 @@ def index(request):
 
     is_admin = user_type == 'Администратор'
 
-    supplier_debts = [getattr(t, 'supplier_debt', 0) for t in page.object_list]
-    client_debts = [getattr(t, 'client_debt', 0) for t in page.object_list]
-    bonus_debts = [getattr(t, 'bonus_debt', 0) for t in page.object_list]
-    investor_debts = [getattr(t, 'investor_debt', 0) for t in page.object_list]
+    supplier_debts = [
+        getattr(t, 'supplier_debt', 0) 
+        for t in page.object_list 
+        if getattr(t, 'paid_amount', 0) != 0
+    ]
+
+    client_debts = [
+        getattr(t, 'client_debt', 0) 
+        for t in page.object_list 
+        if getattr(t, 'remaining_amount', 0) != 0
+    ]
+
+    bonus_debts = [
+        getattr(t, 'bonus_debt', 0) 
+        for t in page.object_list 
+        if getattr(t, 'bonus', 0) != 0
+    ]
+
+    investor_debts = [
+        getattr(t, 'investor_debt', 0) 
+        for t in page.object_list 
+        if getattr(t, 'profit', 0) != 0
+    ]
 
     context = {
         "fields": fields,
@@ -123,7 +142,7 @@ def get_transaction_fields(is_accountant, is_assistant=False):
     ]
 
     field_order = [
-        "created_at", "client", "supplier", "amount", "client_percentage",
+        "created_at", "client", "supplier", "account", "amount", "client_percentage",
         "remaining_amount", "bonus_percentage", "bonus",
     ]
     if not is_accountant:
@@ -132,7 +151,7 @@ def get_transaction_fields(is_accountant, is_assistant=False):
 
     if is_assistant:
         field_order = [
-            "created_at", "client", "supplier", "amount", "paid_amount", "documents"
+            "created_at", "client", "supplier", "account", "amount", "paid_amount", "documents"
         ]
 
     fields = get_model_fields(
@@ -142,28 +161,28 @@ def get_transaction_fields(is_accountant, is_assistant=False):
     )
 
     insertions = [
-        (3, {"name": "amount", "verbose_name": "Сумма", "is_amount": True, }),
-        (4, {"name": "client_percentage", "verbose_name": "%", "is_percent": True, }),
-        (5, {"name": "remaining_amount", "verbose_name": "Выдать", "is_amount": True }),
-        (6, {"name": "bonus_percentage", "verbose_name": "%", "is_percent": True, }),
-        (7, {"name": "bonus", "verbose_name": "Бонус", "is_amount": True}),
+        (4, {"name": "amount", "verbose_name": "Сумма", "is_amount": True, }),
+        (5, {"name": "client_percentage", "verbose_name": "%", "is_percent": True, }),
+        (6, {"name": "remaining_amount", "verbose_name": "Выдать", "is_amount": True }),
+        (7, {"name": "bonus_percentage", "verbose_name": "%", "is_percent": True, }),
+        (8, {"name": "bonus", "verbose_name": "Бонус", "is_amount": True}),
     ]
 
     if not is_accountant:
         insertions.extend([
-            (8, {"name": "supplier_percentage", "verbose_name": "%", "is_percent": True, }),
-            (9, {"name": "profit", "verbose_name": "Прибыль", "is_amount": True}),
+            (9, {"name": "supplier_percentage", "verbose_name": "%", "is_percent": True, }),
+            (10, {"name": "profit", "verbose_name": "Прибыль", "is_amount": True}),
         ])
 
     insertions.extend([
-        (10 if not is_accountant else 8, {"name": "paid_amount", "verbose_name": "Оплачено", "is_amount": True}),
-        (11 if not is_accountant else 9, {"name": "debt", "verbose_name": "Долг", "is_amount": True}),
+        (11 if not is_accountant else 8, {"name": "paid_amount", "verbose_name": "Оплачено", "is_amount": True}),
+        (12 if not is_accountant else 9, {"name": "debt", "verbose_name": "Долг", "is_amount": True}),
     ])
 
     if is_assistant:
         insertions = [
-            (3, {"name": "amount", "verbose_name": "Сумма", "is_amount": True, }),
-            (4, {"name": "paid_amount", "verbose_name": "Оплачено", "is_amount": True}),
+            (4, {"name": "amount", "verbose_name": "Сумма", "is_amount": True, }),
+            (5, {"name": "paid_amount", "verbose_name": "Оплачено", "is_amount": True}),
         ]
 
     for pos, field in insertions:
@@ -211,8 +230,9 @@ def transaction_create(request):
             client_percentage = clean_percentage(request.POST.get("client_percentage"))
             bonus_percentage = clean_percentage(request.POST.get("bonus_percentage", "0"))
             supplier_percentage = clean_percentage(request.POST.get("supplier_percentage"))
+            account_supplier_id = request.POST.get("account")
 
-            if not all([client_id, supplier_id, amount]):
+            if not all([client_id, supplier_id, amount, account_supplier_id]):
                 return JsonResponse(
                     {"status": "error", "message": "Все обязательные поля должны быть заполнены"},
                     status=400,
@@ -233,6 +253,7 @@ def transaction_create(request):
 
             client = get_object_or_404(Client, id=client_id)
             supplier = get_object_or_404(Supplier, id=supplier_id)
+            account_supplier = get_object_or_404(Account, id=account_supplier_id)
 
             client_percentage = client_percentage or client.percentage
             supplier_percentage = supplier_percentage or supplier.cost_percentage
@@ -251,7 +272,8 @@ def transaction_create(request):
                 bonus_percentage=float(bonus_percentage),
                 supplier_percentage=float(supplier_percentage),
                 modified_by_accountant=is_accountant,
-                viewed_by_admin=not is_accountant
+                viewed_by_admin=not is_accountant,
+                account=account_supplier
             )
 
             client_changed = trans.client and trans.client_percentage != trans.client.percentage
@@ -307,8 +329,9 @@ def transaction_edit(request, pk=None):
             client_percentage = clean_percentage(request.POST.get("client_percentage"))
             bonus_percentage = clean_percentage(request.POST.get("bonus_percentage", "0"))
             supplier_percentage = clean_percentage(request.POST.get("supplier_percentage"))
+            account_supplier_id = request.POST.get("account")
 
-            if not all([client_id, supplier_id, amount]):
+            if not all([client_id, supplier_id, amount, account_supplier_id]):
                 return JsonResponse(
                     {"status": "error", "message": "Все обязательные поля должны быть заполнены"},
                     status=400,
@@ -334,6 +357,7 @@ def transaction_edit(request, pk=None):
 
             client = get_object_or_404(Client, id=client_id)
             supplier = get_object_or_404(Supplier, id=supplier_id)
+            account_supplier = get_object_or_404(Account, id=account_supplier_id)
 
             client_percentage = client_percentage or client.percentage
             supplier_percentage = supplier_percentage or supplier.cost_percentage
@@ -347,6 +371,7 @@ def transaction_edit(request, pk=None):
             trans.client_percentage = float(client_percentage)
             trans.bonus_percentage = float(bonus_percentage)
             trans.supplier_percentage = float(supplier_percentage)
+            trans.account = account_supplier
 
             is_accountant = request.user.user_type.name == 'Бухгалтер' if hasattr(request.user, 'user_type') else False
             is_assistant = request.user.user_type.name == 'Ассистент' if hasattr(request.user, 'user_type') else False
@@ -442,13 +467,13 @@ def transaction_payment(request, pk=None):
             payment_difference = new_paid_amount - previous_paid_amount
 
             if payment_difference > 0 and trans.supplier:
-                if not trans.supplier.default_account:
+                if not trans.account:
                     return JsonResponse(
-                        {"status": "error", "message": "У поставщика не указан счет по умолчанию для платежей"},
+                        {"status": "error", "message": "У транзакции не указан счет для проведения оплаты"},
                         status=400,
                     )
 
-                account = trans.supplier.default_account
+                account = trans.account
                 account.balance += payment_difference
                 account.save()
 
@@ -1087,9 +1112,17 @@ def supplier_create(request):
                 supplier.user = user
                 supplier.save()
 
+            supplier.accounts_display = ", ".join(acc.name for acc in supplier.accounts.all())
+
+            fields = get_supplier_fields()
+            
+            for field in fields:
+                if field.get("name") == "accounts":
+                    field["name"] = "accounts_display"
+
             context = {
                 "item": supplier,
-                "fields": get_supplier_fields(),
+                "fields": fields,
             }
             return JsonResponse({
                 "html": render_to_string("components/table_row.html", context),
@@ -1243,8 +1276,9 @@ def cash_flow_create(request):
             amount = clean_currency(request.POST.get("amount"))
             purpose_id = request.POST.get("purpose")
             supplier_id = request.POST.get("supplier")
+            account_id = request.POST.get("account")
 
-            if not all([amount, purpose_id, supplier_id]):
+            if not all([amount, purpose_id, supplier_id, account_id]):
                 return JsonResponse(
                     {"status": "error", "message": "Все поля должны быть заполнены"},
                     status=400,
@@ -1265,6 +1299,7 @@ def cash_flow_create(request):
 
             purpose = get_object_or_404(PaymentPurpose, id=purpose_id)
             supplier = get_object_or_404(Supplier, id=supplier_id)
+            account = get_object_or_404(Account, id=account_id)
 
             amount_value = int(float(amount))
             if purpose.operation_type == PaymentPurpose.EXPENSE:
@@ -1273,17 +1308,17 @@ def cash_flow_create(request):
                 amount_value = abs(amount_value)
 
             cashflow = CashFlow.objects.create(
-                account=supplier.default_account,
+                account=account,
                 amount=amount_value,
                 purpose=purpose,
                 supplier=supplier,
             )
-            supplier.default_account.balance += amount_value
-            supplier.default_account.save()
+            account.balance += amount_value
+            account.save()
 
             supplier_account, created = SupplierAccount.objects.get_or_create(
                 supplier=supplier,
-                account=supplier.default_account,
+                account=account,
                 defaults={'balance': 0}
             )
 
@@ -1319,8 +1354,9 @@ def cash_flow_edit(request, pk=None):
             new_supplier_id = request.POST.get("supplier")
             new_amount = clean_currency(request.POST.get("amount"))
             new_purpose_id = request.POST.get("purpose")
+            new_account_id = request.POST.get("account")
 
-            if not all([new_supplier_id, new_amount, new_purpose_id]):
+            if not all([new_supplier_id, new_amount, new_purpose_id, new_account_id]):
                 return JsonResponse({
                     "status": "error",
                     "message": "Все поля обязательны для заполнения",
@@ -1352,12 +1388,12 @@ def cash_flow_edit(request, pk=None):
 
             new_supplier = get_object_or_404(Supplier, id=new_supplier_id)
             new_purpose = get_object_or_404(PaymentPurpose, id=new_purpose_id)
+            new_account = get_object_or_404(Account, id=new_account_id)
 
-            new_account = new_supplier.default_account
             if not new_account:
                 return JsonResponse({
                     "status": "error",
-                    "message": "У поставщика не указан счет по умолчанию"
+                    "message": "У операции должен быть выбран счет",
                 }, status=400)
 
             if cashflow.purpose.operation_type == PaymentPurpose.INCOME and old_purpose_id != int(new_purpose_id):
@@ -1619,8 +1655,8 @@ def cash_flow_report(request):
 def money_transfer_collection(request):
     try:
         with transaction.atomic():
-            source_supplier_id = request.POST.get("source_supplier")
-            source_account_id = request.POST.get("source_account")
+            source_supplier_id = request.POST.get("supplier")
+            source_account_id = request.POST.get("account")
             amount = clean_currency(request.POST.get("amount"))
 
             if not all([source_supplier_id, source_account_id, amount]):
@@ -1824,9 +1860,13 @@ def money_transfer_create(request):
         with transaction.atomic():
             source_supplier_id = request.POST.get("source_supplier")
             destination_supplier_id = request.POST.get("destination_supplier")
+
+            source_account_id = request.POST.get("source_account")
+            destination_account_id = request.POST.get("destination_account")
+
             amount = clean_currency(request.POST.get("amount"))
 
-            if not all([source_supplier_id, destination_supplier_id, amount]):
+            if not all([source_supplier_id, destination_supplier_id, amount, source_account_id, destination_account_id]):
                 return JsonResponse(
                     {"status": "error", "message": "Все поля должны быть заполнены"},
                     status=400,
@@ -1848,8 +1888,8 @@ def money_transfer_create(request):
             source_supplier = get_object_or_404(Supplier, id=source_supplier_id)
             destination_supplier = get_object_or_404(Supplier, id=destination_supplier_id)
 
-            source_account = source_supplier.default_account
-            destination_account = destination_supplier.default_account
+            source_account = get_object_or_404(Account, id=source_account_id)
+            destination_account = get_object_or_404(Account, id=destination_account_id)
 
             if not source_account or not destination_account:
                 return JsonResponse(
@@ -2007,7 +2047,10 @@ def money_transfer_edit(request, pk: int):
             destination_supplier_id = request.POST.get("destination_supplier")
             amount = clean_currency(request.POST.get("amount"))
 
-            if not all([source_supplier_id, destination_supplier_id, amount]):
+            source_account_id = request.POST.get("source_account")
+            destination_account_id = request.POST.get("destination_account")
+
+            if not all([source_supplier_id, destination_supplier_id, amount, source_account_id, destination_account_id]):
                 return JsonResponse(
                     {"status": "error", "message": "Все поля должны быть заполнены"},
                     status=400,
@@ -2035,8 +2078,8 @@ def money_transfer_edit(request, pk: int):
             new_source_supplier = get_object_or_404(Supplier, id=source_supplier_id)
             new_destination_supplier = get_object_or_404(Supplier, id=destination_supplier_id)
 
-            new_source_account = new_source_supplier.default_account
-            new_destination_account = new_destination_supplier.default_account
+            new_source_account = get_object_or_404(Account, id=source_account_id)
+            new_destination_account = get_object_or_404(Account, id=destination_account_id)
 
             if not new_source_account or not new_destination_account:
                 return JsonResponse(

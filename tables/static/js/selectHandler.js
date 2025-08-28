@@ -37,25 +37,24 @@ export default class SelectHandler {
 
 	static updateSelectOptions(select, data) {
 		if (!select || !data) return
-
 		const dropdown = select.querySelector('.select__dropdown')
 		if (!dropdown) return
 
-		dropdown.innerHTML = ''
-
 		const multiple = select.dataset.multiple === 'true'
-
 		const options = this.createSelectOptions(data, multiple)
-		dropdown.append(...options)
 
+		dropdown.replaceChildren(...options)
 		this.attachOptionHandlers(select, multiple)
 
 		const input = select.querySelector('.select__input')
 		const text = select.querySelector('.select__text')
 		if (input) input.value = ''
-		if (text) text.textContent = ''
+		if (text) {
+			const ph = input ? input.getAttribute('placeholder') || '' : ''
+			text.textContent = ph
+			text.classList.add('select__placeholder')
+		}
 		select.classList.remove('has-value')
-
 		return dropdown
 	}
 
@@ -123,14 +122,16 @@ export default class SelectHandler {
 			}
 		}
 
-		clearButton.addEventListener('click', e => {
-			e.stopPropagation()
-			input.value = ''
-			const placeholder = input.getAttribute('placeholder') || ''
-			text.textContent = placeholder
-			text.classList.add('select__placeholder')
-			select.classList.remove('has-value')
-		})
+		if (clearButton) {
+			clearButton.addEventListener('click', e => {
+				e.stopPropagation()
+				input.value = ''
+				const placeholder = input.getAttribute('placeholder') || ''
+				text.textContent = placeholder
+				text.classList.add('select__placeholder')
+				select.classList.remove('has-value')
+			})
+		}
 
 		const toggleSelect = async () => {
 			if (!dropdown.hasChildNodes() && url) {
@@ -202,6 +203,8 @@ export default class SelectHandler {
 					select.classList.remove('active')
 					select.classList.add('has-value')
 					text.classList.remove('select__placeholder')
+
+					input.dispatchEvent(new Event('change', { bubbles: true }))
 				}
 				option.addEventListener('click', handleSelect)
 				option.addEventListener('keydown', e => {
@@ -209,5 +212,26 @@ export default class SelectHandler {
 				})
 			})
 		}
+	}
+
+	static restoreSelectValue(select, value = null) {
+		if (!select) return
+
+		const input = select.querySelector('.select__input')
+		const text = select.querySelector('.select__text')
+		if (!input || !text) return
+
+		const val = value || input.value || input.getAttribute('value')
+		if (!val) return
+
+		const option = select.querySelector(
+			`.select__option[data-value="${CSS.escape(val)}"]`
+		)
+		if (!option) return
+
+		input.value = val
+		text.textContent = option.textContent
+		text.classList.remove('select__placeholder')
+		select.classList.add('has-value')
 	}
 }

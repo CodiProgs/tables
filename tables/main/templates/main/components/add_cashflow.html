@@ -3,16 +3,19 @@
 <form class="modal-form" id="cash_flow-form" method="post">
     <div class="modal-form__content">
         {% csrf_token %}
-            <input class="modal-form__input"
-                   type="text"
-                   id="operation_type"
-                   name="operation_type"
-                   disabled
-                   hidden>
+        <input class="modal-form__input"
+               type="text"
+               id="operation_type"
+               name="operation_type"
+               disabled
+               hidden>
         <div class="modal-form__group">
             {% include "components/select.html" with id="supplier" placeholder="Выберите поставщика" %}
         </div>
-		<div class="modal-form__group">
+        <div class="modal-form__group">
+            {% include "components/select.html" with id="account" placeholder="Выберите счет поставщика" %}
+        </div>
+        <div class="modal-form__group">
             <input class="modal-form__input"
                    type="text"
                    id="amount"
@@ -20,7 +23,7 @@
                    spellcheck="false"
                    placeholder="Введите сумму">
         </div>
-		<div class="modal-form__group">
+        <div class="modal-form__group">
             {% include "components/select.html" with id="purpose" placeholder="Выберите назначение" %}
         </div>
         <div class="modal-form__buttons">

@@ -1202,6 +1202,169 @@ function showChangedCellsRow(row, changedCells) {
 	}
 }
 
+const setupSupplierAccountSelects = () => {
+	const findSelectByInput = ident => {
+		const input =
+			document.querySelector(`#${ident}`) ||
+			document.querySelector(`[name="${ident}"]`)
+		return input ? input.closest('.select') : null
+	}
+
+	const supplierSelect = findSelectByInput('supplier')
+	const accountSelect = findSelectByInput('account')
+	if (!accountSelect) return
+
+	const supplierInput = supplierSelect?.querySelector('.select__input')
+	const accountInput = accountSelect.querySelector('.select__input')
+	const accountText = accountSelect.querySelector('.select__text')
+	const accountDropdown = accountSelect.querySelector('.select__dropdown')
+	const accountControl = accountSelect.querySelector('.select__control')
+
+	if (
+		typeof SelectHandler !== 'undefined' &&
+		SelectHandler.setupSelectBehavior
+	) {
+		SelectHandler.setupSelectBehavior(accountSelect, null)
+	}
+
+	const clearAccountSelectionUI = () => {
+		if (accountInput) accountInput.value = ''
+		if (accountText) {
+			accountText.textContent = accountInput?.getAttribute('placeholder') || ''
+			accountText.classList.add('select__placeholder')
+		}
+		accountSelect.classList.remove('has-value')
+	}
+
+	let loadToken = 0
+	const loadAccountsForSupplier = async supplierId => {
+		const myToken = ++loadToken
+
+		SelectHandler.updateSelectOptions(accountSelect, [])
+
+		if (!supplierId) return
+		const url = `/accounts/list/?supplier_id=${encodeURIComponent(supplierId)}`
+		const data = await SelectHandler.fetchSelectOptions(url)
+
+		if (myToken !== loadToken) return
+		SelectHandler.updateSelectOptions(accountSelect, data)
+
+		// Восстанавливаем выбранное значение из input.value или атрибута value
+		requestAnimationFrame(() => {
+			if (accountInput) {
+				const currentVal =
+					accountInput.value || accountInput.getAttribute('value')
+				SelectHandler.restoreSelectValue(accountSelect, currentVal)
+			}
+		})
+	}
+
+	if (accountControl) {
+		accountControl.addEventListener('click', async () => {
+			if (accountDropdown?.hasChildNodes()) return
+			const sid = supplierInput?.value
+			await loadAccountsForSupplier(sid)
+		})
+	}
+
+	if (supplierInput) {
+		supplierInput.addEventListener('change', async () => {
+			const sid = supplierInput.value
+			clearAccountSelectionUI()
+			await loadAccountsForSupplier(sid)
+		})
+	}
+
+	const initialSupplierId = supplierInput?.value
+	if (initialSupplierId) {
+		loadAccountsForSupplier(initialSupplierId)
+	} else {
+		SelectHandler.updateSelectOptions(accountSelect, [])
+	}
+}
+
+const setupMultipleSupplierAccountSelects = (pairs = []) => {
+	pairs.forEach(({ supplierId, accountId }) => {
+		const supplierSelect = document
+			.querySelector(`#${supplierId}`)
+			?.closest('.select')
+		const accountSelect = document
+			.querySelector(`#${accountId}`)
+			?.closest('.select')
+		if (!accountSelect) return
+
+		const supplierInput = supplierSelect?.querySelector('.select__input')
+		const accountInput = accountSelect.querySelector('.select__input')
+		const accountText = accountSelect.querySelector('.select__text')
+		const accountDropdown = accountSelect.querySelector('.select__dropdown')
+		const accountControl = accountSelect.querySelector('.select__control')
+
+		if (
+			typeof SelectHandler !== 'undefined' &&
+			SelectHandler.setupSelectBehavior
+		) {
+			SelectHandler.setupSelectBehavior(accountSelect, null)
+		}
+
+		const clearAccountSelectionUI = () => {
+			if (accountInput) accountInput.value = ''
+			if (accountText) {
+				accountText.textContent =
+					accountInput?.getAttribute('placeholder') || ''
+				accountText.classList.add('select__placeholder')
+			}
+			accountSelect.classList.remove('has-value')
+		}
+
+		let loadToken = 0
+		const loadAccountsForSupplier = async supplierId => {
+			const myToken = ++loadToken
+
+			SelectHandler.updateSelectOptions(accountSelect, [])
+
+			if (!supplierId) return
+			const url = `/accounts/list/?supplier_id=${encodeURIComponent(
+				supplierId
+			)}`
+			const data = await SelectHandler.fetchSelectOptions(url)
+
+			if (myToken !== loadToken) return
+			SelectHandler.updateSelectOptions(accountSelect, data)
+
+			requestAnimationFrame(() => {
+				if (accountInput) {
+					const currentVal =
+						accountInput.value || accountInput.getAttribute('value')
+					SelectHandler.restoreSelectValue(accountSelect, currentVal)
+				}
+			})
+		}
+
+		if (accountControl) {
+			accountControl.addEventListener('click', async () => {
+				if (accountDropdown?.hasChildNodes()) return
+				const sid = supplierInput?.value
+				await loadAccountsForSupplier(sid)
+			})
+		}
+
+		if (supplierInput) {
+			supplierInput.addEventListener('change', async () => {
+				const sid = supplierInput.value
+				clearAccountSelectionUI()
+				await loadAccountsForSupplier(sid)
+			})
+		}
+
+		const initialSupplierId = supplierInput?.value
+		if (initialSupplierId) {
+			loadAccountsForSupplier(initialSupplierId)
+		} else {
+			SelectHandler.updateSelectOptions(accountSelect, [])
+		}
+	})
+}
+
 export class TablePaginator {
 	constructor(config) {
 		this.baseUrl = config.baseUrl || '/'
@@ -1444,50 +1607,19 @@ const mainConfig = createConfig(TRANSACTION, {
 		setupPercentInput('client_percentage')
 		setupPercentInput('supplier_percentage')
 		setupPercentInput('bonus_percentage')
+
+		setupSupplierAccountSelects()
 	},
+
 	addFunc: () => {
 		setupCurrencyInput('amount')
 		setupPercentInput('client_percentage')
 		setupPercentInput('supplier_percentage')
 		setupPercentInput('bonus_percentage')
 
-		// нужно слушатель на поставщика и при изменении очищать счет и подгружать новые счета поменять transaction_create и transaction_edit
-		// const accountSupplierInput = document.getElementById('account_supplier')
-		// if (accountSupplierInput) {
-		// 	const accountSupplierSelect = accountSupplierInput.closest('.select')
-		// 	const control = accountSupplierSelect.querySelector('.select__control')
-
-		// 	control.addEventListener('click', async function () {
-		// 		const supplierInput = document.getElementById('supplier')
-		// 		const supplierId = supplierInput ? supplierInput.value : ''
-
-		// 		if (!supplierId) {
-		// 			showError('Не выбран Поставщик')
-		// 			return
-		// 		}
-
-		// 		let isDataLoaded = accountSupplierSelect.dataset.loaded === 'true'
-		// 		if (isDataLoaded) return
-
-		// 		accountSupplierSelect.dataset.loaded = 'true'
-
-		// 		try {
-		// 			const url = `/accounts/list/?supplier_id=${supplierId}`
-		// 			await SelectHandler.setupSelects({
-		// 				url,
-		// 				select: accountSupplierSelect,
-		// 			})
-		// 			const control =
-		// 				accountSupplierSelect.querySelector('.select__control')
-		// 			if (control) {
-		// 				control.click()
-		// 			}
-		// 		} catch (e) {
-		// 			showError('Ошибка загрузки счетов поставщика')
-		// 		}
-		// 	})
-		// }
+		setupSupplierAccountSelects()
 	},
+
 	afterAddFunc: result => {
 		refreshData(`${TRANSACTION}-table`, result.id)
 		const row = TableManager.getRowById(result.id, `${TRANSACTION}-table`)
@@ -1604,10 +1736,12 @@ const cashflowConfig = createConfig(CASH_FLOW, {
 	editFunc: () => {
 		setupCurrencyInput('amount')
 		checkOperationType()
+		setupSupplierAccountSelects()
 	},
 	addFunc: () => {
 		setupCurrencyInput('amount')
 		checkOperationType()
+		setupSupplierAccountSelects()
 	},
 	afterAddFunc: result => {
 		refreshData(`${CASH_FLOW}-table`, result.id)
@@ -1705,10 +1839,7 @@ const collectionFormHandler = createFormHandler(
 	'suppliers-account-table',
 	`collection-form`,
 	[],
-	[
-		{ id: 'source_account', url: `${BASE_URL}accounts/list/?collection=true` },
-		{ id: 'source_supplier', url: `${BASE_URL}${SUPPLIERS}/list/` },
-	],
+	[{ id: 'supplier', url: `${BASE_URL}${SUPPLIERS}/list/` }],
 	{
 		url: '/components/main/collection/',
 		title: 'Инкассация',
@@ -1800,6 +1931,8 @@ const moneyTransfersFormHandler = createFormHandler(
 	[
 		{ id: 'source_supplier', url: `${BASE_URL}${SUPPLIERS}/list/` },
 		{ id: 'destination_supplier', url: `${BASE_URL}${SUPPLIERS}/list/` },
+		// { id: 'source_account', url: `${BASE_URL}accounts/list/` },
+		// { id: 'destination_account', url: `${BASE_URL}accounts/list/` },
 	],
 	{
 		url: '/components/main/add_money_transfers/',
@@ -2095,14 +2228,16 @@ const handleSupplierAccounts = async () => {
 		collectionButton.addEventListener('click', async function (e) {
 			await collectionFormHandler.init(0)
 
-			const supplierId = TableManager.getSelectedRowId(
-				'suppliers-account-table'
-			)
-			const accountId = getSelectedAccountId('suppliers-account-table')
-			if (supplierId && accountId && supplierId !== 'ИТОГО') {
-				selectOptionById('source_supplier', supplierId)
-				selectOptionById('source_account', accountId)
-			}
+			// const supplierId = TableManager.getSelectedRowId(
+			// 	'suppliers-account-table'
+			// )
+			// const accountId = getSelectedAccountId('suppliers-account-table')
+			// if (supplierId && accountId && supplierId !== 'ИТОГО') {
+			// 	selectOptionById('source_supplier', supplierId)
+			// 	selectOptionById('source_account', accountId)
+			// }
+
+			setupSupplierAccountSelects()
 
 			setupCurrencyInput('amount')
 
@@ -2115,12 +2250,20 @@ const handleSupplierAccounts = async () => {
 		moneyTransfersButton.addEventListener('click', async function (e) {
 			await moneyTransfersFormHandler.init(0)
 
-			const supplierId = TableManager.getSelectedRowId(
-				'suppliers-account-table'
-			)
-			if (supplierId && supplierId !== 'ИТОГО') {
-				selectOptionById('source_supplier', supplierId)
-			}
+			// const supplierId = TableManager.getSelectedRowId(
+			// 	'suppliers-account-table'
+			// )
+			// if (supplierId && supplierId !== 'ИТОГО') {
+			// 	selectOptionById('source_supplier', supplierId)
+			// }
+
+			setupMultipleSupplierAccountSelects([
+				{ supplierId: 'source_supplier', accountId: 'source_account' },
+				{
+					supplierId: 'destination_supplier',
+					accountId: 'destination_account',
+				},
+			])
 
 			setupCurrencyInput('amount')
 

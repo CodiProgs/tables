@@ -10,7 +10,7 @@
             {% include "components/select.html" with id="supplier" placeholder="Выберите поставщика" %}
         </div>
         <div class="modal-form__group">
-            {% include "components/select.html" with id="account_supplier" placeholder="Выберите счет поставщика" %}
+            {% include "components/select.html" with id="account" placeholder="Выберите счет поставщика" %}
         </div>
         <div class="modal-form__group">
             <input class="modal-form__input"
@@ -20,32 +20,32 @@
                    spellcheck="false"
                    placeholder="Введите сумму">
         </div>
-		<div class="modal-form__group">
+        <div class="modal-form__group">
             <input class="modal-form__input"
                    id="client_percentage"
                    name="client_percentage"
                    spellcheck="false"
                    placeholder="Введите процент клиенту"
-				   type="text"
-				   step="0.1">
+                   type="text"
+                   step="0.1">
         </div>
-		<div class="modal-form__group">
+        <div class="modal-form__group">
             <input class="modal-form__input"
                    id="supplier_percentage"
                    name="supplier_percentage"
                    spellcheck="false"
                    placeholder="Введите процент себестоимости"
-				   type="text"
-				   step="0.1">
+                   type="text"
+                   step="0.1">
         </div>
-		<div class="modal-form__group">
+        <div class="modal-form__group">
             <input class="modal-form__input"
                    id="bonus_percentage"
                    name="bonus_percentage"
                    spellcheck="false"
                    placeholder="Введите процент бонуса, стандартно 0"
-				   type="text"
-				   step="0.1">
+                   type="text"
+                   step="0.1">
         </div>
         <div class="modal-form__buttons">
             <button class="button modal-form__button" type="submit">Сохранить</button>
