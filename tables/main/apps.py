@@ -40,4 +40,4 @@ class MainConfig(AppConfig):
             for name in ["Филиал 1", "Филиал 2"]:
                 Branch.objects.get_or_create(name=name)
 
-        post_migrate.connect(create_initial_data, sender=self)
+        post_migrate.connect(create_initial_data, sender=MainConfig)
