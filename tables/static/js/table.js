@@ -1094,6 +1094,8 @@ export const TableManager = {
 				)
 				cells.forEach(cell => {
 					if (cell.classList.contains('table__cell--summary')) return
+					if (cell.parentElement.classList.contains('table__row--summary'))
+						return
 
 					cell.style.textAlign = 'right'
 

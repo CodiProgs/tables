@@ -12,12 +12,9 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = 'django-insecure-7$m0khwvsrv67jtr7a*9ei3)3*datk7v+ub1*xto3+b0&yvykj'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = False
+DEBUG = True
 
-ALLOWED_HOSTS = [
-    "Yarche.mysql.pythonanywhere-services.com",
-    "Yarche.pythonanywhere.com",
-]
+ALLOWED_HOSTS = ["*"]
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
 
@@ -72,10 +69,10 @@ WSGI_APPLICATION = 'tables.wsgi.application'
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.mysql",
-        "NAME": "Yarche$tables2",
-        "USER": "Yarche",
-        "PASSWORD": "zPD1XNMlrK",
-        "HOST": "Yarche.mysql.pythonanywhere-services.com",
+        "NAME": "tables",
+        "USER": "root",
+        "PASSWORD": "root",
+        "HOST": "localhost",
         "PORT": "3306",
         "OPTIONS": {
             "init_command": "SET sql_mode='STRICT_TRANS_TABLES'",
