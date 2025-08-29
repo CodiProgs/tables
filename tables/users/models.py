@@ -58,12 +58,11 @@ class User(AbstractUser):
         blank=True,
     )
 
-    supplier = models.OneToOneField(
-        "main.Supplier",
+    branch = models.ForeignKey(
+        "main.Branch",
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
-        unique=True,
         related_name="user_profile"
     )
 

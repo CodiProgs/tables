@@ -1287,6 +1287,41 @@ const setupMultipleSupplierAccountSelects = (pairs = []) => {
 	})
 }
 
+function setupUserTypeBranchToggle() {
+	const userTypeInput = document.getElementById('user_type')
+	const branchGroup = document.getElementById('branch-group')
+	if (!userTypeInput || !branchGroup) return
+
+	function toggleBranch() {
+		const value = userTypeInput.value
+		const selectedText = Array.from(
+			document.querySelectorAll('.select__option[data-value]')
+		)
+			.find(opt => opt.dataset.value === value)
+			?.textContent?.trim()
+		if (selectedText === 'Филиал') {
+			branchGroup.removeAttribute('hidden')
+		} else {
+			branchGroup.setAttribute('hidden', 'true')
+		}
+	}
+
+	userTypeInput.addEventListener('change', toggleBranch)
+
+	const userTypeSelect = userTypeInput.closest('.select')
+	if (userTypeSelect) {
+		userTypeSelect.addEventListener('click', function (e) {
+			const option = e.target.closest('.select__option')
+			if (option) {
+				userTypeInput.value = option.dataset.value
+				toggleBranch()
+			}
+		})
+	}
+
+	toggleBranch()
+}
+
 export class TablePaginator {
 	constructor(config) {
 		this.baseUrl = config.baseUrl || '/'
@@ -1622,7 +1657,16 @@ const suppliersConfig = createConfig(SUPPLIERS, {
 })
 
 const usersConfig = createConfig('users', {
-	dataUrls: [{ id: 'user_type', url: `${BASE_URL}users/types/` }],
+	dataUrls: [
+		{ id: 'user_type', url: `${BASE_URL}users/types/` },
+		{ id: 'branch', url: `${BASE_URL}branches/list/` },
+	],
+	addFunc: () => {
+		setupUserTypeBranchToggle()
+	},
+	editFunc: () => {
+		setupUserTypeBranchToggle()
+	},
 	afterAddFunc: result => refreshData(`users-table`, result.id),
 	afterEditFunc: result => refreshData(`users-table`),
 	modalConfig: {
@@ -2362,7 +2406,7 @@ const handleCashFlow = async config => {
 									align: 'end',
 									font: { size: 10, weight: 'bold' },
 									color: '#000',
-									formatter: value => value,
+									formatter: value => value.toLocaleString('ru-RU') + ' р.',
 								},
 							},
 						},

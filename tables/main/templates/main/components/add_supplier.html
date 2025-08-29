@@ -26,7 +26,7 @@
         <div class="modal-form__group">
             {% include "components/select.html" with id="account_ids" placeholder="Выберите в каких банках р/с" multiple="true" %}
         </div>
-        <div class="modal-form__group">
+        {% comment %} <div class="modal-form__group">
             <input class="modal-form__input"
                    type="text"
                    id="username"
@@ -41,7 +41,7 @@
                    name="password"
                    spellcheck="false"
                    placeholder="Введите пароль пользователя">
-        </div>
+        </div> {% endcomment %}
         <div class="modal-form__group">{% include "components/checkbox.html" with value="true" id="visible_for_assistant" label="Виден ассистенту" %}</div>
         <div class="modal-form__buttons">
             <button class="button modal-form__button" type="submit">Сохранить</button>

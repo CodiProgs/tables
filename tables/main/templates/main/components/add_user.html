@@ -54,6 +54,9 @@
 		<div class="modal-form__group">
             {% include "components/select.html" with id="user_type" placeholder="Выберите тип пользователя" %}
         </div>
+        <div class="modal-form__group" hidden id="branch-group">
+            {% include "components/select.html" with id="branch" placeholder="Выберите филиал" %}
+        </div>
         <div class="modal-form__group">{% include "components/checkbox.html" with value="true" id="is_active" label="Активен" %}</div>
         <div class="modal-form__buttons">
             <button class="button modal-form__button" type="submit">Сохранить</button>

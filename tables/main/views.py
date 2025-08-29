@@ -30,7 +30,7 @@ locale.setlocale(locale.LC_TIME, "ru_RU.UTF-8")
 def forbid_supplier(view_func):
     @wraps(view_func)
     def _wrapped_view(request, *args, **kwargs):
-        if hasattr(request.user, 'user_type') and getattr(request.user.user_type, 'name', None) == 'Поставщик':
+        if hasattr(request.user, 'user_type') and getattr(request.user.user_type, 'name', None) == 'Поставщик' or getattr(request.user.user_type, 'name', None) == 'Филиал':
             from django.shortcuts import redirect
             return redirect('main:debtors')
         return view_func(request, *args, **kwargs)
@@ -63,7 +63,7 @@ def clean_percentage(value):
 @login_required
 def index(request):
     user_type = getattr(getattr(request.user, 'user_type', None), 'name', None)
-    if user_type == 'Поставщик':
+    if user_type == 'Поставщик' or user_type == 'Филиал':
         return redirect('main:debtors')
 
     is_accountant = user_type == 'Бухгалтер'
@@ -2436,13 +2436,20 @@ def debtors(request):
     user = request.user
     is_admin = hasattr(user, 'user_type') and user.user_type.name == 'Администратор'
 
-    is_supplier = hasattr(request.user, 'user_type') and request.user.user_type.name == 'Поставщик'
+    is_supplier = hasattr(request.user, 'user_type') and request.user.user_type.name == 'Поставщик' or request.user.user_type.name == 'Филиал'
 
     branches = list(Branch.objects.all().values('id', 'name'))
 
     if is_supplier:
-        supplier = get_object_or_404(Supplier, user=user)
-        branches = [branch for branch in branches if branch['id'] == supplier.branch_id]
+        branch = None
+        if hasattr(user, 'branch') and user.branch:
+            branch = user.branch
+        else:
+            supplier = Supplier.objects.filter(user=user).first()
+            if supplier:
+                branch = supplier.branch
+        if branch:
+            branches = [b for b in branches if b['id'] == branch.id]
 
     transactions = Transaction.objects.select_related('supplier__branch').filter(paid_amount__gt=0).all()
 
@@ -3592,6 +3599,7 @@ def get_user_fields():
         "is_superuser",
         "is_staff",
         "email",
+        "branch",
     ]
     fields = get_model_fields(
         User,
@@ -3629,6 +3637,7 @@ def user_create(request):
             patronymic = request.POST.get("patronymic")
             user_type_id = request.POST.get("user_type")
             is_active = request.POST.get("is_active") == "on"
+            branch_id = request.POST.get("branch")
 
             if not all([username, password, user_type_id]):
                 return JsonResponse(
@@ -3649,6 +3658,14 @@ def user_create(request):
                 )
 
             user_type = get_object_or_404(UserType, id=user_type_id)
+            branch = None
+            if user_type.name == "Филиал":
+                if not branch_id or branch_id == 'null':
+                    return JsonResponse(
+                        {"status": "error", "message": "Для типа 'Филиал' необходимо выбрать филиал"},
+                        status=400,
+                    )
+                branch = get_object_or_404(Branch, id=branch_id)
 
             user = User.objects.create(
                 email=email,
@@ -3658,6 +3675,7 @@ def user_create(request):
                 patronymic=patronymic,
                 user_type=user_type,
                 is_active=is_active,
+                branch=branch
             )
             user.set_password(password)
             user.save()
@@ -3696,6 +3714,7 @@ def user_edit(request, pk=None):
             patronymic = request.POST.get("patronymic")
             user_type_id = request.POST.get("user_type")
             is_active = request.POST.get("is_active") == "on"
+            branch_id = request.POST.get("branch")
 
             if not all([username, user_type_id]):
                 return JsonResponse(
@@ -3716,6 +3735,14 @@ def user_edit(request, pk=None):
                 )
 
             user_type = get_object_or_404(UserType, id=user_type_id)
+            branch = None
+            if user_type.name == "Филиал":
+                if not branch_id or branch_id == 'null':
+                    return JsonResponse(
+                        {"status": "error", "message": "Для типа 'Филиал' необходимо выбрать филиал"},
+                        status=400,
+                    )
+                branch = get_object_or_404(Branch, id=branch_id)
 
             user.email = email
             user.username = username
@@ -3726,6 +3753,7 @@ def user_edit(request, pk=None):
             user.patronymic = patronymic
             user.user_type = user_type
             user.is_active = is_active
+            user.branch = branch
             user.save()
 
             context = {
@@ -3765,7 +3793,7 @@ def user_delete(request, pk=None):
 @forbid_supplier
 @login_required
 def user_types(request):
-    types = UserType.objects.all()
+    types = UserType.objects.exclude(name="Поставщик")
 
     type_data = [
         {"id": acc.id, "name": acc.name} for acc in types

@@ -34,7 +34,7 @@
                 {% block content %}
                 {% endblock content %}
             </main>
-            {% if not request.user.user_type.name == "Поставщик" and request.user.user_type.name != "Ассистент" %}
+            {% if not request.user.user_type.name == "Поставщик" and request.user.user_type.name != "Ассистент" and request.user.user_type.name != "Филиал" %}
                 <nav class="sidebar-nav">
                     <ul class="nav-list">
                         <li class="nav-item {% if request.path == '/' %}active{% endif %}">

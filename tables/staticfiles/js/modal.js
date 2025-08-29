@@ -40,6 +40,27 @@ export class Modal {
 
 		document.body.appendChild(this.modal)
 
+		this._modalKeydownHandler = e => {
+			if (e.key === 'Enter' && !e.shiftKey) {
+				const active = document.activeElement
+				if (active.tagName === 'SELECT' || active.closest('.select')) {
+					return
+				}
+				if (
+					active.tagName !== 'INPUT' &&
+					active.tagName !== 'SELECT' &&
+					active.tagName !== 'TEXTAREA'
+				) {
+					const form = this.modal.querySelector('form')
+					if (form) {
+						e.preventDefault()
+						form.requestSubmit()
+					}
+				}
+			}
+		}
+		document.addEventListener('keydown', this._modalKeydownHandler)
+
 		this.setFocusOnFirstInput()
 
 		return this.modal
@@ -85,6 +106,11 @@ export class Modal {
 	close() {
 		const content = document.querySelector('.container')
 		content.inert = false
+
+		if (this._modalKeydownHandler) {
+			document.removeEventListener('keydown', this._modalKeydownHandler)
+			this._modalKeydownHandler = null
+		}
 
 		this.modal.remove()
 	}
