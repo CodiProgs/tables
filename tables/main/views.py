@@ -36,6 +36,22 @@ def forbid_supplier(view_func):
         return view_func(request, *args, **kwargs)
     return _wrapped_view
 
+def parse_datetime_string(dt_str):
+    dt_str = dt_str.strip()
+    if " " in dt_str:
+        try:
+            return timezone.make_aware(datetime.strptime(dt_str, "%d.%m.%Y %H:%M"))
+        except ValueError:
+            try:
+                return timezone.make_aware(datetime.strptime(dt_str, "%Y-%m-%d %H:%M"))
+            except ValueError:
+                pass
+    if "." in dt_str:
+        return timezone.make_aware(datetime.strptime(dt_str, "%d.%m.%Y"))
+    elif "-" in dt_str:
+        return timezone.make_aware(datetime.strptime(dt_str, "%Y-%m-%d"))
+    return None
+
 
 class BankAccountData:
     def __init__(self, name, balance):
@@ -1049,18 +1065,24 @@ def investor_list(request):
 def get_cash_flow_fields():
     excluded = [
         "id",
-        "created_at",
         "amount",
         "transaction",
         "returned_to_investor"
     ]
-    fields = get_model_fields(
-        CashFlow,
-        excluded_fields=excluded,
-    )
+    # fields = get_model_fields(
+    #     CashFlow,
+    #     excluded_fields=excluded,
+    # )
+    fields = [
+        {"name": "created_at", "verbose_name": "Дата", "is_date": True},
+        {"name": "account", "verbose_name": "Счет"},
+        {"name": "supplier", "verbose_name": "Поставщик"},
+        {"name": "purpose", "verbose_name": "Назначение"},
+        {"name": "comment", "verbose_name": "Комментарий"},
+    ]
 
     insertions = [
-        (2, {"name": "formatted_amount", "verbose_name": "Сумма", "is_text": True}),
+        (3, {"name": "formatted_amount", "verbose_name": "Сумма", "is_text": True}),
     ]
 
     for pos, field in insertions:
@@ -1504,6 +1526,7 @@ def cash_flow_edit(request, pk=None):
             new_purpose_id = request.POST.get("purpose")
             new_account_id = request.POST.get("account")
             comment = request.POST.get("comment", "")
+            created_at_str = request.POST.get("created_at_formatted", "")
 
             if not all([new_supplier_id, new_amount, new_purpose_id, new_account_id]):
                 return JsonResponse({
@@ -1596,6 +1619,7 @@ def cash_flow_edit(request, pk=None):
             cashflow.amount = updated_amount
             cashflow.purpose = new_purpose
             cashflow.comment = comment
+            cashflow.created_at = parse_datetime_string(created_at_str) if created_at_str else cashflow.created_at
             cashflow.save()
 
             cashflow.refresh_from_db()

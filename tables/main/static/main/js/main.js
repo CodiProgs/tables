@@ -234,7 +234,7 @@ const showChangedCells = (changedCells, tableId) => {
 	})
 }
 
-const hideCompletedTransactions = supplierDebts => {
+const hideCompletedTransactions = debts => {
 	const table = document.getElementById(`${TRANSACTION}-table`)
 	if (!table) return
 
@@ -264,20 +264,49 @@ const hideCompletedTransactions = supplierDebts => {
 			docsCell.querySelector('input[type="checkbox"]')?.checked ||
 			docsCell.querySelector('.checkbox--checked') !== null
 
-		const supplierDebt =
-			supplierDebts && supplierDebts[idx] !== undefined
-				? supplierDebts[idx]
+		const bonusDebt =
+			debts.bonus_debt && debts.bonus_debt[idx] !== undefined
+				? debts.bonus_debt[idx]
 				: null
-		const isSupplierDebtZero =
-			supplierDebt === 0 ||
-			supplierDebt === '0' ||
-			supplierDebt === '0 р.' ||
-			supplierDebt === '0,00 р.'
+		const clientDebt =
+			debts.client_debt && debts.client_debt[idx] !== undefined
+				? debts.client_debt[idx]
+				: null
+		const investorDebt =
+			debts.investor_debt && debts.investor_debt[idx] !== undefined
+				? debts.investor_debt[idx]
+				: null
+
+		const isBonusDebtZero =
+			bonusDebt === 0 ||
+			bonusDebt === '0' ||
+			bonusDebt === '0 р.' ||
+			bonusDebt === '0,00 р.' ||
+			bonusDebt === '0.00' ||
+			bonusDebt === null
+
+		const isClientDebtZero =
+			clientDebt === 0 ||
+			clientDebt === '0' ||
+			clientDebt === '0 р.' ||
+			clientDebt === '0,00 р.' ||
+			clientDebt === '0.00' ||
+			clientDebt === null
+
+		const isInvestorDebtZero =
+			investorDebt === 0 ||
+			investorDebt === '0' ||
+			investorDebt === '0 р.' ||
+			investorDebt === '0,00 р.' ||
+			investorDebt === '0.00' ||
+			investorDebt === null
 
 		if (
 			(debtValue === '0 р.' || debtValue === '0,00 р.') &&
 			docsChecked &&
-			isSupplierDebtZero
+			isBonusDebtZero &&
+			isClientDebtZero &&
+			isInvestorDebtZero
 		) {
 			row.classList.add('hidden-row', 'row-done')
 		}
@@ -296,7 +325,7 @@ const toggleTransactionVisibility = rowId => {
 	updateHiddenRowsCounter()
 }
 
-const toggleAllTransactions = (show, supplierDebts) => {
+const toggleAllTransactions = (show, debts) => {
 	const table = document.getElementById(`${TRANSACTION}-table`)
 	if (!table) return
 
@@ -334,20 +363,49 @@ const toggleAllTransactions = (show, supplierDebts) => {
 				docsCell.querySelector('input[type="checkbox"]')?.checked ||
 				docsCell.querySelector('.checkbox--checked') !== null
 
-			const supplierDebt =
-				supplierDebts && supplierDebts[idx] !== undefined
-					? supplierDebts[idx]
+			const bonusDebt =
+				debts.bonus_debt && debts.bonus_debt[idx] !== undefined
+					? debts.bonus_debt[idx]
 					: null
-			const isSupplierDebtZero =
-				supplierDebt === 0 ||
-				supplierDebt === '0' ||
-				supplierDebt === '0 р.' ||
-				supplierDebt === '0,00 р.'
+			const clientDebt =
+				debts.client_debt && debts.client_debt[idx] !== undefined
+					? debts.client_debt[idx]
+					: null
+			const investorDebt =
+				debts.investor_debt && debts.investor_debt[idx] !== undefined
+					? debts.investor_debt[idx]
+					: null
+
+			const isBonusDebtZero =
+				bonusDebt === 0 ||
+				bonusDebt === '0' ||
+				bonusDebt === '0 р.' ||
+				bonusDebt === '0,00 р.' ||
+				bonusDebt === '0.00' ||
+				bonusDebt === null
+
+			const isClientDebtZero =
+				clientDebt === 0 ||
+				clientDebt === '0' ||
+				clientDebt === '0 р.' ||
+				clientDebt === '0,00 р.' ||
+				clientDebt === '0.00' ||
+				clientDebt === null
+
+			const isInvestorDebtZero =
+				investorDebt === 0 ||
+				investorDebt === '0' ||
+				investorDebt === '0 р.' ||
+				investorDebt === '0,00 р.' ||
+				investorDebt === '0.00' ||
+				investorDebt === null
 
 			if (
 				(debtValue === '0 р.' || debtValue === '0,00 р.') &&
 				docsChecked &&
-				isSupplierDebtZero
+				isBonusDebtZero &&
+				isClientDebtZero &&
+				isInvestorDebtZero
 			) {
 				row.classList.add('hidden-row')
 			}
@@ -935,7 +993,7 @@ const colorizeRemainingAmountByDebts = (debts = {}) => {
 	})
 	const rows = table.querySelectorAll('tbody tr:not(.table__row--summary)')
 	rows.forEach((row, idx) => {
-		if (remainingAmountCol !== -1 && debts.supplier_debts) {
+		if (remainingAmountCol !== -1 && debts) {
 			const cell = row.querySelectorAll('td')[remainingAmountCol]
 			const debt = debts.supplier_debts[idx]
 			if (cell) {
@@ -1733,6 +1791,11 @@ const cashflowConfig = createConfig(CASH_FLOW, {
 				})
 			}
 		}
+
+		const createdAtInput = document.getElementById('created_at_formatted')
+		if (createdAtInput) {
+			createdAtInput.removeAttribute('hidden')
+		}
 	},
 	addFunc: () => {
 		setupCurrencyInput('amount')
@@ -2020,10 +2083,10 @@ const handleTransactions = async config => {
 		const debtsData = document.getElementById('debts')?.textContent
 		if (debtsData) {
 			const debts = JSON.parse(debtsData)
-			supplierDebtsAll = debts.supplier_debts || []
+			supplierDebtsAll = debts || []
 			colorizeRemainingAmountByDebts(debts)
 
-			hideCompletedTransactions(debts.supplier_debts)
+			hideCompletedTransactions(debts)
 		} else {
 			console.warn("Element with ID 'supplier-debts' not found or empty.")
 		}
