@@ -1,0 +1,43 @@
+{% extends "layout.html" %}
+{% load static %}
+{% block content %}
+    <div class="page-table-container" id="exchange-container">
+        <div class="exchange-row" id="from-us-exchange">
+                <h2>От нас</h2>
+                {% include "components/table.html" with id="from_us_exchange-table" fields=fields data=data.from_us %}
+        </div>
+        <div class="exchange-row" id="to-us-exchange">
+                <h2>К нам</h2>
+                {% include "components/table.html" with id="to_us_exchange-table" fields=fields data=data.to_us %}
+        </div>
+        <div class="exchange-summary" id="exchange-summary">
+			<div class="exchange-totals">
+				От нас: <span>{{ totals.from_us }} р.</span><br>
+				К нам: <span>{{ totals.to_us }} р.</span>
+			</div>
+			<div>
+				<button class="button" type="button" id="exchange-summary-ok-button">
+				Ок</button>
+			</div>
+		</div>
+        <div id="context-menu"
+             class="dropdown-menu"
+             data-is-admin="{{ is_admin|yesno:'true,false' }}">
+                <a class="dropdown-item context-action"
+               id="add-button"
+               data-action="add">Добавить</a>
+                <a class="dropdown-item context-action"
+                id="edit-button"
+                data-action="edit">Редактировать</a>
+                <a class="dropdown-item context-action"
+                id="delete-button"
+                data-action="delete">Удалить</a>
+        </div>
+    </div>
+{% endblock content %}
+{% block extra_scripts %}
+    {{ block.super }}
+    <script src="{% static 'main/js/main.js' %}" type="module"></script>
+    <script src="{% static 'main/js/autonumeric.js' %}"></script>
+    {{ data_ids|json_script:"data-ids" }}
+{% endblock extra_scripts %}

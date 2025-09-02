@@ -423,6 +423,11 @@ class SupplierAccount(models.Model):
         unique_together = ('supplier', 'account')
 
 class MoneyTransfer(models.Model):
+    TYPE_CHOICES = [
+        ("from_us", "От нас"),
+        ("to_us", "Нам"),
+    ]
+
     source_account = models.ForeignKey(
         Account,
         on_delete=models.PROTECT,
@@ -465,6 +470,14 @@ class MoneyTransfer(models.Model):
     
     created_at = models.DateTimeField(
         auto_now_add=True,
+    )
+
+    transfer_type = models.CharField(
+        max_length=10,
+        choices=TYPE_CHOICES,
+        verbose_name="Тип перевода",
+        null=True,
+        blank=True
     )
 
     def __str__(self):

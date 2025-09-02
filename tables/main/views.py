@@ -1132,7 +1132,7 @@ def transaction_list(request):
 @forbid_supplier
 @login_required
 def supplier_accounts(request):
-    suppliers = Supplier.objects.all().order_by('name')
+    suppliers = Supplier.objects.filter(visible_for_assistant=True).order_by('name')
 
     bank_accounts = Account.objects.order_by('name')
 
@@ -2059,6 +2059,16 @@ def money_transfer_create(request):
 
             amount = clean_currency(request.POST.get("amount"))
 
+            transfer_type = request.POST.get("transfer_type")
+
+            is_exchange = request.GET.get("exchange") == "true"
+
+            if is_exchange and not transfer_type:
+                return JsonResponse(
+                    {"status": "error", "message": "Тип обмена обязателен"},
+                    status=400,
+                )
+
             if not all([source_supplier_id, destination_supplier_id, amount, source_account_id, destination_account_id]):
                 return JsonResponse(
                     {"status": "error", "message": "Все поля должны быть заполнены"},
@@ -2112,7 +2122,8 @@ def money_transfer_create(request):
                 destination_account=destination_account,
                 source_supplier=source_supplier,
                 destination_supplier=destination_supplier,
-                amount=amount_value
+                amount=amount_value,
+                transfer_type=transfer_type if is_exchange else None
             )
 
             source_account.balance -= amount_value
@@ -2223,7 +2234,9 @@ def money_transfer_create(request):
                 "id": money_transfer.id,
                 "status": "success",
                 "message": f"Перевод на сумму {amount_value} р. успешно выполнен",
-                "table_html": html_table
+                "table_html": html_table,
+                "transfer_type": money_transfer.transfer_type,
+                "type": "create"
             })
     except Exception as e:
         return JsonResponse({"status": "error", "message": str(e)}, status=400)
@@ -2242,7 +2255,17 @@ def money_transfer_edit(request, pk: int):
 
             source_account_id = request.POST.get("source_account")
             destination_account_id = request.POST.get("destination_account")
+            transfer_type = request.POST.get("transfer_type")
 
+            if money_transfer.transfer_type:
+                if not transfer_type:
+                    return JsonResponse(
+                        {"status": "error", "message": "Тип обмена обязателен для этого перевода"},
+                        status=400,
+                    )
+            else:
+                transfer_type = None
+            
             if not all([source_supplier_id, destination_supplier_id, amount, source_account_id, destination_account_id]):
                 return JsonResponse(
                     {"status": "error", "message": "Все поля должны быть заполнены"},
@@ -2261,6 +2284,8 @@ def money_transfer_edit(request, pk: int):
                     {"status": "error", "message": "Некорректное значение суммы"},
                     status=400,
                 )
+
+            old_transfer_type = money_transfer.transfer_type
 
             old_source_account = money_transfer.source_account
             old_destination_account = money_transfer.destination_account
@@ -2283,6 +2308,16 @@ def money_transfer_edit(request, pk: int):
             if new_source_account.id == new_destination_account.id and new_source_supplier.id == new_destination_supplier.id:
                 return JsonResponse(
                     {"status": "error", "message": "Нельзя переводить средства на тот же счет того же поставщика"},
+                    status=400,
+                )
+
+            new_source_supplier_account = SupplierAccount.objects.filter(
+                supplier=new_source_supplier,
+                account=new_source_account
+            ).first()
+            if not new_source_supplier_account or new_source_supplier_account.balance < amount_value:
+                return JsonResponse(
+                    {"status": "error", "message": "Недостаточно средств на счете поставщика-отправителя"},
                     status=400,
                 )
 
@@ -2309,16 +2344,6 @@ def money_transfer_edit(request, pk: int):
                     old_destination_supplier_account.balance -= old_amount
                     old_destination_supplier_account.save()
 
-            new_source_supplier_account = SupplierAccount.objects.filter(
-                supplier=new_source_supplier,
-                account=new_source_account
-            ).first()
-            if not new_source_supplier_account or new_source_supplier_account.balance < amount_value:
-                return JsonResponse(
-                    {"status": "error", "message": "Недостаточно средств на счете поставщика-отправителя"},
-                    status=400,
-                )
-
             new_source_account.balance -= amount_value
             new_source_account.save()
             new_destination_account.balance += amount_value
@@ -2340,6 +2365,7 @@ def money_transfer_edit(request, pk: int):
             money_transfer.source_supplier = new_source_supplier
             money_transfer.destination_supplier = new_destination_supplier
             money_transfer.amount = amount_value
+            money_transfer.transfer_type = transfer_type
             money_transfer.save()
 
             class MoneyTransferRow:
@@ -2375,7 +2401,10 @@ def money_transfer_edit(request, pk: int):
                 "html": render_to_string("components/table_row.html", context),
                 "id": money_transfer.id,
                 "status": "success",
-                "message": f"Перевод успешно обновлен"
+                "message": f"Перевод успешно обновлен",
+                "transfer_type": money_transfer.transfer_type,
+                "old_transfer_type": old_transfer_type,
+                "type": "edit"
             })
     except Exception as e:
         return JsonResponse({"status": "error", "message": str(e)}, status=400)
@@ -2451,6 +2480,8 @@ def money_transfer_delete(request, pk=None):
             return JsonResponse({
                 "status": "success",
                 "message": f"Перевод на сумму {amount} р. успешно удален",
+                "id": pk,
+                "type": "delete"
             })
     except Exception as e:
         return JsonResponse({"status": "error", "message": str(e)}, status=400)
@@ -3644,6 +3675,8 @@ def get_user_fields():
 def user_detail(request, pk: int):
     user = get_object_or_404(User, id=pk)
     data = model_to_dict(user)
+
+    data.pop("password", None)
     
     return JsonResponse({"data": data})
 
@@ -3868,3 +3901,38 @@ def edit_supplier_debt_repayment(request, pk=None):
             })
     except Exception as e:
         return JsonResponse({"status": "error", "message": str(e)}, status=400)
+
+@forbid_supplier
+@login_required
+def exchange(request):
+    fields = [
+        {"name": "source_supplier", "verbose_name": "От кого"},
+        {"name": "source_account", "verbose_name": "С какого счета"},
+        {"name": "destination_supplier", "verbose_name": "Кому"},
+        {"name": "destination_account", "verbose_name": "На какой счет"},
+        {"name": "amount", "verbose_name": "Сумма", "is_amount": True}
+    ]
+
+    from_us_transfers = MoneyTransfer.objects.filter(transfer_type="from_us")
+    to_us_transfers = MoneyTransfer.objects.filter(transfer_type="to_us")
+
+    total_from_us = sum(t.amount for t in from_us_transfers)
+    total_to_us = sum(t.amount for t in to_us_transfers)
+
+    context = {
+        "fields": fields,
+        "data": {
+            "from_us": from_us_transfers,
+            "to_us": to_us_transfers,
+        },
+        "data_ids": {
+            "from_us": [t.id for t in from_us_transfers],
+            "to_us": [t.id for t in to_us_transfers],
+        },
+        "totals": {
+            "from_us": total_from_us,
+            "to_us": total_to_us,
+        }
+    }
+
+    return render(request, "main/exchange.html", context)

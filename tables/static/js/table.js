@@ -2096,7 +2096,7 @@ document.addEventListener('DOMContentLoaded', function () {
 		if (itemsCount === 6) {
 			navList.style.gridTemplateColumns = 'repeat(3, minmax(0, 1fr))'
 		} else {
-			navList.style.gridTemplateColumns = 'repeat(4, minmax(0, 1fr))'
+			navList.style.gridTemplateColumns = 'repeat(5, minmax(0, 1fr))'
 		}
 	}
 
