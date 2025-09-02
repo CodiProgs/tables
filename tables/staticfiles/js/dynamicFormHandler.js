@@ -151,7 +151,16 @@ export class DynamicFormHandler {
 				}
 			}
 
-			element.value = value ?? ''
+			if (element.type === 'date' && value) {
+				value = value.split(' ')[0]
+				if (/^\d{2}\.\d{2}\.\d{4}$/.test(value)) {
+					const [day, month, year] = value.split('.')
+					value = `${year}-${month}-${day}`
+				}
+				element.value = value
+			} else {
+				element.value = value ?? ''
+			}
 
 			if (element.type === 'hidden' || element.hasAttribute('hidden')) {
 				element.setAttribute('value', value)
