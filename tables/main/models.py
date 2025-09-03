@@ -479,6 +479,16 @@ class MoneyTransfer(models.Model):
         null=True,
         blank=True
     )
+    is_counted = models.BooleanField(
+        verbose_name="Учитывать в итогах",
+        null=True,
+        blank=True,
+    )
+    is_completed = models.BooleanField(
+        default=False,
+        verbose_name="Завершен"
+    )
+
 
     def __str__(self):
         source = f"{self.source_supplier.name} - " if self.source_supplier else ""

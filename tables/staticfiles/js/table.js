@@ -1834,7 +1834,7 @@ export const TableManager = {
 	calculateTableSummary(
 		tableId,
 		columnsToSum,
-		options = { grouped: false, total: true, className: null }
+		options = { grouped: false, total: true, className: null, ids: null }
 	) {
 		if (
 			!columnsToSum ||
@@ -1858,6 +1858,12 @@ export const TableManager = {
 
 		const groupRows = Array.from(tbody.querySelectorAll('.table__group-row'))
 
+		const filterRowsByIds = (rows, ids) => {
+			if (!Array.isArray(ids) || ids.length === 0) return rows
+			const idsStr = ids.map(String)
+			return rows.filter(row => idsStr.includes(row.getAttribute('data-id')))
+		}
+
 		if (options.grouped && groupRows.length > 0) {
 			groupRows.forEach(groupRow => {
 				let currentRow = groupRow.nextElementSibling
@@ -1876,9 +1882,11 @@ export const TableManager = {
 					currentRow = currentRow.nextElementSibling
 				}
 
-				if (rows.length > 0) {
+				const filteredRows = filterRowsByIds(rows, options.ids)
+
+				if (filteredRows.length > 0) {
 					const summaryData = this.calculateSums(
-						rows,
+						filteredRows,
 						columnsToSum,
 						columnNames
 					)
@@ -1888,7 +1896,7 @@ export const TableManager = {
 						summaryData,
 						'text-blue'
 					)
-					const lastRow = rows[rows.length - 1]
+					const lastRow = filteredRows[filteredRows.length - 1]
 					this.applyColumnWidthsForRow(tableId, summaryRow)
 
 					tbody.insertBefore(summaryRow, lastRow.nextElementSibling)
@@ -1897,11 +1905,13 @@ export const TableManager = {
 		}
 
 		if (!options.grouped || options.total) {
-			const rows = Array.from(
+			let rows = Array.from(
 				tbody.querySelectorAll(
 					'tr:not(.table__row--summary):not(.table__group-row)'
 				)
 			).filter(row => row.style.display !== 'none')
+
+			rows = filterRowsByIds(rows, options.ids)
 
 			if (rows.length > 0) {
 				const summaryData = this.calculateSums(rows, columnsToSum, columnNames)
@@ -2093,8 +2103,8 @@ document.addEventListener('DOMContentLoaded', function () {
 	const navList = document.querySelector('.nav-list')
 	if (navList) {
 		const itemsCount = navList.children.length
-		if (itemsCount === 6) {
-			navList.style.gridTemplateColumns = 'repeat(3, minmax(0, 1fr))'
+		if (itemsCount === 7) {
+			navList.style.gridTemplateColumns = 'repeat(4, minmax(0, 1fr))'
 		} else {
 			navList.style.gridTemplateColumns = 'repeat(5, minmax(0, 1fr))'
 		}

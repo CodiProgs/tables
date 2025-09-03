@@ -2059,15 +2059,7 @@ def money_transfer_create(request):
 
             amount = clean_currency(request.POST.get("amount"))
 
-            transfer_type = request.POST.get("transfer_type")
-
             is_exchange = request.GET.get("exchange") == "true"
-
-            if is_exchange and not transfer_type:
-                return JsonResponse(
-                    {"status": "error", "message": "Тип обмена обязателен"},
-                    status=400,
-                )
 
             if not all([source_supplier_id, destination_supplier_id, amount, source_account_id, destination_account_id]):
                 return JsonResponse(
@@ -2090,6 +2082,26 @@ def money_transfer_create(request):
 
             source_supplier = get_object_or_404(Supplier, id=source_supplier_id)
             destination_supplier = get_object_or_404(Supplier, id=destination_supplier_id)
+
+            transfer_type = None
+            is_counted = None
+
+            if is_exchange:
+                source_visible = getattr(source_supplier, "visible_for_assistant", False)
+                destination_visible = getattr(destination_supplier, "visible_for_assistant", False)
+                if source_visible:
+                    transfer_type = "from_us"
+                elif not destination_visible:
+                    transfer_type = "from_us"
+                else:
+                    transfer_type = "to_us"
+
+                if source_visible and destination_visible:
+                    is_counted = False
+                elif not source_visible and not destination_visible:
+                    is_counted = False
+                else:
+                    is_counted = True
 
             source_account = get_object_or_404(Account, id=source_account_id)
             destination_account = get_object_or_404(Account, id=destination_account_id)
@@ -2123,7 +2135,8 @@ def money_transfer_create(request):
                 source_supplier=source_supplier,
                 destination_supplier=destination_supplier,
                 amount=amount_value,
-                transfer_type=transfer_type if is_exchange else None
+                transfer_type=transfer_type if is_exchange else None,
+                is_counted=is_counted if is_exchange else None
             )
 
             source_account.balance -= amount_value
@@ -2217,10 +2230,10 @@ def money_transfer_create(request):
             )
 
             fields = [
-                {"name": "source_account", "verbose_name": "Счет отправителя"},
-                {"name": "destination_account", "verbose_name": "Счет получателя"},
                 {"name": "source_supplier", "verbose_name": "Поставщик отправитель"},
+                {"name": "source_account", "verbose_name": "Счет отправителя"},
                 {"name": "destination_supplier", "verbose_name": "Поставщик получатель"},
+                {"name": "destination_account", "verbose_name": "Счет получателя"},
                 {"name": "amount", "verbose_name": "Сумма", "is_amount": True}
             ]
 
@@ -2229,6 +2242,13 @@ def money_transfer_create(request):
                 "fields": fields
             }
 
+            from_us_transfers = list(
+                MoneyTransfer.objects.filter(transfer_type="from_us").order_by('-is_counted')
+            )
+            to_us_transfers = list(
+                MoneyTransfer.objects.filter(transfer_type="to_us")
+            )
+
             return JsonResponse({
                 "html": render_to_string("components/table_row.html", context),
                 "id": money_transfer.id,
@@ -2236,7 +2256,11 @@ def money_transfer_create(request):
                 "message": f"Перевод на сумму {amount_value} р. успешно выполнен",
                 "table_html": html_table,
                 "transfer_type": money_transfer.transfer_type,
-                "type": "create"
+                "type": "create",
+                "counted_from_us": [t.id for t in from_us_transfers if t.is_counted],
+                "counted_to_us": [t.id for t in to_us_transfers if not t.is_completed],
+                "from_us_completed": [t.id for t in from_us_transfers if t.is_completed],
+                "to_us_completed": [t.id for t in to_us_transfers if t.is_completed],
             })
     except Exception as e:
         return JsonResponse({"status": "error", "message": str(e)}, status=400)
@@ -2249,23 +2273,19 @@ def money_transfer_edit(request, pk: int):
         with transaction.atomic():
             money_transfer = get_object_or_404(MoneyTransfer, id=pk)
 
+            if money_transfer.is_completed:
+                return JsonResponse(
+                    {"status": "error", "message": "Редактирование завершенных переводов не допускается"},
+                    status=400,
+                )
+
             source_supplier_id = request.POST.get("source_supplier")
             destination_supplier_id = request.POST.get("destination_supplier")
             amount = clean_currency(request.POST.get("amount"))
 
             source_account_id = request.POST.get("source_account")
             destination_account_id = request.POST.get("destination_account")
-            transfer_type = request.POST.get("transfer_type")
 
-            if money_transfer.transfer_type:
-                if not transfer_type:
-                    return JsonResponse(
-                        {"status": "error", "message": "Тип обмена обязателен для этого перевода"},
-                        status=400,
-                    )
-            else:
-                transfer_type = None
-            
             if not all([source_supplier_id, destination_supplier_id, amount, source_account_id, destination_account_id]):
                 return JsonResponse(
                     {"status": "error", "message": "Все поля должны быть заполнены"},
@@ -2360,12 +2380,33 @@ def money_transfer_edit(request, pk: int):
             new_destination_supplier_account.balance += amount_value
             new_destination_supplier_account.save()
 
+            transfer_type = None
+            is_counted = None
+
+            if money_transfer.transfer_type in ["from_us", "to_us"]:
+                source_visible = getattr(new_source_supplier, "visible_for_assistant", False)
+                destination_visible = getattr(new_destination_supplier, "visible_for_assistant", False)
+                if source_visible:
+                    transfer_type = "from_us"
+                elif not destination_visible:
+                    transfer_type = "from_us"
+                else:
+                    transfer_type = "to_us"
+
+                if source_visible and destination_visible:
+                    is_counted = False
+                elif not source_visible and not destination_visible:
+                    is_counted = False
+                else:
+                    is_counted = True
+
             money_transfer.source_account = new_source_account
             money_transfer.destination_account = new_destination_account
             money_transfer.source_supplier = new_source_supplier
             money_transfer.destination_supplier = new_destination_supplier
             money_transfer.amount = amount_value
             money_transfer.transfer_type = transfer_type
+            money_transfer.is_counted = is_counted
             money_transfer.save()
 
             class MoneyTransferRow:
@@ -2385,10 +2426,10 @@ def money_transfer_edit(request, pk: int):
             )
 
             fields = [
-                {"name": "source_account", "verbose_name": "Счет отправителя"},
-                {"name": "destination_account", "verbose_name": "Счет получателя"},
                 {"name": "source_supplier", "verbose_name": "Поставщик отправитель"},
+                {"name": "source_account", "verbose_name": "Счет отправителя"},
                 {"name": "destination_supplier", "verbose_name": "Поставщик получатель"},
+                {"name": "destination_account", "verbose_name": "Счет получателя"},
                 {"name": "amount", "verbose_name": "Сумма", "is_amount": True}
             ]
 
@@ -2397,6 +2438,13 @@ def money_transfer_edit(request, pk: int):
                 "fields": fields
             }
 
+            from_us_transfers = list(
+                MoneyTransfer.objects.filter(transfer_type="from_us").order_by('-is_counted')
+            )
+            to_us_transfers = list(
+                MoneyTransfer.objects.filter(transfer_type="to_us")
+            )
+
             return JsonResponse({
                 "html": render_to_string("components/table_row.html", context),
                 "id": money_transfer.id,
@@ -2404,7 +2452,11 @@ def money_transfer_edit(request, pk: int):
                 "message": f"Перевод успешно обновлен",
                 "transfer_type": money_transfer.transfer_type,
                 "old_transfer_type": old_transfer_type,
-                "type": "edit"
+                "type": "edit",
+                "counted_from_us": [t.id for t in from_us_transfers if t.is_counted],
+                "counted_to_us": [t.id for t in to_us_transfers if not t.is_completed],
+                "from_us_completed": [t.id for t in from_us_transfers if t.is_completed],
+                "to_us_completed": [t.id for t in to_us_transfers if t.is_completed],
             })
     except Exception as e:
         return JsonResponse({"status": "error", "message": str(e)}, status=400)
@@ -2422,14 +2474,13 @@ def money_transfer_delete(request, pk=None):
                     status=400,
                 )
 
-            is_admin = request.user.user_type.name == 'Администратор' if hasattr(request.user, 'user_type') else False
-
-            if not is_admin:
-                return JsonResponse(
-                    {"status": "error", "message": "Недостаточно прав для выполнения действия"},
-                    status=403
-                )
             money_transfer = get_object_or_404(MoneyTransfer, id=pk)
+
+            if money_transfer.is_completed:
+                return JsonResponse(
+                    {"status": "error", "message": "Удаление завершенных переводов не допускается"},
+                    status=400,
+                )
 
             source_account = money_transfer.source_account
             destination_account = money_transfer.destination_account
@@ -2446,15 +2497,9 @@ def money_transfer_delete(request, pk=None):
 
                 if not destination_supplier_account or destination_supplier_account.balance < amount:
                     return JsonResponse(
-                        {"status": "error", "message": "Недостаточно средств у получателя для отмены перевода"},
+                        {"status": "error", "message": "Недостаточно средств у отправителя для отмены перевода"},
                         status=400,
                     )
-
-            if destination_account.balance < amount:
-                return JsonResponse(
-                    {"status": "error", "message": "Недостаточно средств на счете получателя для отмены перевода"},
-                    status=400,
-                )
 
             source_account.balance += amount
             source_account.save()
@@ -2474,14 +2519,26 @@ def money_transfer_delete(request, pk=None):
             if destination_supplier and destination_supplier_account:
                 destination_supplier_account.balance -= amount
                 destination_supplier_account.save()
-
+            transfer_type = money_transfer.transfer_type
             money_transfer.delete()
+
+            from_us_transfers = list(
+                MoneyTransfer.objects.filter(transfer_type="from_us").order_by('-is_counted')
+            )
+            to_us_transfers = list(
+                MoneyTransfer.objects.filter(transfer_type="to_us")
+            )
 
             return JsonResponse({
                 "status": "success",
                 "message": f"Перевод на сумму {amount} р. успешно удален",
                 "id": pk,
-                "type": "delete"
+                "type": "delete",
+                "transfer_type": transfer_type,
+                "counted_from_us": [t.id for t in from_us_transfers if t.is_counted],
+                "counted_to_us": [t.id for t in to_us_transfers if not t.is_completed],
+                "from_us_completed": [t.id for t in from_us_transfers if t.is_completed],
+                "to_us_completed": [t.id for t in to_us_transfers if t.is_completed],
             })
     except Exception as e:
         return JsonResponse({"status": "error", "message": str(e)}, status=400)
@@ -3913,10 +3970,14 @@ def exchange(request):
         {"name": "amount", "verbose_name": "Сумма", "is_amount": True}
     ]
 
-    from_us_transfers = MoneyTransfer.objects.filter(transfer_type="from_us")
-    to_us_transfers = MoneyTransfer.objects.filter(transfer_type="to_us")
+    from_us_transfers = list(
+        MoneyTransfer.objects.filter(transfer_type="from_us").order_by('-is_counted')
+    )
+    to_us_transfers = list(
+        MoneyTransfer.objects.filter(transfer_type="to_us")
+    )
 
-    total_from_us = sum(t.amount for t in from_us_transfers)
+    total_from_us = sum(t.amount for t in from_us_transfers if t.is_counted)
     total_to_us = sum(t.amount for t in to_us_transfers)
 
     context = {
@@ -3928,11 +3989,32 @@ def exchange(request):
         "data_ids": {
             "from_us": [t.id for t in from_us_transfers],
             "to_us": [t.id for t in to_us_transfers],
+            "counted_from_us": [t.id for t in from_us_transfers if t.is_counted],
+            "counted_to_us": [t.id for t in to_us_transfers if not t.is_completed],
+            "from_us_completed": [t.id for t in from_us_transfers if t.is_completed],
+            "to_us_completed": [t.id for t in to_us_transfers if t.is_completed],
         },
         "totals": {
             "from_us": total_from_us,
             "to_us": total_to_us,
+            
         }
     }
 
     return render(request, "main/exchange.html", context)
+
+@forbid_supplier
+@login_required
+@require_http_methods(["POST"])
+def complete_all_unfinished_transfers(request):
+    try:
+        with transaction.atomic():
+            unfinished_transfers = MoneyTransfer.objects.filter(is_completed=False)
+            count = unfinished_transfers.update(is_completed=True)
+            return JsonResponse({
+                "status": "success",
+                "message": f"Завершено {count} переводов",
+                "completed_count": count,
+            })
+    except Exception as e:
+        return JsonResponse({"status": "error", "message": str(e)}, status=400)

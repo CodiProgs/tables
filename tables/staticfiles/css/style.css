@@ -382,11 +382,10 @@ textarea::placeholder {
 }
 
 .text-green {
-	color: #218838;
+	color: #1e7e34;
 }
-
 .text-red {
-	color: #ff0033;
+	color: #d32f2f;
 }
 
 .text-blue {
@@ -738,12 +737,7 @@ textarea::placeholder {
 	font-weight: 600;
 	font-size: 13px;
 }
-.text-green {
-	color: #218838;
-}
-.text-red {
-	color: #d32f2f;
-}
+
 .debtors-office-list__details {
 	display: none;
 	background: var(--color-table-background, #f5f7fa);

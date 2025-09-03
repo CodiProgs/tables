@@ -65,11 +65,9 @@
                             <a href="{% url 'main:users' %}">Пользователи</a>
                         </li>
                         {% endif %}
-                        {% if request.user.is_authenticated and request.user.user_type.name == "Администратор" %}
                         <li class="nav-item {% if request.resolver_match.url_name == 'exchange' %}active{% endif %}">
                             <a href="{% url 'main:exchange' %}">Обмен</a>
                         </li>
-                        {% endif %}
                         {% comment %} <li class="nav-item {% if request.resolver_match.url_name == 'money_transfers' %}active{% endif %}">
                             <a href="{% url 'main:money_transfers' %}">Перемещение ₽</a>
                         </li> {% endcomment %}

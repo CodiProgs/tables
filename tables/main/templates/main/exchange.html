@@ -16,7 +16,7 @@
 				К нам: <span>{{ totals.to_us }} р.</span>
 			</div>
 			<div>
-				<button class="button" type="button" id="exchange-summary-ok-button">
+				<button class="button" type="button" id="exchange-summary-button">
 				Ок</button>
 			</div>
 		</div>
@@ -32,6 +32,15 @@
                 <a class="dropdown-item context-action"
                 id="delete-button"
                 data-action="delete">Удалить</a>
+                <a class="dropdown-item context-action"
+                id="hide-button"
+                data-action="hide">Скрыть</a>
+                <a class="dropdown-item context-action"
+                id="hide-all-button"
+                data-action="hide-all">Скрыть все</a>
+                <a class="dropdown-item context-action"
+                id="show-all-button"
+                data-action="show-all">Показать все</a>
         </div>
     </div>
 {% endblock content %}

@@ -622,7 +622,17 @@ td.hidden {
 }
 
 .table__row.row-done {
-	background-color: rgba(33, 136, 56, 0.2);
+	background-color: rgba(33, 136, 56, 0.12);
+}
+
+.table__row.row-done td {
+	border-right: 1px solid var(--color-border-window);
+	border-bottom: 1px solid var(--color-border-window);
+}
+
+.table__row.row-done--color td {
+	color: #1e7e34;
+	font-weight: 600;
 }
 
 .total-column {

@@ -27,6 +27,7 @@ urlpatterns = [
 	path("money_transfers/add/", views.money_transfer_create, name="money_transfer_create"),
 	path("money_transfers/edit/<int:pk>/", views.money_transfer_edit, name="money_transfer_edit"),
 	path("money_transfers/delete/<int:pk>/", views.money_transfer_delete, name="money_transfer_delete"),
+	path("money_transfers/complete_all/", views.complete_all_unfinished_transfers, name="complete_all_unfinished_transfers"),
 	path("payment_purposes/list/", views.payment_purpose_list, name="payment_purpose_list"),
     path('payment_purpose/types/', views.payment_purpose_types, name='payment_purpose_types'),
 	path("cash_flow/", views.cash_flow, name="cash_flow"),

@@ -595,6 +595,69 @@ const markAsViewed = async (id, row) => {
 	}
 }
 
+function hideCompletedExchangeRows(fromCompleted = [], toCompleted = []) {
+	const fromRows = document.querySelectorAll(
+		'#from_us_exchange-table tbody tr:not(.table__row--summary)'
+	)
+	const toRows = document.querySelectorAll(
+		'#to_us_exchange-table tbody tr:not(.table__row--summary)'
+	)
+
+	const fromCompletedIds = (
+		Array.isArray(fromCompleted) ? fromCompleted : []
+	).map(String)
+	const toCompletedIds = (Array.isArray(toCompleted) ? toCompleted : []).map(
+		String
+	)
+
+	fromRows.forEach(row => {
+		const rowId = row.getAttribute('data-id')
+		if (fromCompletedIds.includes(rowId)) {
+			row.classList.add('hidden-row')
+			row.classList.add('row-done')
+		} else {
+			row.classList.remove('hidden-row')
+			row.classList.remove('row-done')
+		}
+	})
+
+	toRows.forEach(row => {
+		const rowId = row.getAttribute('data-id')
+		if (toCompletedIds.includes(rowId)) {
+			row.classList.add('hidden-row')
+			row.classList.add('row-done')
+		} else {
+			row.classList.remove('hidden-row')
+			row.classList.remove('row-done')
+		}
+	})
+}
+
+function toggleExchangeRowVisibility(rowId, tableId) {
+	const row = document.querySelector(`#${tableId} tr[data-id="${rowId}"]`)
+	if (!row) return
+	row.classList.toggle('hidden-row')
+}
+
+function toggleAllExchangeRows(show, tableId, completedIds = []) {
+	const rows = document.querySelectorAll(
+		`#${tableId} tbody tr:not(.table__row--summary)`
+	)
+	const completedStrIds = (Array.isArray(completedIds) ? completedIds : []).map(
+		String
+	)
+	if (show) {
+		rows.forEach(row => row.classList.remove('hidden-row'))
+	} else {
+		rows.forEach(row => {
+			const rowId = row.getAttribute('data-id')
+			if (completedStrIds.includes(rowId)) {
+				row.classList.add('hidden-row')
+			}
+		})
+	}
+}
+
 const createExchangeFormHandler = action => {
 	const urlMap = {
 		add: `${BASE_URL}money_transfers/add/?exchange=true`,
@@ -607,13 +670,6 @@ const createExchangeFormHandler = action => {
 		`money_transfers-form`,
 		`${BASE_URL}money_transfers/`,
 		[
-			{
-				id: 'transfer_type',
-				url: [
-					{ id: 'from_us', name: 'От нас' },
-					{ id: 'to_us', name: 'К нам' },
-				],
-			},
 			{ id: 'source_supplier', url: `${BASE_URL}${SUPPLIERS}/list/` },
 			// { id: 'source_account', url: `${BASE_URL}accounts/list/` },
 			{ id: 'destination_supplier', url: `${BASE_URL}${SUPPLIERS}/list/` },
@@ -655,6 +711,24 @@ const createExchangeFormHandler = action => {
 						lastRow.setAttribute('data-id', result.id)
 					}
 				}
+
+				// counted_from_us =
+				// 	result.transfer_type === 'from_us'
+				// 		? Array.isArray(result?.counted_from_us) &&
+				// 		  result.counted_from_us.length > 0
+				// 			? result.counted_from_us
+				// 			: [0]
+				// 		: []
+
+				// TableManager.calculateTableSummary(
+				// 	result.transfer_type === 'from_us'
+				// 		? 'from_us_exchange-table'
+				// 		: 'to_us_exchange-table',
+				// 	['amount'],
+				// 	{
+				// 		ids: result.transfer_type === 'from_us' ? counted_from_us : [],
+				// 	}
+				// )
 			} else if (result.type === 'edit') {
 				if (
 					result.old_transfer_type &&
@@ -686,13 +760,6 @@ const createExchangeFormHandler = action => {
 							lastRow.setAttribute('data-id', result.id)
 						}
 					}
-
-					TableManager.calculateTableSummary(
-						result.old_transfer_type === 'from_us'
-							? 'from_us_exchange-table'
-							: 'to_us_exchange-table',
-						['amount']
-					)
 				} else {
 					TableManager.updateTableRow(
 						result,
@@ -701,16 +768,71 @@ const createExchangeFormHandler = action => {
 							: 'to_us_exchange-table'
 					)
 				}
-			} else if (result.type === 'delete') {
-				const row = document.querySelector(
-					`#${tableId} tr[data-id="${result.id}"]`
-				)
-				if (row) row.remove()
+
+				// counted_from_us =
+				// 	result.transfer_type === 'from_us'
+				// 		? Array.isArray(result?.counted_from_us) &&
+				// 		  result.counted_from_us.length > 0
+				// 			? result.counted_from_us
+				// 			: [0]
+				// 		: []
+				// TableManager.calculateTableSummary(
+				// 	result.transfer_type === 'from_us'
+				// 		? 'from_us_exchange-table'
+				// 		: 'to_us_exchange-table',
+				// 	['amount'],
+				// 	{
+				// 		ids: result.transfer_type === 'from_us' ? counted_from_us : [],
+				// 	}
+				// )
+				// const counted_from_us_old =
+				// 	result.old_transfer_type === 'from_us'
+				// 		? Array.isArray(result?.counted_from_us) &&
+				// 		  result.counted_from_us.length > 0
+				// 			? result.counted_from_us
+				// 			: [0]
+				// 		: []
+				// TableManager.calculateTableSummary(
+				// 	result.old_transfer_type === 'from_us'
+				// 		? 'from_us_exchange-table'
+				// 		: 'to_us_exchange-table',
+				// 	['amount'],
+				// 	{
+				// 		ids:
+				// 			result.old_transfer_type === 'from_us' ? counted_from_us_old : [],
+				// 	}
+				// )
 			}
 
-			TableManager.calculateTableSummary(tableId, ['amount'])
+			let to_us_completed = result.to_us_completed || []
+			let from_us_completed = result.from_us_completed || []
 
-			highlightExchangeTotals()
+			const counted_from_us =
+				Array.isArray(result?.counted_from_us) &&
+				result.counted_from_us.length > 0
+					? result.counted_from_us
+					: [0]
+
+			const counted_to_us =
+				Array.isArray(result?.counted_to_us) && result.counted_to_us.length > 0
+					? result.counted_to_us
+					: [0]
+
+			const filteredFrom = counted_from_us.filter(
+				id => !from_us_completed.includes(id)
+			)
+
+			const filteredTo = counted_to_us.filter(
+				id => !to_us_completed.includes(id)
+			)
+
+			TableManager.calculateTableSummary('from_us_exchange-table', ['amount'], {
+				ids: filteredFrom && filteredFrom.length > 0 ? filteredFrom : [0],
+			})
+			TableManager.calculateTableSummary('to_us_exchange-table', ['amount'], {
+				ids: filteredTo,
+			})
+			highlightExchangeTotals(counted_from_us)
 		}
 	)
 }
@@ -1012,7 +1134,7 @@ const updateHiddenDebtorsCounter = () => {
 	}
 }
 
-function highlightExchangeTotals() {
+function highlightExchangeTotals(counted_from_us = []) {
 	const fromTable = document.getElementById('from_us_exchange-table')
 	const toTable = document.getElementById('to_us_exchange-table')
 
@@ -1066,7 +1188,7 @@ function highlightExchangeTotals() {
 
 	const fromUsSpan = totalsBlock.querySelector('span')
 	const toUsSpan = totalsBlock.querySelectorAll('span')[1]
-	const okButton = document.getElementById('exchange-summary-ok-button')
+	const okButton = document.getElementById('exchange-summary-button')
 
 	if (!fromUsSpan || !toUsSpan || !okButton) return
 
@@ -1079,6 +1201,8 @@ function highlightExchangeTotals() {
 	if (toUsValue < fromUsValue) {
 		toUsSpan.classList.add('text-red', 'text-bold')
 		okButton.disabled = true
+	} else if (toUsValue === 0 && fromUsValue === 0) {
+		okButton.disabled = true
 	} else if (toUsValue === fromUsValue) {
 		fromUsSpan.classList.add('text-green', 'text-bold')
 		toUsSpan.classList.add('text-green', 'text-bold')
@@ -1087,6 +1211,19 @@ function highlightExchangeTotals() {
 		toUsSpan.classList.add('text-green', 'text-bold')
 		okButton.disabled = false
 	}
+
+	const fromRows = document.querySelectorAll('#from_us_exchange-table tbody tr')
+	const countedIds = (
+		Array.isArray(counted_from_us) ? counted_from_us : []
+	).map(String)
+	fromRows.forEach(row => {
+		if (row.classList.contains('table__row--summary')) return
+		if (!countedIds.includes(row.getAttribute('data-id'))) {
+			row.classList.add('row-done--color')
+		} else {
+			row.classList.remove('row-done--color')
+		}
+	})
 }
 
 const hideDebtorRowIfNoDebt = (row, tableId, type) => {
@@ -1580,41 +1717,6 @@ function setupUserTypeBranchToggle() {
 	}
 
 	toggleBranch()
-}
-
-function selectOptionById(inputId, value) {
-	const input = document.getElementById(inputId)
-	if (!input) return
-	const select = input.closest('.select')
-	if (!select) return
-
-	const options = select.querySelectorAll('.select__option')
-	let found = false
-	options.forEach(option => {
-		if (option.dataset.value === value) {
-			options.forEach(opt => opt.classList.remove('selected'))
-			option.classList.add('selected')
-			input.value = value
-
-			const textSpan = select.querySelector('.select__text')
-			if (textSpan) {
-				textSpan.textContent = option.textContent.trim()
-				textSpan.classList.remove('select__placeholder')
-			}
-			select.classList.add('has-value')
-			found = true
-		}
-	})
-	if (!found) {
-		input.value = ''
-		const textSpan = select.querySelector('.select__text')
-		if (textSpan) {
-			textSpan.textContent = input.getAttribute('placeholder') || ''
-			textSpan.classList.add('select__placeholder')
-		}
-		select.classList.remove('has-value')
-	}
-	input.dispatchEvent(new Event('change'))
 }
 
 export class TablePaginator {
@@ -2566,15 +2668,6 @@ const handleSupplierAccounts = async () => {
 		collectionButton.addEventListener('click', async function (e) {
 			await collectionFormHandler.init(0)
 
-			// const supplierId = TableManager.getSelectedRowId(
-			// 	'suppliers-account-table'
-			// )
-			// const accountId = getSelectedAccountId('suppliers-account-table')
-			// if (supplierId && accountId && supplierId !== 'ИТОГО') {
-			// 	selectOptionById('source_supplier', supplierId)
-			// 	selectOptionById('source_account', accountId)
-			// }
-
 			setupSupplierAccountSelects()
 
 			setupCurrencyInput('amount')
@@ -2587,13 +2680,6 @@ const handleSupplierAccounts = async () => {
 	if (moneyTransfersButton && !moneyTransfersButton.dataset.listenerAdded) {
 		moneyTransfersButton.addEventListener('click', async function (e) {
 			await moneyTransfersFormHandler.init(0)
-
-			// const supplierId = TableManager.getSelectedRowId(
-			// 	'suppliers-account-table'
-			// )
-			// if (supplierId && supplierId !== 'ИТОГО') {
-			// 	selectOptionById('source_supplier', supplierId)
-			// }
 
 			setupMultipleSupplierAccountSelects([
 				{ supplierId: 'source_supplier', accountId: 'source_account' },
@@ -2756,12 +2842,49 @@ const handleMoneyTransfers = async config => {
 }
 
 const handleExchange = () => {
+	let to_us_completed
+	let from_us_completed
+
 	try {
 		const dataIdsData = document.getElementById('data-ids')?.textContent
 		if (dataIdsData) {
 			const dataIds = JSON.parse(dataIdsData)
 			setIds(dataIds.from_us, 'from_us_exchange-table')
 			setIds(dataIds.to_us, 'to_us_exchange-table')
+
+			to_us_completed = dataIds.to_us_completed || []
+			from_us_completed = dataIds.from_us_completed || []
+
+			const counted_from_us =
+				Array.isArray(dataIds?.counted_from_us) &&
+				dataIds.counted_from_us.length > 0
+					? dataIds.counted_from_us
+					: [0]
+
+			const counted_to_us =
+				Array.isArray(dataIds?.counted_to_us) &&
+				dataIds.counted_to_us.length > 0
+					? dataIds.counted_to_us
+					: [0]
+
+			const filteredFrom = counted_from_us.filter(
+				id => !from_us_completed.includes(id)
+			)
+
+			const filteredTo = counted_to_us.filter(
+				id => !to_us_completed.includes(id)
+			)
+
+			TableManager.calculateTableSummary('from_us_exchange-table', ['amount'], {
+				ids: filteredFrom && filteredFrom.length > 0 ? filteredFrom : [0],
+			})
+			TableManager.calculateTableSummary('to_us_exchange-table', ['amount'], {
+				ids: filteredTo,
+			})
+
+			highlightExchangeTotals(counted_from_us)
+
+			hideCompletedExchangeRows(from_us_completed, to_us_completed)
 		} else {
 			console.warn("Element with ID 'data-ids' not found or empty.")
 		}
@@ -2771,11 +2894,6 @@ const handleExchange = () => {
 			e
 		)
 	}
-
-	TableManager.calculateTableSummary('from_us_exchange-table', ['amount'])
-	TableManager.calculateTableSummary('to_us_exchange-table', ['amount'])
-
-	highlightExchangeTotals()
 
 	const addExchangeFormHandler = createExchangeFormHandler('add')
 	const editExchangeFormHandler = createExchangeFormHandler('edit')
@@ -2799,6 +2917,9 @@ const handleExchange = () => {
 			editExchangeFormHandler.tableId = 'to_us_exchange-table'
 			deleteExchangeFormHandler.tableId = 'to_us_exchange-table'
 		}
+
+		const tableRow = e.target.closest('tr')
+		const dataId = tableRow ? tableRow.dataset.id : null
 	})
 
 	const addButton = document.getElementById('add-button')
@@ -2808,15 +2929,6 @@ const handleExchange = () => {
 	if (addButton) {
 		addButton.addEventListener('click', async function (e) {
 			await addExchangeFormHandler.init(0)
-
-			const transferTypeInput = document.getElementById('transfer_type')
-			if (transferTypeInput) {
-				const transferTypeContainer =
-					transferTypeInput.closest('.modal-form__group')
-				transferTypeContainer.removeAttribute('hidden')
-
-				selectOptionById('transfer_type', transferType)
-			}
 
 			setupMultipleSupplierAccountSelects([
 				{ supplierId: 'source_supplier', accountId: 'source_account' },
@@ -2835,16 +2947,18 @@ const handleExchange = () => {
 			)
 
 			if (rowId) {
+				if (
+					(from_us_completed &&
+						from_us_completed.map(String).includes(String(rowId))) ||
+					(to_us_completed &&
+						to_us_completed.map(String).includes(String(rowId)))
+				) {
+					showError('Нельзя редактировать завершённый обмен!')
+					return
+				}
+
 				await editExchangeFormHandler.init(rowId)
 
-				const transferTypeInput = document.getElementById('transfer_type')
-				if (transferTypeInput) {
-					const transferTypeContainer =
-						transferTypeInput.closest('.modal-form__group')
-					transferTypeContainer.removeAttribute('hidden')
-
-					selectOptionById('transfer_type', transferType)
-				}
 				setupMultipleSupplierAccountSelects([
 					{ supplierId: 'source_supplier', accountId: 'source_account' },
 					{
@@ -2865,24 +2979,156 @@ const handleExchange = () => {
 			)
 
 			if (rowId) {
+				if (
+					(from_us_completed &&
+						from_us_completed.map(String).includes(String(rowId))) ||
+					(to_us_completed &&
+						to_us_completed.map(String).includes(String(rowId)))
+				) {
+					showError('Нельзя удалять завершённый обмен!')
+					return
+				}
+
 				showQuestion(
 					'Вы действительно хотите удалить запись?',
 					'Удаление',
 					async () => {
-						await TableManager.sendDeleteRequest(
+						const result = await TableManager.sendDeleteRequest(
 							rowId,
 							deleteExchangeFormHandler.config.submitUrl,
 							deleteExchangeFormHandler.tableId
 						)
-						TableManager.calculateTableSummary(
-							deleteExchangeFormHandler.tableId,
-							['amount']
-						)
+
+						if (result && result.status === 'success') {
+							let counted_from_us =
+								result.transfer_type === 'from_us'
+									? Array.isArray(result?.counted_from_us) &&
+									  result.counted_from_us.length > 0
+										? result.counted_from_us
+										: [0]
+									: []
+
+							TableManager.calculateTableSummary(
+								result.transfer_type === 'from_us'
+									? 'from_us_exchange-table'
+									: 'to_us_exchange-table',
+								['amount'],
+								{
+									ids:
+										result.transfer_type === 'from_us' ? counted_from_us : [],
+								}
+							)
+							let to_us_completed = result.to_us_completed || []
+							let from_us_completed = result.from_us_completed || []
+
+							const counted_to_us =
+								Array.isArray(result?.counted_to_us) &&
+								result.counted_to_us.length > 0
+									? result.counted_to_us
+									: [0]
+
+							const filteredFrom = counted_from_us.filter(
+								id => !from_us_completed.includes(id)
+							)
+
+							const filteredTo = counted_to_us.filter(
+								id => !to_us_completed.includes(id)
+							)
+
+							TableManager.calculateTableSummary(
+								'from_us_exchange-table',
+								['amount'],
+								{
+									ids:
+										filteredFrom && filteredFrom.length > 0
+											? filteredFrom
+											: [0],
+								}
+							)
+							TableManager.calculateTableSummary(
+								'to_us_exchange-table',
+								['amount'],
+								{
+									ids: filteredTo,
+								}
+							)
+
+							highlightExchangeTotals(counted_from_us)
+						}
 					}
 				)
 			} else {
 				showError('Выберите строку для удаления!')
 			}
+		})
+	}
+
+	const hideButton = document.getElementById('hide-button')
+	const showAllButton = document.getElementById('show-all-button')
+	const hideAllButton = document.getElementById('hide-all-button')
+
+	if (hideButton) {
+		hideButton.addEventListener('click', function () {
+			const tableId =
+				transferType === 'from_us'
+					? 'from_us_exchange-table'
+					: 'to_us_exchange-table'
+			const rowId = TableManager.getSelectedRowId(tableId)
+			if (rowId) {
+				toggleExchangeRowVisibility(rowId, tableId)
+			}
+		})
+	}
+
+	if (showAllButton) {
+		showAllButton.addEventListener('click', function () {
+			toggleAllExchangeRows(true, 'from_us_exchange-table', from_us_completed)
+			toggleAllExchangeRows(true, 'to_us_exchange-table', to_us_completed)
+		})
+	}
+
+	if (hideAllButton) {
+		hideAllButton.addEventListener('click', function () {
+			toggleAllExchangeRows(false, 'from_us_exchange-table', from_us_completed)
+			toggleAllExchangeRows(false, 'to_us_exchange-table', to_us_completed)
+		})
+	}
+
+	const exchangeSummaryButton = document.getElementById(
+		'exchange-summary-button'
+	)
+	if (exchangeSummaryButton) {
+		exchangeSummaryButton.addEventListener('click', async function () {
+			showQuestion(
+				'Вы действительно хотите завершить все переводы?',
+				'Завершение обмена',
+				async () => {
+					try {
+						const response = await fetch('/money_transfers/complete_all/', {
+							method: 'POST',
+							headers: {
+								'X-CSRFToken': getCSRFToken(),
+								'Content-Type': 'application/json',
+							},
+						})
+						if (!response.ok) {
+							const errorText = await response.json()
+							showError(errorText.message || 'Ошибка завершения переводов.')
+							return
+						}
+						const fromRows = document.querySelectorAll(
+							'#from_us_exchange-table tbody tr:not(.table__row--summary)'
+						)
+						const toRows = document.querySelectorAll(
+							'#to_us_exchange-table tbody tr:not(.table__row--summary)'
+						)
+						fromRows.forEach(row => row.classList.add('hidden-row'))
+						toRows.forEach(row => row.classList.add('hidden-row'))
+					} catch (e) {
+						showError('Ошибка завершения переводов.')
+					}
+				}
+			)
 		})
 	}
 }

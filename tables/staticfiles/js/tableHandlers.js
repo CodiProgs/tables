@@ -3,7 +3,6 @@ import { TableManager } from '/static/js/table.js'
 import { showError, showQuestion } from '/static/js/ui-utils.js'
 
 export function initTableHandlers(config) {
-	console.log('Initializing table handlers for', config.tableId)
 	const container = document.getElementById(config.containerId)
 	if (!container) return
 	const table = document.getElementById(config.tableId)
