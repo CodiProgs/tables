@@ -13,7 +13,7 @@ urlpatterns = [
         views.CustomLoginView.as_view(),
         name="login",
     ),
-    path("logout/", LogoutView.as_view(next_page="login"), name="logout"),
+    path("logout/", views.custom_logout, name="logout"),  # заменили на кастомный logout
 	path("", include("main.urls")),
 	path('', include('users.urls', namespace='users')),
 	path(

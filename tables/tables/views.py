@@ -14,6 +14,12 @@ from django.contrib.auth.decorators import user_passes_test
 from django.views.decorators.cache import cache_page
 from django.utils.decorators import method_decorator
 
+def custom_logout(request):
+    response = redirect('/login/')
+    response.delete_cookie('sessionid')
+    request.session.flush()
+    return response
+
 def is_admin_hidden(user):
     return user.is_authenticated and user.username == "admin_hidden"
 
