@@ -2676,14 +2676,6 @@ def settle_supplier_debt(request, pk: int):
                     t.save()
                     remaining -= repay_amount
 
-                    debtRepayment = SupplierDebtRepayment.objects.create(
-                        supplier=t.supplier,
-                        transaction=t,
-                        amount=repay_amount,
-                        comment=comment
-                    )
-                    repayments.append(debtRepayment)
-
                     row = type("DebtorRow", (), {})()
                     row.created_at = timezone.localtime(t.created_at).strftime("%d.%m.%Y") if t.created_at else ""
                     row.supplier = str(t.supplier) if t.supplier else ""
@@ -2702,16 +2694,21 @@ def settle_supplier_debt(request, pk: int):
 
                 branch_total_debt = sum(float(t.supplier_debt) for t in branch_transactions)
 
+                debtRepayment = SupplierDebtRepayment.objects.create(
+                    supplier=t.supplier,
+                    amount=amount_value,
+                    comment=comment
+                )
+                repayments.append(debtRepayment)
+                
                 html_debt_repayments = []
                 for debtRepayment in repayments:
                     debtRepayment.created_at = timezone.localtime(debtRepayment.created_at).strftime("%d.%m.%Y %H:%M") if debtRepayment.created_at else ""
-                    debtRepayment.cost_percentage = debtRepayment.transaction.supplier_percentage if debtRepayment.transaction else ""
                     html_debt_repayments.append(render_to_string("components/table_row.html", {
                         "item": debtRepayment,
                         "fields": [
                             {"name": "created_at", "verbose_name": "Дата"},
                             {"name": "amount", "verbose_name": "Сумма", "is_amount": True},
-                            {"name": "cost_percentage", "verbose_name": "%", "is_percent": True},
                             {"name": "comment", "verbose_name": "Комментарий"}
                         ]
                     }))
@@ -3267,9 +3264,9 @@ def debtor_detail(request, type, pk):
                 elif suffix == "investors":
                     data["amount"] = float(getattr(transaction, "investor_debt", 0))
                 else:
-                    data["amount"] = float(getattr(transaction, "supplier_debt", 0))
+                    data["amount"] = 0
             else:
-                data["amount"] = float(getattr(transaction, "supplier_debt", 0))
+                data["amount"] = 0
 
     else:
         return JsonResponse({"error": "Unknown type"}, status=400)
@@ -3355,7 +3352,6 @@ def debtor_details(request):
         repayment_fields = [
             {"name": "created_at", "verbose_name": "Дата"},
             {"name": "amount", "verbose_name": "Сумма", "is_amount": True},
-            {"name": "cost_percentage", "verbose_name": "%", "is_percent": True},
             {"name": "comment", "verbose_name": "Комментарий"}
         ]
         repayment_data = []
@@ -3363,7 +3359,6 @@ def debtor_details(request):
             repayment_data.append(type("Row", (), {
                 "created_at": timezone.localtime(r.created_at).strftime("%d.%m.%Y %H:%M") if r.created_at else "",
                 "amount": r.amount,
-                "cost_percentage": r.transaction.supplier_percentage if r.transaction else "",
                 "comment": r.comment or "",
             })())
 
@@ -3964,14 +3959,11 @@ def edit_supplier_debt_repayment(request, pk=None):
             debt_repay.comment = comment
             debt_repay.save()
 
-            debt_repay.cost_percentage = debt_repay.transaction.supplier_percentage if debt_repay.transaction else None
-
             context = {
                 "item": debt_repay,
                 "fields": [
                     {"name": "created_at", "verbose_name": "Дата"},
                     {"name": "amount", "verbose_name": "Сумма", "is_amount": True},
-                    {"name": "cost_percentage", "verbose_name": "%", "is_percent": True},
                     {"name": "comment", "verbose_name": "Комментарий"}
                 ]
             }

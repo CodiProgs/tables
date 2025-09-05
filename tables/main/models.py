@@ -515,14 +515,6 @@ class SupplierDebtRepayment(models.Model):
         verbose_name="Поставщик",
         related_name="debt_repayments"
     )
-    transaction = models.ForeignKey(
-        Transaction,
-        on_delete=models.SET_NULL,
-        verbose_name="Транзакция",
-        related_name="debt_repayments",
-        null=True,
-        blank=True
-    )
     amount = models.DecimalField(
         max_digits=12,
         decimal_places=2,
