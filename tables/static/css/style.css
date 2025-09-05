@@ -959,3 +959,8 @@ textarea::placeholder {
 	border-top: none;
 	background-color: var(--color-table-background);
 }
+
+.dropdown-divider {
+	height: 1px;
+	background-color: #e1e6eb;
+}

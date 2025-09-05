@@ -11,6 +11,8 @@
                 id="repayment-edit-button"
                 data-action="repayment-edit">Изменить</a>
             {% endif %}
+            <div class="dropdown-divider">
+            </div>
             <a class="dropdown-item context-action"
                id="hide-button"
                data-action="hide">Скрыть</a>
@@ -37,9 +39,11 @@
                                     type="button"
                                     aria-label="Подробнее">+</button>
                             <span class="debtors-office-list__title">{{ branch.branch }}</span>
+                            {% if branch.branch != "Филиал 1" %}
                             <span class="debtors-office-list__amount {% if branch.debt != 0 %}text-red{% else %}text-green{% endif %}">
                                 {{ branch.debt|floatformat:2 }}
                             </span>
+                            {% endif %}
                         </div>
                         <div class="debtors-office-list__details"
                              id="branch-{{ forloop.counter }}"></div>

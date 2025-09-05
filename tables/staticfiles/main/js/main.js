@@ -3316,11 +3316,15 @@ const handleDebtors = async () => {
 										} else {
 											setIds(data.data_ids, data.transactions_table_id)
 											setIds(data.repayment_ids, data.repayments_table_id)
-
-											TableManager.calculateTableSummary(
-												data.transactions_table_id,
-												['supplier_debt']
-											)
+											if (
+												data.transactions_table_id !==
+												'branch-transactions-Филиал_1'
+											) {
+												TableManager.calculateTableSummary(
+													data.transactions_table_id,
+													['supplier_debt']
+												)
+											}
 										}
 									}
 								}
@@ -3778,7 +3782,7 @@ const handleDebtors = async () => {
 						: {}),
 				},
 				result => {
-					if (result.html) {
+					if (result.html || result.html_debt_repayments) {
 						let tableId
 
 						switch (result.type) {
@@ -3791,10 +3795,35 @@ const handleDebtors = async () => {
 							case 'Поставщики':
 								tableId = `branch-transactions-${result.branch}`
 
-								TableManager.addTableRow(
-									{ html: result.html_debt_repayments },
-									`branch-repayments-${result.branch}`
-								)
+								if (Array.isArray(result.html_debt_repayments)) {
+									result.html_debt_repayments.forEach(html => {
+										TableManager.addTableRow(
+											{ html },
+											`branch-repayments-${result.branch}`
+										)
+									})
+								} else if (result.html_debt_repayments) {
+									TableManager.addTableRow(
+										{ html: result.html_debt_repayments },
+										`branch-repayments-${result.branch}`
+									)
+								}
+
+								if (Array.isArray(result.changed_html_rows)) {
+									const transactionsTable = document.getElementById(tableId)
+									if (transactionsTable) {
+										result.changed_html_rows.forEach((htmlRow, idx) => {
+											const id = result.changed_ids[idx]
+											TableManager.updateTableRow(
+												{ html: htmlRow, id },
+												tableId
+											)
+
+											const row = TableManager.getRowById(id, tableId)
+											TableManager.formatCurrencyValuesForRow(tableId, row)
+										})
+									}
+								}
 
 								const table = document.getElementById(
 									`branch-repayments-${result.branch}`
@@ -3892,7 +3921,8 @@ const handleDebtors = async () => {
 								? 'summary-header'
 								: 'branch-debts-header'
 						)
-						if (debtsHeader) {
+
+						if (debtsHeader && result.branch !== 'Филиал_1') {
 							const totalSpan = debtsHeader.querySelector('span.debtors-total')
 							if (totalSpan) {
 								let number = Number(
@@ -3919,13 +3949,17 @@ const handleDebtors = async () => {
 							}
 						}
 
-						TableManager.updateTableRow(result, tableId)
+						if (result.html) {
+							TableManager.updateTableRow(result, tableId)
+						}
 
 						if (result.type === 'Поставщики') {
-							TableManager.calculateTableSummary(
-								`branch-transactions-${result.branch}`,
-								['supplier_debt']
-							)
+							if (result.branch !== 'Филиал_1') {
+								TableManager.calculateTableSummary(
+									`branch-transactions-${result.branch}`,
+									['supplier_debt']
+								)
+							}
 						} else if (
 							result.type === 'Инвесторы' ||
 							result.type === 'investors' ||
@@ -3937,10 +3971,11 @@ const handleDebtors = async () => {
 
 						refreshData(tableId)
 
-						const row = TableManager.getRowById(result.id, tableId)
-						TableManager.formatCurrencyValuesForRow(tableId, row)
-
-						hideDebtorRowIfNoDebt(row, tableId, result.type)
+						if (result.id) {
+							const row = TableManager.getRowById(result.id, tableId)
+							TableManager.formatCurrencyValuesForRow(tableId, row)
+							hideDebtorRowIfNoDebt(row, tableId, result.type)
+						}
 
 						const table = document.getElementById(tableId)
 						if (table) {
@@ -3988,7 +4023,7 @@ const handleDebtors = async () => {
 								}
 							}
 
-							if (branchKey) {
+							if (branchKey && branchKey !== 'Филиал_1') {
 								const branchSpan = branchSpans.find(
 									span =>
 										span.textContent.trim() ===

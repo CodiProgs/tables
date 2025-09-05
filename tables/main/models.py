@@ -70,6 +70,10 @@ class Supplier(models.Model):
         default=True,
         verbose_name="Видим для ассистента"
     )
+    visible_in_summary = models.BooleanField(
+        default=True,
+        verbose_name="Виден в остатках"
+    )
 
     def __str__(self):
         return self.name

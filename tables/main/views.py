@@ -853,6 +853,7 @@ def get_supplier_fields():
         "user",
         "visible_for_assistant",
         "default_account",
+        "visible_in_summary"
     ]
     fields = get_model_fields(
         Supplier,
@@ -1132,7 +1133,7 @@ def transaction_list(request):
 @forbid_supplier
 @login_required
 def supplier_accounts(request):
-    suppliers = Supplier.objects.filter(visible_for_assistant=True).order_by('name')
+    suppliers = Supplier.objects.filter(visible_in_summary=True).order_by('name')
 
     bank_accounts = Account.objects.order_by('name')
 
@@ -1220,6 +1221,7 @@ def supplier_create(request):
             cost_percentage = clean_percentage(request.POST.get("cost_percentage"))
             account_ids = request.POST.get("account_ids")
             visible_for_assistant = request.POST.get("visible_for_assistant") == "on"
+            visible_in_summary = request.POST.get("visible_in_summary") == "on"
 
             username = request.POST.get("username")
             password = request.POST.get("password")
@@ -1237,6 +1239,7 @@ def supplier_create(request):
                 branch=branch,
                 cost_percentage=float(cost_percentage),
                 visible_for_assistant=visible_for_assistant,
+                visible_in_summary=visible_in_summary,
             )
 
             supplier.accounts.set(Account.objects.filter(id__in=account_ids.split(',')))
@@ -1295,6 +1298,7 @@ def supplier_edit(request, pk=None):
             cost_percentage = clean_percentage(request.POST.get("cost_percentage"))
             account_ids = request.POST.get("account_ids")
             visible_for_assistant = request.POST.get("visible_for_assistant") == "on"
+            visible_in_summary = request.POST.get("visible_in_summary") == "on"
 
             username = request.POST.get("username")
             password = request.POST.get("password")
@@ -1328,6 +1332,7 @@ def supplier_edit(request, pk=None):
             supplier.branch = branch
             supplier.cost_percentage = float(cost_percentage)
             supplier.visible_for_assistant = visible_for_assistant
+            supplier.visible_in_summary = visible_in_summary
             supplier.accounts.set(Account.objects.filter(id__in=account_ids.split(',')))
 
             from users.models import User, UserType
@@ -2568,7 +2573,7 @@ def debtors(request):
     branch_debts = defaultdict(float)
     for t in transactions:
         branch = t.supplier.branch if t.supplier and t.supplier.branch else None
-        if branch:
+        if branch and branch.name != "Филиал 1":
             branch_debts[branch.name] += float(getattr(t, 'supplier_debt', 0))
 
     branch_debts_list = [
@@ -2576,7 +2581,9 @@ def debtors(request):
         for branch in branches
     ]
 
-    total_branch_debts = sum(branch['debt'] for branch in branch_debts_list)
+    total_branch_debts = sum(
+        branch['debt'] for branch in branch_debts_list if branch['branch'] != "Филиал 1"
+    )
 
     total_bonuses = sum(float(t.bonus_debt) for t in transactions)
     total_remaining = sum(float(t.client_debt_paid) for t in transactions)
@@ -2608,7 +2615,7 @@ def debtors(request):
         summary = []
 
     total_summary_debts = sum(item['amount'] for item in summary)
-
+    
     context = {
         "is_admin": is_admin,
         "is_supplier": is_supplier,
@@ -2642,73 +2649,82 @@ def settle_supplier_debt(request, pk: int):
                 trans = get_object_or_404(Transaction, id=pk)
 
             if type_ == "branch":
-                if (amount_value > trans.supplier_debt):
-                    return JsonResponse({"status": "error", "message": "Сумма не может превышать долг поставщика"}, status=400)
+                branch = trans.supplier.branch
 
-                trans.returned_by_supplier += amount_value
-                trans.returned_date = timezone.now()
-                trans.save()
+                supplier_ids = Supplier.objects.filter(branch=branch).values_list('id', flat=True)
+                branch_transactions = Transaction.objects.filter(
+                    supplier_id__in=supplier_ids,
+                    paid_amount__gt=0
+                ).order_by('created_at')
+                branch_total_debt = sum(float(t.supplier_debt) for t in branch_transactions)
 
-                trans.refresh_from_db()
+                if amount_value > branch_total_debt:
+                    return JsonResponse({"status": "error", "message": "Сумма не может превышать долг филиала"}, status=400)
 
-                debtRepayment = SupplierDebtRepayment.objects.create(
-                    supplier=trans.supplier,
-                    transaction=trans,
-                    amount=amount_value,
-                    comment=comment
-                )
+                remaining = Decimal(str(amount_value))
+                repayments = []
+                changed_html_rows = []
+                changed_ids = []
 
-                branch = trans.supplier.branch if trans.supplier and trans.supplier.branch else None
-                branch_total_debt = 0
-                if branch:
-                    supplier_ids = Supplier.objects.filter(branch=branch).values_list('id', flat=True)
-                    branch_transactions = Transaction.objects.filter(
-                        supplier_id__in=supplier_ids,
-                        paid_amount__gt=0
+                for t in branch_transactions:
+                    debt = Decimal(str(t.supplier_debt))
+                    if debt <= 0 or remaining <= 0:
+                        continue
+                    repay_amount = min(debt, remaining)
+                    t.returned_by_supplier += repay_amount
+                    t.returned_date = timezone.now()
+                    t.save()
+                    remaining -= repay_amount
+
+                    debtRepayment = SupplierDebtRepayment.objects.create(
+                        supplier=t.supplier,
+                        transaction=t,
+                        amount=repay_amount,
+                        comment=comment
                     )
-                    branch_total_debt = sum(float(t.supplier_debt) for t in branch_transactions)
-                import math
-                row = type("DebtorRow", (), {})()
-                row.created_at = timezone.localtime(trans.created_at).strftime("%d.%m.%Y") if trans.created_at else ""
-                row.supplier = str(trans.supplier) if trans.supplier else ""
-                row.supplier_percentage = trans.supplier_percentage
+                    repayments.append(debtRepayment)
 
-                paid = trans.paid_amount or Decimal(0)
-                supplier_fee = Decimal(math.floor(float(trans.amount) * float(trans.supplier_percentage) / 100))
-
-                row.supplier_debt = paid - supplier_fee - trans.returned_by_supplier
-
-                fields = [
-                    {"name": "created_at", "verbose_name": "Дата"},
-                    {"name": "supplier", "verbose_name": "Поставщик"},
-                    {"name": "supplier_debt", "verbose_name": "Сумма", "is_amount": True},
-                    {"name": "supplier_percentage", "verbose_name": "%", "is_percent": True},
-                ]
-
-                html = render_to_string("components/table_row.html", {"item": row, "fields": fields})
-
-                debtRepayment.created_at = timezone.localtime(debtRepayment.created_at).strftime("%d.%m.%Y %H:%M") if debtRepayment.created_at else ""
-                debtRepayment.cost_percentage = debtRepayment.transaction.supplier_percentage if debtRepayment.transaction else ""
-
-                html_debt_repayments = render_to_string("components/table_row.html", {
-                    "item": debtRepayment,
-                    "fields": [
+                    row = type("DebtorRow", (), {})()
+                    row.created_at = timezone.localtime(t.created_at).strftime("%d.%m.%Y") if t.created_at else ""
+                    row.supplier = str(t.supplier) if t.supplier else ""
+                    row.supplier_percentage = t.supplier_percentage
+                    paid = t.paid_amount or Decimal(0)
+                    supplier_fee = Decimal(math.floor(float(t.amount) * float(t.supplier_percentage) / 100))
+                    row.supplier_debt = paid - supplier_fee - t.returned_by_supplier
+                    fields = [
                         {"name": "created_at", "verbose_name": "Дата"},
-                        {"name": "amount", "verbose_name": "Сумма", "is_amount": True},
-                        {"name": "cost_percentage", "verbose_name": "%", "is_percent": True},
-                        {"name": "comment", "verbose_name": "Комментарий"}
+                        {"name": "supplier", "verbose_name": "Поставщик"},
+                        {"name": "supplier_debt", "verbose_name": "Сумма", "is_amount": True},
+                        {"name": "supplier_percentage", "verbose_name": "%", "is_percent": True},
                     ]
-                })
+                    changed_html_rows.append(render_to_string("components/table_row.html", {"item": row, "fields": fields}))
+                    changed_ids.append(t.id)
 
-                transactions = Transaction.objects.filter(paid_amount__gt=0)
+                branch_total_debt = sum(float(t.supplier_debt) for t in branch_transactions)
+
+                html_debt_repayments = []
+                for debtRepayment in repayments:
+                    debtRepayment.created_at = timezone.localtime(debtRepayment.created_at).strftime("%d.%m.%Y %H:%M") if debtRepayment.created_at else ""
+                    debtRepayment.cost_percentage = debtRepayment.transaction.supplier_percentage if debtRepayment.transaction else ""
+                    html_debt_repayments.append(render_to_string("components/table_row.html", {
+                        "item": debtRepayment,
+                        "fields": [
+                            {"name": "created_at", "verbose_name": "Дата"},
+                            {"name": "amount", "verbose_name": "Сумма", "is_amount": True},
+                            {"name": "cost_percentage", "verbose_name": "%", "is_percent": True},
+                            {"name": "comment", "verbose_name": "Комментарий"}
+                        ]
+                    }))
+
+                transactions = Transaction.objects.filter(paid_amount__gt=0).exclude(supplier__branch__name="Филиал 1")
                 all_branches_total_debt = sum(float(t.supplier_debt) for t in transactions)
 
                 return JsonResponse({
-                    "html": html,
                     "html_debt_repayments": html_debt_repayments,
-                    "debt_repayment_id": debtRepayment.id,
-                    "id": trans.id,
-                    "branch": trans.supplier.branch.name.replace(" ", "_") if trans.supplier and trans.supplier.branch else None,
+                    "debt_repayment_ids": [r.id for r in repayments],
+                    "changed_html_rows": changed_html_rows,
+                    "changed_ids": changed_ids,
+                    "branch": branch.name.replace(" ", "_") if branch else None,
                     "total_debt": float(branch_total_debt) if branch else 0,
                     "type": "Поставщики",
                     "total_branch_debts": all_branches_total_debt,
@@ -3004,14 +3020,17 @@ def settle_supplier_debt(request, pk: int):
                 total_debtors = Decimal(0)
                 for branch in Supplier.objects.exclude(branch=None).values_list("branch__id", "branch__name").distinct():
                     branch_id, branch_name = branch
-                    branch_debt = sum(
-                        (t.supplier_debt or Decimal(0)) for t in Transaction.objects.filter(supplier__branch_id=branch_id)
-                    )
-                    debtors.append({"branch": branch_name, "amount": branch_debt})
-                    
-                    total_debtors += branch_debt
+                    if branch_name != "Филиал 1":
+                        branch_debt = sum(
+                            (t.supplier_debt or Decimal(0))
+                            for t in Transaction.objects.filter(supplier__branch_id=branch_id, paid_amount__gt=0)
+                        )
+                        debtors.append({"branch": branch_name, "amount": branch_debt})
+                        total_debtors += branch_debt
                 
-                safe_amount = SupplierAccount.objects.filter(account__name="Наличные").aggregate(total=Sum("balance"))["total"] or Decimal(0)
+                safe_amount = SupplierAccount.objects.filter(
+                    supplier__visible_in_summary=True
+                ).aggregate(total=Sum("balance"))["total"] or Decimal(0)
 
                 investors = list(Investor.objects.values("name", "balance"))
                 investors = [{"name": inv["name"], "amount": inv["balance"]} for inv in investors]
@@ -3033,7 +3052,7 @@ def settle_supplier_debt(request, pk: int):
                         "inventory": {"total": 0, "items": []},
                         "debtors": {"total": total_debtors, "items": debtors},
                         "cash": {"total": safe_amount + investors_total,
-                                "items": [{"name": "Сейф", "amount": safe_amount}] + investors},
+                                "items": [{"name": "Счета, Карты и Сейф", "amount": safe_amount}] + investors},
                     },
                     "assets": assets_total,
                     "liabilities": {
@@ -3314,7 +3333,7 @@ def debtor_details(request):
         transactions = (
             Transaction.objects
             .filter(supplier_id__in=supplier_ids, paid_amount__gt=0)
-            .select_related('supplier')
+            .select_related('supplier').order_by('created_at')
         )
 
         transaction_fields = [
@@ -3560,13 +3579,17 @@ def company_balance_stats(request):
     total_debtors = Decimal(0)
     for branch in Supplier.objects.exclude(branch=None).values_list("branch__id", "branch__name").distinct():
         branch_id, branch_name = branch
-        branch_debt = sum(
-            (t.supplier_debt or Decimal(0)) for t in Transaction.objects.filter(supplier__branch_id=branch_id, paid_amount__gt=0)
-        )
-        debtors.append({"branch": branch_name, "amount": branch_debt})
-        total_debtors += branch_debt
+        if branch_name != "Филиал 1":
+            branch_debt = sum(
+                (t.supplier_debt or Decimal(0))
+                for t in Transaction.objects.filter(supplier__branch_id=branch_id, paid_amount__gt=0)
+            )
+            debtors.append({"branch": branch_name, "amount": branch_debt})
+            total_debtors += branch_debt
 
-    safe_amount = SupplierAccount.objects.filter(account__name="Наличные").aggregate(total=Sum("balance"))["total"] or Decimal(0)
+    safe_amount = SupplierAccount.objects.filter(
+        supplier__visible_in_summary=True
+    ).aggregate(total=Sum("balance"))["total"] or Decimal(0)
 
     investors = list(Investor.objects.values("name", "initial_balance"))
     investors = [{"name": inv["name"], "amount": inv["initial_balance"]} for inv in investors]
@@ -3617,7 +3640,7 @@ def company_balance_stats(request):
             "inventory": {"total": 0, "items": []},
             "debtors": {"total": total_debtors, "items": debtors},
             "cash": {"total": safe_amount + investors_total,
-                     "items": [{"name": "Сейф", "amount": safe_amount}] + investors},
+                     "items": [{"name": "Счета, Карты и Сейф", "amount": safe_amount}] + investors},
         },
         "assets": assets_total,
         "liabilities": {
