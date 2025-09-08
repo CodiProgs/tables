@@ -1134,7 +1134,6 @@ def transaction_list(request):
 @login_required
 def supplier_accounts(request):
     suppliers = Supplier.objects.filter(visible_in_summary=True).order_by('name')
-
     bank_accounts = Account.objects.order_by('name')
 
     class SupplierAccountRow:
@@ -1143,42 +1142,43 @@ def supplier_accounts(request):
             self.supplier_id = supplier_id
 
     balances = {}
-
     supplier_accounts = SupplierAccount.objects.select_related('supplier', 'account').all()
     for sa in supplier_accounts:
         balances[(sa.supplier_id, sa.account_id)] = sa.balance
 
     rows = []
 
+    cash_account = Account.objects.filter(name__iexact="Наличные").first()
+
     account_totals = {account.id: 0 for account in bank_accounts}
     grand_total = 0
 
     for supplier in suppliers:
         row = SupplierAccountRow(supplier.name, supplier.id)
-
         total_balance = 0
 
         for account in bank_accounts:
             balance = balances.get((supplier.id, account.id), 0)
             setattr(row, f'account_{account.id}', format_currency(balance))
 
-            account_totals[account.id] += balance
+            if not cash_account or account.id != cash_account.id:
+                account_totals[account.id] += balance
 
             total_balance += balance
 
         grand_total += total_balance
-
         setattr(row, 'total_balance', format_currency(total_balance))
-
         rows.append(row)
 
-    total_row = SupplierAccountRow("ИТОГО", 0)
+    if cash_account:
+        account_totals[cash_account.id] = cash_account.balance
 
+    grand_total = sum(account_totals.values())
+
+    total_row = SupplierAccountRow("ИТОГО", 0)
     for account in bank_accounts:
         setattr(total_row, f'account_{account.id}', format_currency(account_totals[account.id]))
-
     setattr(total_row, 'total_balance', format_currency(grand_total))
-
     rows.append(total_row)
 
     supplier_fields = [
@@ -1197,9 +1197,11 @@ def supplier_accounts(request):
         "verbose_name": "Итого",
         "is_amount": True
     })
+
     is_admin = request.user.user_type.name == 'Администратор' if hasattr(request.user, 'user_type') else False
     supplier_ids = [supplier.id for supplier in suppliers]
     account_ids = [account.id for account in bank_accounts]
+
     context = {
         "fields": supplier_fields,
         "data": rows,
@@ -1856,7 +1858,7 @@ def money_transfer_collection(request):
             source_supplier_id = request.POST.get("supplier")
             source_account_id = request.POST.get("account")
             amount = clean_currency(request.POST.get("amount"))
-
+            
             if not all([source_supplier_id, source_account_id, amount]):
                 return JsonResponse(
                     {"status": "error", "message": "Все поля должны быть заполнены"},
@@ -1914,13 +1916,13 @@ def money_transfer_collection(request):
             cash_account.balance += amount_value
             cash_account.save()
 
-            cash_supplier_account, created = SupplierAccount.objects.get_or_create(
-                supplier=source_supplier,
-                account=cash_account,
-                defaults={'balance': 0}
-            )
-            cash_supplier_account.balance += amount_value
-            cash_supplier_account.save()
+            # cash_supplier_account, created = SupplierAccount.objects.get_or_create(
+            #     supplier=source_supplier,
+            #     account=cash_account,
+            #     defaults={'balance': 0}
+            # )
+            # cash_supplier_account.balance += amount_value
+            # cash_supplier_account.save()
 
             bank_accounts = Account.objects.order_by('name')
 
@@ -1930,14 +1932,24 @@ def money_transfer_collection(request):
                     self.supplier_id = supplier_id
 
             balances = {}
-            account_totals = {account.id: 0 for account in bank_accounts}
-            grand_total = 0
+            account_totals = {}
+            balances = {}
+            cash_account = Account.objects.filter(name__iexact="Наличные").first()
+
             all_supplier_accounts = SupplierAccount.objects.select_related('supplier', 'account').all()
+
+            for account in bank_accounts:
+                account_totals[account.id] = 0
 
             for sa in all_supplier_accounts:
                 balances[(sa.supplier_id, sa.account_id)] = sa.balance
-                account_totals[sa.account_id] += sa.balance
-                grand_total += sa.balance
+                if sa.account.name.lower() != "наличные":
+                    account_totals[sa.account_id] += sa.balance
+
+            if cash_account:
+                account_totals[cash_account.id] = cash_account.balance
+
+            grand_total = sum(account_totals.values())
 
             total_row = SupplierAccountRow("ИТОГО", 0)
 
@@ -2803,16 +2815,16 @@ def settle_supplier_debt(request, pk: int):
                 if not cash_account:
                     return JsonResponse({"status": "error", "message": 'Счет "Наличные" не найден'}, status=400)
 
-                supplier_account = SupplierAccount.objects.filter(
-                    supplier=trans.supplier,
-                    account=cash_account
-                ).first()
+                # supplier_account = SupplierAccount.objects.filter(
+                #     supplier=trans.supplier,
+                #     account=cash_account
+                # ).first()
 
-                if not supplier_account or supplier_account.balance < amount_value:
+                if not cash_account or cash_account.balance < amount_value:
                     return JsonResponse({"status": "error", "message": "Недостаточно средств на счете 'Наличные' у поставщика"}, status=400)
 
-                supplier_account.balance -= amount_value
-                supplier_account.save()
+                # supplier_account.balance -= amount_value
+                # supplier_account.save()
                 cash_account.balance -= amount_value
                 cash_account.save()
 

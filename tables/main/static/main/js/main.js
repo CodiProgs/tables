@@ -2300,6 +2300,7 @@ const collectionFormHandler = createFormHandler(
 					}
 				})
 			}
+			TableManager.formatCurrencyValuesForRow('suppliers-account-table', row)
 		}
 
 		if (result.total_html) {
