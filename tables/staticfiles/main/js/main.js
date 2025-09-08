@@ -34,6 +34,26 @@ const fetchData = async url => {
 	}
 }
 
+const formatAmountString = value => {
+	let num = Number(
+		String(value)
+			.replace(/\s/g, '')
+			.replace('р.', '')
+			.replace('р', '')
+			.replace(',', '.')
+	)
+	if (isNaN(num)) return value
+	let formatted = num.toLocaleString('ru-RU', {
+		minimumFractionDigits: 0,
+		maximumFractionDigits: 2,
+	})
+	formatted = formatted.replace(/,00$/, '')
+	if (!formatted.endsWith('р.') && !formatted.endsWith('р')) {
+		formatted += ' р.'
+	}
+	return formatted
+}
+
 const postData = async (url, data) => {
 	try {
 		const response = await fetch(url, {
@@ -456,6 +476,7 @@ const addMenuHandler = () => {
 	const paymentButton = document.getElementById('payment-button')
 	const hideButton = document.getElementById('hide-button')
 	const settleDebtButton = document.getElementById('settle-debt-button')
+	const settleDebtAllButton = document.getElementById('settle-debt-all-button')
 	const repaymentsEditButton = document.getElementById('repayment-edit-button')
 
 	function showMenu(x, y) {
@@ -518,6 +539,13 @@ const addMenuHandler = () => {
 						settleDebtButton.dataset.type = ''
 					}
 				}
+				if (settleDebtAllButton) {
+					if (table.id === 'summary-profit') {
+						settleDebtAllButton.style.display = 'block'
+					} else {
+						settleDebtAllButton.style.display = 'none'
+					}
+				}
 				if (repaymentsEditButton) {
 					if (table.id && table.id.startsWith('branch-repayments-')) {
 						repaymentsEditButton.style.display = 'block'
@@ -538,7 +566,8 @@ const addMenuHandler = () => {
 						if (
 							purposeCell &&
 							(purposeCell.textContent.trim() === 'Перевод' ||
-								purposeCell.textContent.trim() === 'Инкассация')
+								purposeCell.textContent.trim() === 'Инкассация' ||
+								purposeCell.textContent.trim() === 'Погашение долга поставщика')
 						) {
 							e.preventDefault()
 
@@ -561,6 +590,7 @@ const addMenuHandler = () => {
 				if (paymentButton) paymentButton.style.display = 'none'
 				if (hideButton) hideButton.style.display = 'none'
 				if (settleDebtButton) settleDebtButton.style.display = 'none'
+				if (settleDebtAllButton) settleDebtAllButton.style.display = 'none'
 				if (repaymentsEditButton) repaymentsEditButton.style.display = 'none'
 
 				showMenu(e.pageX, e.pageY)
@@ -1543,7 +1573,7 @@ function showChangedCellsRow(row, changedCells) {
 	}
 }
 
-const setupSupplierAccountSelects = () => {
+const setupSupplierAccountSelects = (isCollection = false) => {
 	const findSelectByInput = ident => {
 		const input =
 			document.querySelector(`#${ident}`) ||
@@ -1584,7 +1614,9 @@ const setupSupplierAccountSelects = () => {
 		SelectHandler.updateSelectOptions(accountSelect, [])
 
 		if (!supplierId) return
-		const url = `/accounts/list/?supplier_id=${encodeURIComponent(supplierId)}`
+		const url = `/accounts/list/?supplier_id=${encodeURIComponent(
+			supplierId
+		)}&is_collection=${isCollection}`
 		const data = await SelectHandler.fetchSelectOptions(url)
 
 		if (myToken !== loadToken) return
@@ -2256,6 +2288,77 @@ const createFormHandler = (
 	})
 }
 
+const settleDebtAllFormHandler = createFormHandler(
+	`${BASE_URL}${SUPPLIERS}/close_investor_debt/`,
+	'summary-profit',
+	'settle-debt-form',
+	`/suppliers/debtors/transactions.investors/`,
+	[
+		{
+			id: 'investor_select',
+			url: `${BASE_URL}investors/list/`,
+		},
+	],
+	{
+		url: '/components/main/settle-debt/',
+		title: 'Погасить все долги инвесторам',
+	},
+	async result => {
+		const table = document.getElementById('summary-profit')
+		if (!table) return
+
+		if (Array.isArray(result.closed)) {
+			result.closed.forEach(obj => {
+				const row = table.querySelector(`tr[data-id="${obj.id}"]`)
+				if (row) {
+					row.classList.add('hidden-row', 'row-done')
+				}
+			})
+		}
+
+		if (Array.isArray(result.changed_html_rows)) {
+			result.changed_html_rows.forEach(({ id, html }) => {
+				TableManager.updateTableRow({ html, id }, 'summary-profit')
+				const row = TableManager.getRowById(id, 'summary-profit')
+				TableManager.formatCurrencyValuesForRow('summary-profit', row)
+			})
+		}
+
+		if (result.html_investor_debt_operation) {
+			const tableOps = document.getElementById('investor-operations-table')
+			if (tableOps) {
+				const wrapper = document.createElement('tbody')
+				wrapper.innerHTML = result.html_investor_debt_operation
+				const newRow = wrapper.querySelector('tr')
+				if (newRow) {
+					tableOps.querySelector('tbody').appendChild(newRow)
+					TableManager.formatCurrencyValuesForRow(
+						'investor-operations-table',
+						newRow
+					)
+				}
+			}
+		}
+
+		if (result.html_investor_row && result.investor_id) {
+			const investorsTable = document.getElementById('investors-table')
+			if (investorsTable) {
+				TableManager.updateTableRow(
+					{ html: result.html_investor_row, id: result.investor_id },
+					'investors-table'
+				)
+				const investorRow = TableManager.getRowById(
+					result.investor_id,
+					'investors-table'
+				)
+				TableManager.formatCurrencyValuesForRow('investors-table', investorRow)
+
+				TableManager.calculateTableSummary('investors-table', ['balance'])
+			}
+		}
+	}
+)
+
 const paymentFormHandler = createFormHandler(
 	`${BASE_URL}${TRANSACTION}/payment/`,
 	mainConfig.tableId,
@@ -2371,6 +2474,24 @@ const collectionFormHandler = createFormHandler(
 				}
 			}
 		}
+
+		if (
+			result.cash_balance !== undefined &&
+			result.grand_total_with_cash !== undefined
+		) {
+			const cashBalanceDisplay = document.getElementById('cash-balance-display')
+			const grandTotalWithCashDisplay = document.getElementById(
+				'grand-total-with-cash-display'
+			)
+			if (cashBalanceDisplay) {
+				cashBalanceDisplay.textContent = formatAmountString(result.cash_balance)
+			}
+			if (grandTotalWithCashDisplay) {
+				grandTotalWithCashDisplay.textContent = formatAmountString(
+					result.grand_total_with_cash
+				)
+			}
+		}
 	}
 )
 
@@ -2404,6 +2525,24 @@ const moneyTransfersFormHandler = createFormHandler(
 					TableManager.init()
 					handleSupplierAccounts()
 				}
+			}
+		}
+
+		if (
+			result.cash_balance !== undefined &&
+			result.grand_total_with_cash !== undefined
+		) {
+			const cashBalanceDisplay = document.getElementById('cash-balance-display')
+			const grandTotalWithCashDisplay = document.getElementById(
+				'grand-total-with-cash-display'
+			)
+			if (cashBalanceDisplay) {
+				cashBalanceDisplay.textContent = formatAmountString(result.cash_balance)
+			}
+			if (grandTotalWithCashDisplay) {
+				grandTotalWithCashDisplay.textContent = formatAmountString(
+					result.grand_total_with_cash
+				)
 			}
 		}
 	}
@@ -2686,12 +2825,165 @@ const handleSupplierAccounts = async () => {
 		console.error('Error parsing account IDs data for actions column:', e)
 	}
 
+	try {
+		const summaryContainer = document.getElementById('summary-container')
+		if (summaryContainer) {
+			summaryContainer.innerHTML = '<div class="loader"></div>'
+			const response = await fetch('/money_logs/')
+			if (!response.ok) throw new Error('Ошибка загрузки логов')
+			const data = await response.json()
+			summaryContainer.innerHTML = data.html
+
+			TableManager.initTable('money-logs-table')
+
+			const table = document.getElementById('money-logs-table')
+			if (table) {
+				const headers = table.querySelectorAll('thead th')
+				let amountCol = -1
+				headers.forEach((th, idx) => {
+					if (th.dataset.name === 'amount') amountCol = idx
+				})
+				if (amountCol !== -1) {
+					const rows = table.querySelectorAll('tbody tr')
+					rows.forEach(row => {
+						const cells = row.querySelectorAll('td')
+						if (cells.length > amountCol) {
+							const cell = cells[amountCol]
+							let value = cell.textContent
+								.replace(/\s/g, '')
+								.replace('р.', '')
+								.replace('р', '')
+								.replace(',', '.')
+							let num = Number(value)
+							if (!isNaN(num)) {
+								if (num < 0) {
+									cell.classList.add('text-red')
+									cell.classList.remove('text-green')
+								} else {
+									cell.classList.add('text-green')
+									cell.classList.remove('text-red')
+								}
+							}
+						}
+					})
+				}
+			}
+
+			if (!document.getElementById('refresh-money-logs-btn')) {
+				const refreshBtn = document.createElement('button')
+				refreshBtn.id = 'refresh-money-logs-btn'
+				refreshBtn.className = 'refresh-money-logs-btn'
+				refreshBtn.title = 'Обновить'
+				refreshBtn.innerHTML = `<img src="/static/images/arrows-rotate.svg" alt="Обновить" height="16" width="16">`
+
+				refreshBtn.addEventListener('click', async () => {
+					refreshBtn.disabled = true
+					summaryContainer.innerHTML = '<div class="loader"></div>'
+					try {
+						const response = await fetch('/money_logs/')
+						if (!response.ok) throw new Error('Ошибка загрузки логов')
+						const data = await response.json()
+						summaryContainer.innerHTML = data.html
+						TableManager.initTable('money-logs-table')
+						summaryContainer.appendChild(refreshBtn)
+						const table = document.getElementById('money-logs-table')
+						if (table) {
+							const headers = table.querySelectorAll('thead th')
+							let amountCol = -1
+							headers.forEach((th, idx) => {
+								if (th.dataset.name === 'amount') amountCol = idx
+							})
+							if (amountCol !== -1) {
+								const rows = table.querySelectorAll('tbody tr')
+								rows.forEach(row => {
+									const cells = row.querySelectorAll('td')
+									if (cells.length > amountCol) {
+										const cell = cells[amountCol]
+										let value = cell.textContent
+											.replace(/\s/g, '')
+											.replace('р.', '')
+											.replace('р', '')
+											.replace(',', '.')
+										let num = Number(value)
+										if (!isNaN(num)) {
+											if (num < 0) {
+												cell.classList.add('text-red')
+												cell.classList.remove('text-green')
+											} else {
+												cell.classList.add('text-green')
+												cell.classList.remove('text-red')
+											}
+										}
+									}
+								})
+							}
+						}
+					} catch (e) {
+						summaryContainer.innerHTML =
+							'<div class="error">Ошибка загрузки логов</div>'
+					} finally {
+						refreshBtn.disabled = false
+					}
+				})
+
+				summaryContainer.appendChild(refreshBtn)
+			}
+		}
+	} catch (e) {
+		const summaryContainer = document.getElementById('summary-container')
+		if (summaryContainer) {
+			summaryContainer.innerHTML =
+				'<div class="error">Ошибка загрузки логов</div>'
+		}
+		console.error('Ошибка загрузки money_logs:', e)
+	}
+
+	const cashBalanceDisplay = document.getElementById('cash-balance-display')
+	const grandTotalWithCashDisplay = document.getElementById(
+		'grand-total-with-cash-display'
+	)
+
+	if (!cashBalanceDisplay && !grandTotalWithCashDisplay) {
+		try {
+			const cash_balance = document.getElementById('cash-balance')?.textContent
+			const grand_total_with_cash = document.getElementById(
+				'grand-total-with-cash'
+			)?.textContent
+			const table = document.getElementById('suppliers-account-table')
+			if (cash_balance && grand_total_with_cash && table) {
+				const cashBalance = JSON.parse(cash_balance)
+				const grandTotalWithCash = JSON.parse(grand_total_with_cash)
+
+				const summaryBlock = document.createElement('div')
+				summaryBlock.className = 'account-summary-block'
+				summaryBlock.innerHTML = `
+            <div class="account-summary-row">
+                <span class="account-summary-label">Наличные:</span>
+                <span class="account-summary-value" id="cash-balance-display"
+				>${formatAmountString(cashBalance)}</span>
+            </div>
+            <div class="account-summary-row">
+                <span class="account-summary-label">Итого:</span>
+                <span class="account-summary-value" id="grand-total-with-cash-display"
+				>${formatAmountString(grandTotalWithCash)}</span>
+            </div>
+        `
+
+				table.parentNode.insertBefore(summaryBlock, table.nextSibling)
+			} else {
+				console.warn("Element with ID 'account-ids' not found or empty.")
+			}
+		} catch (e) {
+			console.error('Error parsing account IDs data for actions column:', e)
+		}
+	}
+
 	const collectionButton = document.getElementById('collection-button')
 	if (collectionButton && !collectionButton.dataset.listenerAdded) {
 		collectionButton.addEventListener('click', async function (e) {
 			await collectionFormHandler.init(0)
 
-			setupSupplierAccountSelects()
+			setupSupplierAccountSelects(true)
 
 			setupCurrencyInput('amount')
 
@@ -4174,8 +4466,8 @@ const handleDebtors = async () => {
 					}
 				}
 			)
-
 			await settleDebtFormHandler.init(currentRowId)
+
 			setupCurrencyInput('amount')
 
 			if (type === 'initial') {
@@ -4184,6 +4476,25 @@ const handleDebtors = async () => {
 					const container = operation_type.closest('.modal-form__group')
 
 					container.setAttribute('hidden', 'true')
+				}
+			}
+
+			if (type === 'transactions.investors') {
+				const investorSelectInput = document.getElementById('investor_select')
+				if (investorSelectInput) {
+					const select = investorSelectInput.closest('.select')
+					const dropdown = select.querySelector('.select__dropdown')
+					const firstOption = dropdown.querySelector('.select__option')
+					const selectText = select.querySelector('.select__text')
+
+					if (firstOption) {
+						investorSelectInput.value = firstOption.dataset.value
+						selectText.textContent = firstOption.textContent
+						selectText.classList.remove('select__placeholder')
+						select.classList.add('has-value')
+						const event = new Event('change', { bubbles: true })
+						investorSelectInput.dispatchEvent(event)
+					}
 				}
 			}
 
@@ -4229,6 +4540,56 @@ const handleDebtors = async () => {
 					typeInput.value = type
 				}
 			}
+		})
+	}
+
+	const settleDebtAllButton = document.getElementById('settle-debt-all-button')
+	if (settleDebtAllButton) {
+		settleDebtAllButton.addEventListener('click', async function (e) {
+			e.preventDefault()
+
+			await settleDebtAllFormHandler.init(-1)
+
+			setupCurrencyInput('amount')
+
+			const table = document.getElementById('summary-profit')
+			const rows = table.querySelectorAll('tbody tr[data-id]')
+			const ids = Array.from(rows).map(row => row.getAttribute('data-id'))
+
+			const investorSelectInput = document.getElementById('investor_select')
+			if (investorSelectInput) {
+				const modalFormGroup = investorSelectInput.closest('.modal-form__group')
+				if (modalFormGroup) {
+					modalFormGroup.removeAttribute('hidden')
+				}
+
+				const select = investorSelectInput.closest('.select')
+				const dropdown = select.querySelector('.select__dropdown')
+				const firstOption = dropdown.querySelector('.select__option')
+				const selectText = select.querySelector('.select__text')
+
+				if (firstOption) {
+					investorSelectInput.value = firstOption.dataset.value
+					selectText.textContent = firstOption.textContent
+					selectText.classList.remove('select__placeholder')
+					select.classList.add('has-value')
+					const event = new Event('change', { bubbles: true })
+					investorSelectInput.dispatchEvent(event)
+				}
+			}
+
+			const settleDebtForm = document.getElementById('settle-debt-form')
+			if (!settleDebtForm) return
+
+			let idsInput = settleDebtForm.querySelector('#settle-debt-all-ids')
+			if (!idsInput) {
+				idsInput = document.createElement('input')
+				idsInput.type = 'hidden'
+				idsInput.id = 'settle-debt-all-ids'
+				idsInput.name = 'ids'
+				settleDebtForm.appendChild(idsInput)
+			}
+			idsInput.value = JSON.stringify(ids)
 		})
 	}
 

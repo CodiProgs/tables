@@ -81,4 +81,6 @@ urlpatterns = [
     path("users/types/", views.user_types, name="user_types"),
     path("investors/list/", views.investor_list, name="investor_list"),
     path('exchange/', views.exchange, name='exchange'),
+    path('money_logs/', views.money_logs, name='money_logs'),
+    path('suppliers/close_investor_debt/<pk>/', views.close_investor_debt, name='close_investor_debt'),
 ]

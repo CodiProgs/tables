@@ -1130,7 +1130,7 @@ def transaction_list(request):
 @login_required
 def supplier_accounts(request):
     suppliers = Supplier.objects.filter(visible_in_summary=True).order_by('name')
-    bank_accounts = Account.objects.order_by('name')
+    bank_accounts = Account.objects.exclude(name__iexact="Наличные").order_by('name')  # исключаем "Наличные"
 
     class SupplierAccountRow:
         def __init__(self, supplier_name, supplier_id):
@@ -1138,40 +1138,29 @@ def supplier_accounts(request):
             self.supplier_id = supplier_id
 
     balances = {}
-    supplier_accounts = SupplierAccount.objects.select_related('supplier', 'account').all()
-    for sa in supplier_accounts:
+    supplier_accounts_qs = SupplierAccount.objects.select_related('supplier', 'account').all()
+    for sa in supplier_accounts_qs:
         balances[(sa.supplier_id, sa.account_id)] = sa.balance
 
     rows = []
-
-    cash_account = Account.objects.filter(name__iexact="Наличные").first()
-
     account_totals = {account.id: 0 for account in bank_accounts}
     grand_total = 0
 
     for supplier in suppliers:
         row = SupplierAccountRow(supplier.name, supplier.id)
         total_balance = 0
-
         for account in bank_accounts:
             balance = balances.get((supplier.id, account.id), 0)
             setattr(row, f'account_{account.id}', format_currency(balance))
-
-            if not cash_account or account.id != cash_account.id:
-                account_totals[account.id] += balance
-
+            account_totals[account.id] += balance
             total_balance += balance
-
         grand_total += total_balance
         setattr(row, 'total_balance', format_currency(total_balance))
         rows.append(row)
 
-    if cash_account:
-        account_totals[cash_account.id] = cash_account.balance
-
     grand_total = sum(account_totals.values())
 
-    total_row = SupplierAccountRow("ИТОГО", 0)
+    total_row = SupplierAccountRow("ВСЕГО", 0)
     for account in bank_accounts:
         setattr(total_row, f'account_{account.id}', format_currency(account_totals[account.id]))
     setattr(total_row, 'total_balance', format_currency(grand_total))
@@ -1180,14 +1169,12 @@ def supplier_accounts(request):
     supplier_fields = [
         {"name": "supplier", "verbose_name": "Поставщик"}
     ]
-
     for account in bank_accounts:
         supplier_fields.append({
             "name": f"account_{account.id}",
             "verbose_name": account.name,
             "is_amount": True
         })
-
     supplier_fields.append({
         "name": "total_balance",
         "verbose_name": "Итого",
@@ -1198,13 +1185,20 @@ def supplier_accounts(request):
     supplier_ids = [supplier.id for supplier in suppliers]
     account_ids = [account.id for account in bank_accounts]
 
+    cash_account = Account.objects.filter(name__iexact="Наличные").first()
+    cash_balance = cash_account.balance if cash_account else 0
+
+    grand_total_with_cash = grand_total + cash_balance
+
     context = {
         "fields": supplier_fields,
         "data": rows,
         "is_grouped": {"accounts-table": True},
         "is_admin": is_admin,
         "supplier_ids": supplier_ids,
-        "account_ids": account_ids
+        "account_ids": account_ids,
+        "cash_balance": format_currency(cash_balance),
+        "grand_total_with_cash": format_currency(grand_total_with_cash),
     }
     return render(request, "main/supplierAccount.html", context)
 
@@ -1693,22 +1687,29 @@ def cash_flow_delete(request, pk=None):
             })
     except Exception as e:
         return JsonResponse({"status": "error", "message": str(e)}, status=400)
-
+    
 @forbid_supplier
 @login_required
 def account_list(request):
     supplier_id = request.GET.get('supplier_id')
+    is_collection = request.GET.get('is_collection') == 'true'
     accounts = Account.objects.all()
-
-    if supplier_id:
+    
+    if supplier_id and is_collection:
+        try:
+            supplier = Supplier.objects.get(id=supplier_id)
+            accounts = supplier.accounts.filter(account_type__name="Банковская карта")
+        except Supplier.DoesNotExist:
+            accounts = Account.objects.none()
+    elif supplier_id:
         try:
             supplier = Supplier.objects.get(id=supplier_id)
             accounts = supplier.accounts.all()
         except Supplier.DoesNotExist:
             accounts = Account.objects.none()
+    elif is_collection:
+        accounts = accounts.filter(account_type__name="Банковская карта")
 
-    # is_collection = request.GET.get('collection') == 'true'
-    # if is_collection:
     accounts = accounts.exclude(name="Наличные")
 
     account_data = [
@@ -1728,7 +1729,7 @@ def payment_purpose_list(request):
     else:
         payment_purpose_data = [
             {"id": acc.id, "name": acc.name}
-            for acc in PaymentPurpose.objects.all().exclude(name="Оплата").exclude(name="Перевод").exclude(name="Инкассация").order_by('operation_type', 'name')
+            for acc in PaymentPurpose.objects.all().exclude(name="Оплата").exclude(name="Перевод").exclude(name="Инкассация").exclude(name="Погашение долга поставщика").order_by('operation_type', 'name')
         ]
     return JsonResponse(payment_purpose_data, safe=False)
 
@@ -1741,6 +1742,7 @@ def payment_purpose_types(request):
         .exclude(name="Оплата")
         .exclude(name="Перевод")
         .exclude(name="Инкассация")
+        .exclude(name="Погашение долга поставщика")
         .order_by('operation_type', 'name')
         .values('id', 'operation_type')
     )
@@ -1921,14 +1923,6 @@ def money_transfer_collection(request):
             cash_account.balance += amount_value
             cash_account.save()
 
-            # cash_supplier_account, created = SupplierAccount.objects.get_or_create(
-            #     supplier=source_supplier,
-            #     account=cash_account,
-            #     defaults={'balance': 0}
-            # )
-            # cash_supplier_account.balance += amount_value
-            # cash_supplier_account.save()
-
             collection_purpose = PaymentPurpose.objects.filter(name="Инкассация").first()
             if not collection_purpose:
                 collection_purpose = PaymentPurpose.objects.create(
@@ -1943,7 +1937,7 @@ def money_transfer_collection(request):
                 comment=f"Инкассация: перевод на счет 'Наличные'"
             )
 
-            bank_accounts = Account.objects.order_by('name')
+            bank_accounts = Account.objects.exclude(name__iexact="Наличные").order_by('name')
             suppliers = Supplier.objects.filter(visible_in_summary=True).order_by('name')
 
             class SupplierAccountRow:
@@ -1952,50 +1946,42 @@ def money_transfer_collection(request):
                     self.supplier_id = supplier_id
 
             balances = {}
-            account_totals = {account.id: 0 for account in bank_accounts}
-            cash_account = Account.objects.filter(name__iexact="Наличные").first()
-
-            all_supplier_accounts = SupplierAccount.objects.select_related('supplier', 'account').all()
-            for sa in all_supplier_accounts:
+            supplier_accounts_qs = SupplierAccount.objects.select_related('supplier', 'account').all()
+            for sa in supplier_accounts_qs:
                 balances[(sa.supplier_id, sa.account_id)] = sa.balance
 
+            rows = []
+            account_totals = {account.id: 0 for account in bank_accounts}
+            grand_total = 0
+
             for supplier in suppliers:
+                row = SupplierAccountRow(supplier.name, supplier.id)
+                total_balance = 0
                 for account in bank_accounts:
                     balance = balances.get((supplier.id, account.id), 0)
-                    if not cash_account or account.id != cash_account.id:
-                        account_totals[account.id] += balance
-
-            if cash_account:
-                account_totals[cash_account.id] = cash_account.balance
+                    setattr(row, f'account_{account.id}', format_currency(balance))
+                    account_totals[account.id] += balance
+                    total_balance += balance
+                grand_total += total_balance
+                setattr(row, 'total_balance', format_currency(total_balance))
+                rows.append(row)
 
             grand_total = sum(account_totals.values())
 
-            total_row = SupplierAccountRow("ИТОГО", 0)
+            total_row = SupplierAccountRow("ВСЕГО", 0)
             for account in bank_accounts:
                 setattr(total_row, f'account_{account.id}', format_currency(account_totals[account.id]))
             setattr(total_row, 'total_balance', format_currency(grand_total))
 
-            row = SupplierAccountRow(source_supplier.name, source_supplier.id)
-
-            supplier_total_balance = 0
-            for account in bank_accounts:
-                balance = balances.get((source_supplier.id, account.id), 0)
-                setattr(row, f'account_{account.id}', format_currency(balance))
-                supplier_total_balance += balance
-
-            setattr(row, 'total_balance', format_currency(supplier_total_balance))
-
             supplier_fields = [
                 {"name": "supplier", "verbose_name": "Поставщик"}
             ]
-
             for account in bank_accounts:
                 supplier_fields.append({
                     "name": f"account_{account.id}",
                     "verbose_name": account.name,
                     "is_amount": True
                 })
-
             supplier_fields.append({
                 "name": "total_balance",
                 "verbose_name": "Итого",
@@ -2012,12 +1998,19 @@ def money_transfer_collection(request):
                 "fields": supplier_fields
             }
 
+            cash_account = Account.objects.filter(name__iexact="Наличные").first()
+            cash_balance = cash_account.balance if cash_account else 0
+
+            grand_total_with_cash = grand_total + cash_balance
+
             return JsonResponse({
                 "html": render_to_string("components/table_row.html", context_row),
                 "total_html": render_to_string("components/table_row.html", context_total),
                 "id": source_supplier.id,
                 "status": "success",
-                "message": f"Инкассация на сумму {amount_value} р. успешно выполнена"
+                "message": f"Инкассация на сумму {amount_value} р. успешно выполнена",
+                "cash_balance": format_currency(cash_balance),
+                "grand_total_with_cash": format_currency(grand_total_with_cash),
             })
     except Exception as e:
         return JsonResponse({"status": "error", "message": str(e)}, status=400)
@@ -2212,7 +2205,7 @@ def money_transfer_create(request):
             )
 
             suppliers = Supplier.objects.filter(visible_in_summary=True).order_by('name')
-            bank_accounts = Account.objects.order_by('name')
+            bank_accounts = Account.objects.exclude(name__iexact="Наличные").order_by('name')  # исключаем "Наличные"
 
             class SupplierAccountRow:
                 def __init__(self, supplier_name, supplier_id):
@@ -2228,27 +2221,21 @@ def money_transfer_create(request):
             account_totals = {account.id: 0 for account in bank_accounts}
             grand_total = 0
 
-            cash_account = Account.objects.filter(name__iexact="Наличные").first()
-
             for supplier in suppliers:
                 row = SupplierAccountRow(supplier.name, supplier.id)
                 total_balance = 0
                 for account in bank_accounts:
                     balance = balances.get((supplier.id, account.id), 0)
                     setattr(row, f'account_{account.id}', format_currency(balance))
-                    if not cash_account or account.id != cash_account.id:
-                        account_totals[account.id] += balance
+                    account_totals[account.id] += balance
                     total_balance += balance
                 grand_total += total_balance
                 setattr(row, 'total_balance', format_currency(total_balance))
                 rows.append(row)
 
-            if cash_account:
-                account_totals[cash_account.id] = cash_account.balance
-
             grand_total = sum(account_totals.values())
 
-            total_row = SupplierAccountRow("ИТОГО", 0)
+            total_row = SupplierAccountRow("ВСЕГО", 0)
             for account in bank_accounts:
                 setattr(total_row, f'account_{account.id}', format_currency(account_totals[account.id]))
             setattr(total_row, 'total_balance', format_currency(grand_total))
@@ -2311,7 +2298,12 @@ def money_transfer_create(request):
             to_us_transfers = list(
                 MoneyTransfer.objects.filter(transfer_type="to_us")
             )
+            
+            cash_account = Account.objects.filter(name__iexact="Наличные").first()
+            cash_balance = cash_account.balance if cash_account else 0
 
+            grand_total_with_cash = grand_total + cash_balance
+            
             return JsonResponse({
                 "html": render_to_string("components/table_row.html", context),
                 "id": money_transfer.id,
@@ -2324,6 +2316,8 @@ def money_transfer_create(request):
                 "counted_to_us": [t.id for t in to_us_transfers if not t.is_completed],
                 "from_us_completed": [t.id for t in from_us_transfers if t.is_completed],
                 "to_us_completed": [t.id for t in to_us_transfers if t.is_completed],
+                "cash_balance": format_currency(cash_balance),
+                "grand_total_with_cash": format_currency(grand_total_with_cash),
             })
     except Exception as e:
         return JsonResponse({"status": "error", "message": str(e)}, status=400)
@@ -2789,6 +2783,25 @@ def settle_supplier_debt(request, pk: int):
 
                 branch_total_debt = sum(float(t.supplier_debt) for t in branch_transactions)
 
+                cash_account = Account.objects.filter(name__iexact="Наличные").first()
+                if cash_account:
+                    cash_account.balance += amount_value
+                    cash_account.save()
+
+                    # repayment_purpose = PaymentPurpose.objects.filter(name="Погашение долга поставщика").first()
+                    # if not repayment_purpose:
+                    #     repayment_purpose = PaymentPurpose.objects.create(
+                    #         name="Погашение долга поставщика",
+                    #         operation_type=PaymentPurpose.INCOME
+                    #     )
+                    # CashFlow.objects.create(
+                    #     account=cash_account,
+                    #     amount=amount_value,
+                    #     purpose=repayment_purpose,
+                    #     supplier=t.supplier,
+                    #     comment=f"Погашение долга филиала {branch.name}"
+                    # )
+
                 debtRepayment = SupplierDebtRepayment.objects.create(
                     supplier=t.supplier,
                     amount=amount_value,
@@ -2904,7 +2917,7 @@ def settle_supplier_debt(request, pk: int):
                 # ).first()
 
                 if not cash_account or cash_account.balance < amount_value:
-                    return JsonResponse({"status": "error", "message": "Недостаточно средств на счете 'Наличные' у поставщика"}, status=400)
+                    return JsonResponse({"status": "error", "message": "Недостаточно средств на счете 'Наличные'"}, status=400)
 
                 # supplier_account.balance -= amount_value
                 # supplier_account.save()
@@ -3328,6 +3341,7 @@ def debtor_detail(request, type, pk):
         cf_id = pk.replace("cf-", "")
         cashflow = get_object_or_404(CashFlow, id=cf_id)
         data = model_to_dict(cashflow)
+
         data['amount'] = float(cashflow.amount - (cashflow.returned_to_investor or 0))
         return JsonResponse({"data": data})
 
@@ -3337,6 +3351,7 @@ def debtor_detail(request, type, pk):
         "short_term_liabilities": "Краткосрочные обязательства",
     }
     type = type_map.get(type, type)
+    
     if type in ["Оборудование", "Кредит", "Краткосрочные обязательства"]:
         obj = BalanceData.objects.filter(name=type).order_by('-created_at').first()
         if not obj:
@@ -3354,8 +3369,27 @@ def debtor_detail(request, type, pk):
         if type == "initial" and obj.initial_balance != 0:
             data["amount"] = float(getattr(obj, "initial_balance", 0))
     elif type.startswith("transactions"):
-        if pk == -1:
-            return JsonResponse({"error": "ID транзакции не указан"}, status=400)
+        try:
+            pk_int = int(pk)
+        except (ValueError, TypeError):
+            pk_int = None
+        if pk_int == -1:
+            transactions = [
+                t for t in Transaction.objects.filter(paid_amount__gt=0)
+                if getattr(t, 'bonus_debt', 0) == 0
+                and getattr(t, 'client_debt', 0) == 0
+                and t.amount == t.paid_amount
+            ]
+            
+            total_investor_debt = sum(float(getattr(t, 'investor_debt', 0) or 0) for t in transactions)
+            
+            cashflows = CashFlow.objects.filter(
+                purpose__operation_type=PaymentPurpose.INCOME
+            ).exclude(purpose__name="Оплата")
+            total_cashflow_income = sum(float(cf.amount - (cf.returned_to_investor or 0)) for cf in cashflows if cf.amount > 0)
+            data = {}
+            data["amount"] = total_investor_debt + total_cashflow_income
+            return JsonResponse({"data": data})
         transaction = get_object_or_404(Transaction, id=pk)
         data = model_to_dict(transaction)
         if "amount" in data:
@@ -3548,8 +3582,10 @@ def debtor_details(request):
             ]
 
             cashflows = CashFlow.objects.filter(
-                purpose__operation_type=PaymentPurpose.INCOME
+                purpose__operation_type=PaymentPurpose.INCOME,
             ).exclude(purpose__name="Оплата")
+
+            cashflows = [cf for cf in cashflows if (cf.amount - (cf.returned_to_investor or 0)) > 0]
 
             class TransactionRow:
                 def __init__(self, created_at, client, amount, profit, id, returned_to_investor=0):
@@ -3563,8 +3599,8 @@ def debtor_details(request):
             for cf in cashflows:
                 transactions.append(TransactionRow(
                     created_at=cf.created_at,
-                    client=None,
-                    amount=None,
+                    client=cf.purpose.name if cf.purpose else "",
+                    amount=cf.amount,
                     profit=cf.amount,
                     id=f"cf-{cf.id}",
                     returned_to_investor=cf.returned_to_investor if cf.returned_to_investor is not None else 0
@@ -4142,6 +4178,214 @@ def complete_all_unfinished_transfers(request):
                 "status": "success",
                 "message": f"Завершено {count} переводов",
                 "completed_count": count,
+            })
+    except Exception as e:
+        return JsonResponse({"status": "error", "message": str(e)}, status=400)
+
+
+@forbid_supplier
+@login_required
+def money_logs(request):
+    transactions = Transaction.objects.select_related('client', 'supplier', 'account').all()
+    cash_flows = CashFlow.objects.select_related('account', 'supplier', 'purpose', 'transaction').all()
+    # money_transfers = MoneyTransfer.objects.select_related('source_account', 'destination_account', 'source_supplier', 'destination_supplier').all()
+    debt_repayments = SupplierDebtRepayment.objects.select_related('supplier').all()
+    investor_ops = InvestorDebtOperation.objects.select_related('investor').all()
+
+    class LogRow:
+        def __init__(self, dt, type, info, amount, comment=""):
+            self.dt = dt  
+            self.date = timezone.localtime(dt).strftime("%d.%m.%Y %H:%M")
+            self.type = type
+            self.info = info
+            self.amount = amount
+            self.comment = comment
+
+    rows = []
+
+    for t in transactions:
+        rows.append(LogRow(
+            dt=t.created_at,
+            type="Транзакция",
+            info=f"Клиент: {t.client}, Поставщик: {t.supplier}, Счет: {t.account}",
+            amount=t.amount,
+            comment=""
+        ))
+
+    for cf in cash_flows:
+        rows.append(LogRow(
+            dt=cf.created_at,
+            type="Движение ДС",
+            info=f"Счет: {cf.account}, Поставщик: {cf.supplier}, Назначение: {cf.purpose}",
+            amount=cf.amount,
+            comment=cf.comment or ""
+        ))
+
+    # for mt in money_transfers:
+    #     rows.append(LogRow(
+    #         dt=mt.created_at,
+    #         type="Перевод",
+    #         info=f"От: {mt.source_supplier} ({mt.source_account}) → Кому: {mt.destination_supplier} ({mt.destination_account})",
+    #         amount=mt.amount,
+    #         comment=""
+    #     ))
+
+    for dr in debt_repayments:
+        rows.append(LogRow(
+            dt=dr.created_at,
+            type="Погашение долга",
+            info=f"Поставщик: {dr.supplier}",
+            amount=dr.amount,
+            comment=dr.comment or ""
+        ))
+
+    for io in investor_ops:
+        rows.append(LogRow(
+            dt=io.created_at,
+            type=f"Инвестор: {io.get_operation_type_display()}",
+            info=f"Инвестор: {io.investor}",
+            amount=io.amount,
+            comment=""
+        ))
+
+    rows.sort(key=lambda x: x.dt, reverse=True)
+
+    fields = [
+        {"name": "date", "verbose_name": "Дата"},
+        {"name": "type", "verbose_name": "Тип"},
+        {"name": "info", "verbose_name": "Инфо"},
+        {"name": "amount", "verbose_name": "Сумма", "is_amount": True},
+        {"name": "comment", "verbose_name": "Комментарий"},
+    ]
+
+    html = render_to_string("components/table.html", {
+        "id": "money-logs-table",
+        "fields": fields,
+        "data": rows,
+    })
+
+    return JsonResponse({"html": html})
+
+@forbid_supplier
+@login_required
+def close_investor_debt(request, pk):
+    try:
+        with transaction.atomic():
+            ids_raw = request.POST.get("ids")  
+            amount = clean_currency(request.POST.get("amount"))
+            investor_id = request.POST.get("investor_select")
+
+            if not ids_raw or not amount or not investor_id:
+                return JsonResponse({"status": "error", "message": "Не указаны все параметры"}, status=400)
+
+            amount_value = Decimal(amount)
+            if amount_value <= 0:
+                return JsonResponse({"status": "error", "message": "Сумма должна быть больше нуля"}, status=400)
+
+            try:
+                ids = json.loads(ids_raw) if ids_raw else []
+            except Exception:
+                ids = []
+
+            investor = get_object_or_404(Investor, id=investor_id)
+            remaining = amount_value
+            closed = []
+            changed_html_rows = []
+
+            for item_id in ids:
+                if remaining <= 0:
+                    break
+                if str(item_id).startswith("cf-"):
+                    cf_id = item_id.replace("cf-", "")
+                    obj = get_object_or_404(CashFlow, id=cf_id)
+                    debt = Decimal(obj.amount) - (obj.returned_to_investor or Decimal(0))
+                    repay = min(debt, remaining)
+                    if repay > 0:
+                        obj.returned_to_investor = (obj.returned_to_investor or Decimal(0)) + repay
+                        obj.save()
+                        closed.append({"id": item_id, "closed": repay})
+                        remaining -= repay
+                        if repay < debt:
+                            row = type("Row", (), {
+                                "created_at": timezone.localtime(obj.created_at).strftime("%d.%m.%Y") if obj.created_at else "",
+                                "client": obj.purpose.name if obj.purpose else "",
+                                "amount": obj.amount,
+                                "profit": obj.amount - obj.returned_to_investor,
+                            })()
+                            fields = [
+                                {"name": "created_at", "verbose_name": "Дата"},
+                                {"name": "client", "verbose_name": "Клиент"},
+                                {"name": "amount", "verbose_name": "Сумма", "is_amount": True},
+                                {"name": "profit", "verbose_name": "Прибыль", "is_amount": True},
+                            ]
+                            html_row = render_to_string("components/table_row.html", {"item": row, "fields": fields})
+                            changed_html_rows.append({"id": item_id, "html": html_row})
+                else:
+                    t = get_object_or_404(Transaction, id=item_id)
+                    debt = Decimal(t.profit) - (t.returned_to_investor or Decimal(0))
+                    repay = min(debt, remaining)
+                    if repay > 0:
+                        t.returned_to_investor = (t.returned_to_investor or Decimal(0)) + repay
+                        t.save()
+                        closed.append({"id": item_id, "closed": repay})
+                        remaining -= repay
+                        if repay < debt:
+                            row = type("Row", (), {
+                                "created_at": timezone.localtime(t.created_at).strftime("%d.%m.%Y") if t.created_at else "",
+                                "client": str(t.client) if t.client else "",
+                                "amount": t.amount,
+                                "profit": t.profit - t.returned_to_investor,
+                            })()
+                            fields = [
+                                {"name": "created_at", "verbose_name": "Дата"},
+                                {"name": "client", "verbose_name": "Клиент"},
+                                {"name": "amount", "verbose_name": "Сумма", "is_amount": True},
+                                {"name": "profit", "verbose_name": "Прибыль", "is_amount": True},
+                            ]
+                            html_row = render_to_string("components/table_row.html", {"item": row, "fields": fields})
+                            changed_html_rows.append({"id": item_id, "html": html_row})
+
+            investor.balance += (amount_value - remaining)
+            investor.save()
+            investorDebtOperation = InvestorDebtOperation.objects.create(
+                investor=investor,
+                amount=(amount_value - remaining),
+                operation_type="deposit",
+            )
+
+            investorDebtOperation.created_at = timezone.localtime(investorDebtOperation.created_at).strftime("%d.%m.%Y %H:%M") if investorDebtOperation.created_at else ""
+            investorDebtOperation.operation_type = "Внесение" if investorDebtOperation.operation_type == "deposit" else "Забор"
+            html_investor_debt_operation = render_to_string("components/table_row.html", {
+                "item": investorDebtOperation,
+                "fields": [
+                    {"name": "created_at", "verbose_name": "Дата"},
+                    {"name": "investor", "verbose_name": "Инвестор"},
+                    {"name": "operation_type", "verbose_name": "Тип операции"},
+                    {"name": "amount", "verbose_name": "Сумма", "is_amount": True},
+                ]
+            })
+
+            investor_fields = [
+                {"name": "name", "verbose_name": "Инвестор"},
+                {"name": "initial_balance", "verbose_name": "Изначальные инвест", "is_amount": True},
+                {"name": "balance", "verbose_name": "Фактические инвест", "is_amount": True},
+            ]
+            investor_row = type("InvestorRow", (), {
+                "name": investor.name,
+                "initial_balance": investor.initial_balance,
+                "balance": investor.balance,
+            })()
+            html_investor_row = render_to_string("components/table_row.html", {"item": investor_row, "fields": investor_fields})
+
+            return JsonResponse({
+                "status": "success",
+                "closed": closed,
+                "amount_closed": float(amount_value - remaining),
+                "amount_left": float(remaining),
+                "changed_html_rows": changed_html_rows,
+                "html_investor_debt_operation": html_investor_debt_operation,
+                "html_investor_row": html_investor_row,
+                "investor_id": investor.id,
             })
     except Exception as e:
         return JsonResponse({"status": "error", "message": str(e)}, status=400)

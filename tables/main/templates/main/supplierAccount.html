@@ -2,7 +2,9 @@
 {% load static %}
 {% block content %}
     <div class="page-table-container" id="suppliers-account-container">
-        {% include "components/table.html" with id="suppliers-account-table" fields=fields data=data %}
+                {% include "components/table.html" with id="suppliers-account-table" fields=fields data=data %}
+                <div id="summary-container" class="summary-container">
+                </div>
         <div id="context-menu"
              class="dropdown-menu"
              data-is-admin="{{ is_admin|yesno:'true,false' }}">
@@ -23,4 +25,6 @@
     <script src="{% static 'main/js/autonumeric.js' %}"></script>
     {{ account_ids|json_script:"account-ids" }}
     {{ supplier_ids|json_script:"supplier-ids" }}
+    {{ cash_balance|json_script:"cash-balance" }}
+    {{ grand_total_with_cash|json_script:"grand-total-with-cash" }}
 {% endblock extra_scripts %}
