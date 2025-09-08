@@ -1687,7 +1687,6 @@ export const TableManager = {
 				)
 
 				const inputElement = await formBuilder.createColumnInput(th, i)
-
 				if (columnConfig.url) {
 					SelectHandler.setupSelects({
 						url: columnConfig.url,
@@ -2108,7 +2107,7 @@ document.addEventListener('DOMContentLoaded', function () {
 	const navList = document.querySelector('.nav-list')
 	if (navList) {
 		const itemsCount = navList.children.length
-		if (itemsCount === 7) {
+		if (itemsCount === 8) {
 			navList.style.gridTemplateColumns = 'repeat(4, minmax(0, 1fr))'
 		} else {
 			navList.style.gridTemplateColumns = 'repeat(5, minmax(0, 1fr))'

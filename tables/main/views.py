@@ -823,10 +823,6 @@ def clear_cache_view(request):
 @forbid_supplier
 @login_required
 def suppliers(request):
-    is_admin = request.user.user_type.name == 'Администратор' if hasattr(request.user, 'user_type') else False
-    if not is_admin:
-        raise PermissionDenied
-
     suppliers = Supplier.objects.all()
 
     for supplier in suppliers:
@@ -1076,9 +1072,9 @@ def get_cash_flow_fields():
     # )
     fields = [
         {"name": "created_at", "verbose_name": "Дата", "is_date": True},
-        {"name": "account", "verbose_name": "Счет"},
-        {"name": "supplier", "verbose_name": "Поставщик"},
-        {"name": "purpose", "verbose_name": "Назначение"},
+        {"name": "account", "verbose_name": "Счет", "is_relation": True},
+        {"name": "supplier", "verbose_name": "Поставщик", "is_relation": True},
+        {"name": "purpose", "verbose_name": "Назначение", "is_relation": True},
         {"name": "comment", "verbose_name": "Комментарий"},
     ]
 
@@ -1723,10 +1719,17 @@ def account_list(request):
 @forbid_supplier
 @login_required
 def payment_purpose_list(request):
-    payment_purpose_data = [
-        {"id": acc.id, "name": acc.name}
-        for acc in PaymentPurpose.objects.all().exclude(name="Оплата").order_by('operation_type', 'name')
-    ]
+    show_all = request.GET.get("all") == "True" or request.GET.get("all") == "true"
+    if show_all:
+        payment_purpose_data = [
+            {"id": acc.id, "name": acc.name}
+            for acc in PaymentPurpose.objects.all().order_by('operation_type', 'name')
+        ]
+    else:
+        payment_purpose_data = [
+            {"id": acc.id, "name": acc.name}
+            for acc in PaymentPurpose.objects.all().exclude(name="Оплата").exclude(name="Перевод").exclude(name="Инкассация").order_by('operation_type', 'name')
+        ]
     return JsonResponse(payment_purpose_data, safe=False)
 
 @forbid_supplier
@@ -1736,6 +1739,8 @@ def payment_purpose_types(request):
         PaymentPurpose.objects
         .all()
         .exclude(name="Оплата")
+        .exclude(name="Перевод")
+        .exclude(name="Инкассация")
         .order_by('operation_type', 'name')
         .values('id', 'operation_type')
     )
@@ -1924,7 +1929,22 @@ def money_transfer_collection(request):
             # cash_supplier_account.balance += amount_value
             # cash_supplier_account.save()
 
+            collection_purpose = PaymentPurpose.objects.filter(name="Инкассация").first()
+            if not collection_purpose:
+                collection_purpose = PaymentPurpose.objects.create(
+                    name="Инкассация",
+                    operation_type=PaymentPurpose.EXPENSE
+                )
+            CashFlow.objects.create(
+                account=source_account,
+                supplier=source_supplier,
+                amount=-amount_value,
+                purpose=collection_purpose,
+                comment=f"Инкассация: перевод на счет 'Наличные'"
+            )
+
             bank_accounts = Account.objects.order_by('name')
+            suppliers = Supplier.objects.filter(visible_in_summary=True).order_by('name')
 
             class SupplierAccountRow:
                 def __init__(self, supplier_name, supplier_id):
@@ -1932,19 +1952,18 @@ def money_transfer_collection(request):
                     self.supplier_id = supplier_id
 
             balances = {}
-            account_totals = {}
-            balances = {}
+            account_totals = {account.id: 0 for account in bank_accounts}
             cash_account = Account.objects.filter(name__iexact="Наличные").first()
 
             all_supplier_accounts = SupplierAccount.objects.select_related('supplier', 'account').all()
-
-            for account in bank_accounts:
-                account_totals[account.id] = 0
-
             for sa in all_supplier_accounts:
                 balances[(sa.supplier_id, sa.account_id)] = sa.balance
-                if sa.account.name.lower() != "наличные":
-                    account_totals[sa.account_id] += sa.balance
+
+            for supplier in suppliers:
+                for account in bank_accounts:
+                    balance = balances.get((supplier.id, account.id), 0)
+                    if not cash_account or account.id != cash_account.id:
+                        account_totals[account.id] += balance
 
             if cash_account:
                 account_totals[cash_account.id] = cash_account.balance
@@ -1952,10 +1971,8 @@ def money_transfer_collection(request):
             grand_total = sum(account_totals.values())
 
             total_row = SupplierAccountRow("ИТОГО", 0)
-
             for account in bank_accounts:
                 setattr(total_row, f'account_{account.id}', format_currency(account_totals[account.id]))
-
             setattr(total_row, 'total_balance', format_currency(grand_total))
 
             row = SupplierAccountRow(source_supplier.name, source_supplier.id)
@@ -2173,7 +2190,28 @@ def money_transfer_create(request):
             destination_supplier_account.balance += amount_value
             destination_supplier_account.save()
 
-            suppliers = Supplier.objects.all().order_by('name')
+            transfer_purpose = PaymentPurpose.objects.filter(name="Перевод").first()
+            if not transfer_purpose:
+                transfer_purpose = PaymentPurpose.objects.create(
+                    name="Перевод",
+                    operation_type=PaymentPurpose.EXPENSE
+                )
+            CashFlow.objects.create(
+                account=source_account,
+                supplier=source_supplier,
+                amount=-amount_value,
+                purpose=transfer_purpose,
+                comment=f"Перевод {destination_supplier.name} на счет {destination_account.name}"
+            )
+            CashFlow.objects.create(
+                account=destination_account,
+                supplier=destination_supplier,
+                amount=amount_value,
+                purpose=transfer_purpose,
+                comment=f"Получено от {source_supplier.name} со счета {source_account.name}"
+            )
+
+            suppliers = Supplier.objects.filter(visible_in_summary=True).order_by('name')
             bank_accounts = Account.objects.order_by('name')
 
             class SupplierAccountRow:
@@ -2190,17 +2228,25 @@ def money_transfer_create(request):
             account_totals = {account.id: 0 for account in bank_accounts}
             grand_total = 0
 
+            cash_account = Account.objects.filter(name__iexact="Наличные").first()
+
             for supplier in suppliers:
                 row = SupplierAccountRow(supplier.name, supplier.id)
                 total_balance = 0
                 for account in bank_accounts:
                     balance = balances.get((supplier.id, account.id), 0)
                     setattr(row, f'account_{account.id}', format_currency(balance))
-                    account_totals[account.id] += balance
+                    if not cash_account or account.id != cash_account.id:
+                        account_totals[account.id] += balance
                     total_balance += balance
                 grand_total += total_balance
                 setattr(row, 'total_balance', format_currency(total_balance))
                 rows.append(row)
+
+            if cash_account:
+                account_totals[cash_account.id] = cash_account.balance
+
+            grand_total = sum(account_totals.values())
 
             total_row = SupplierAccountRow("ИТОГО", 0)
             for account in bank_accounts:
@@ -2425,6 +2471,43 @@ def money_transfer_edit(request, pk: int):
             money_transfer.transfer_type = transfer_type
             money_transfer.is_counted = is_counted
             money_transfer.save()
+
+            transfer_purpose = PaymentPurpose.objects.filter(name="Перевод").first()
+            if not transfer_purpose:
+                transfer_purpose = PaymentPurpose.objects.create(
+                    name="Перевод",
+                    operation_type=PaymentPurpose.EXPENSE
+                )
+
+            CashFlow.objects.filter(
+                account=old_source_account,
+                supplier=old_source_supplier,
+                amount=-old_amount,
+                purpose=transfer_purpose,
+                comment__icontains=old_destination_supplier.name if old_destination_supplier else ""
+            ).delete()
+            CashFlow.objects.filter(
+                account=old_destination_account,
+                supplier=old_destination_supplier,
+                amount=old_amount,
+                purpose=transfer_purpose,
+                comment__icontains=old_source_supplier.name if old_source_supplier else ""
+            ).delete()
+
+            CashFlow.objects.create(
+                account=new_source_account,
+                supplier=new_source_supplier,
+                amount=-amount_value,
+                purpose=transfer_purpose,
+                comment=f"Перевод {new_destination_supplier.name} на счет {new_destination_account.name}"
+            )
+            CashFlow.objects.create(
+                account=new_destination_account,
+                supplier=new_destination_supplier,
+                amount=amount_value,
+                purpose=transfer_purpose,
+                comment=f"Получено от {new_source_supplier.name} со счета {new_source_account.name}"
+            )
 
             class MoneyTransferRow:
                 def __init__(self, source_account, destination_account, source_supplier, destination_supplier, amount):

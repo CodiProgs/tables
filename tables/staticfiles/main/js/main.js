@@ -526,6 +526,28 @@ const addMenuHandler = () => {
 					}
 				}
 
+				if (table.id === 'cash_flow-table') {
+					const headers = table.querySelectorAll('thead th')
+					let purposeIndex = -1
+					headers.forEach((th, idx) => {
+						if (th.dataset.name === 'purpose') purposeIndex = idx
+					})
+					if (purposeIndex !== -1) {
+						const cells = row.querySelectorAll('td')
+						const purposeCell = cells[purposeIndex]
+						if (
+							purposeCell &&
+							(purposeCell.textContent.trim() === 'Перевод' ||
+								purposeCell.textContent.trim() === 'Инкассация')
+						) {
+							e.preventDefault()
+
+							if (editButton) editButton.style.display = 'none'
+							if (deleteButton) deleteButton.style.display = 'none'
+						}
+					}
+				}
+
 				showMenu(e.pageX, e.pageY)
 				return
 			}
@@ -2713,6 +2735,19 @@ const handleCashFlow = async config => {
 	colorizeAmounts(`${CASH_FLOW}-table`)
 	initTableHandlers(config)
 
+	TableManager.createColumnsForTable(
+		'cash_flow-table',
+		[
+			{ name: 'created_at' },
+			{ name: 'account', url: '/accounts/list/' },
+			{ name: 'supplier', url: '/suppliers/list/' },
+			{ name: 'formatted_amount' },
+			{ name: 'purpose', url: '/payment_purposes/list/?all=True' },
+			{ name: 'comment' },
+		],
+		['profit']
+	)
+
 	new TablePaginator({
 		baseUrl: BASE_URL,
 		entityName: CASH_FLOW,
@@ -2721,6 +2756,17 @@ const handleCashFlow = async config => {
 			const { cash_flow_ids = [] } = data.context
 			setIds(cash_flow_ids, `${CASH_FLOW}-table`)
 			colorizeAmounts(`${CASH_FLOW}-table`)
+
+			TableManager.createColumnsForTable(
+				'cash_flow-table',
+				[
+					{ name: 'created_at' },
+					{ name: 'account', url: '/accounts/list/' },
+					{ name: 'supplier', url: '/suppliers/list/' },
+					{ name: 'amount' },
+				],
+				['profit']
+			)
 		},
 	})
 
