@@ -4186,7 +4186,7 @@ def complete_all_unfinished_transfers(request):
 @forbid_supplier
 @login_required
 def money_logs(request):
-    transactions = Transaction.objects.select_related('client', 'supplier', 'account').all()
+    # transactions = Transaction.objects.select_related('client', 'supplier', 'account').exclude(paid_amount=0)
     cash_flows = CashFlow.objects.select_related('account', 'supplier', 'purpose', 'transaction').all()
     # money_transfers = MoneyTransfer.objects.select_related('source_account', 'destination_account', 'source_supplier', 'destination_supplier').all()
     debt_repayments = SupplierDebtRepayment.objects.select_related('supplier').all()
@@ -4203,14 +4203,14 @@ def money_logs(request):
 
     rows = []
 
-    for t in transactions:
-        rows.append(LogRow(
-            dt=t.created_at,
-            type="Транзакция",
-            info=f"Клиент: {t.client}, Поставщик: {t.supplier}, Счет: {t.account}",
-            amount=t.amount,
-            comment=""
-        ))
+    # for t in transactions:
+    #     rows.append(LogRow(
+    #         dt=t.created_at,
+    #         type="Транзакция",
+    #         info=f"Клиент: {t.client}, Поставщик: {t.supplier}, Счет: {t.account}",
+    #         amount=t.paid_amount,
+    #         comment=""
+    #     ))
 
     for cf in cash_flows:
         rows.append(LogRow(
