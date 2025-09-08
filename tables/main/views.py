@@ -830,7 +830,7 @@ def suppliers(request):
     suppliers = Supplier.objects.all()
 
     for supplier in suppliers:
-        supplier.accounts_display = ", ".join(acc.name for acc in supplier.accounts.all())
+        supplier.accounts_display = ", ".join(acc.name for acc in supplier.accounts.all().exclude(name="Наличные"))
 
     fields = get_supplier_fields()
     
@@ -1262,7 +1262,7 @@ def supplier_create(request):
                 supplier.user = user
                 supplier.save()
 
-            supplier.accounts_display = ", ".join(acc.name for acc in supplier.accounts.all())
+            supplier.accounts_display = ", ".join(acc.name for acc in supplier.accounts.all().exclude(name="Наличные"))
 
             fields = get_supplier_fields()
             
@@ -1374,7 +1374,7 @@ def supplier_edit(request, pk=None):
 
             supplier.save()
 
-            supplier.accounts_display = ", ".join(acc.name for acc in supplier.accounts.all())
+            supplier.accounts_display = ", ".join(acc.name for acc in supplier.accounts.all().exclude(name="Наличные"))
 
             fields = get_supplier_fields()
             
@@ -1711,9 +1711,9 @@ def account_list(request):
         except Supplier.DoesNotExist:
             accounts = Account.objects.none()
 
-    is_collection = request.GET.get('collection') == 'true'
-    if is_collection:
-        accounts = accounts.exclude(name="Наличные")
+    # is_collection = request.GET.get('collection') == 'true'
+    # if is_collection:
+    accounts = accounts.exclude(name="Наличные")
 
     account_data = [
         {"id": acc.id, "name": acc.name} for acc in accounts
@@ -3036,19 +3036,26 @@ def settle_supplier_debt(request, pk: int):
                         )
                         debtors.append({"branch": branch_name, "amount": branch_debt})
                         total_debtors += branch_debt
-                
+
                 safe_amount = SupplierAccount.objects.filter(
                     supplier__visible_in_summary=True
                 ).aggregate(total=Sum("balance"))["total"] or Decimal(0)
 
-                investors = list(Investor.objects.values("name", "balance"))
-                investors = [{"name": inv["name"], "amount": inv["balance"]} for inv in investors]
-                investors_total = sum([inv["amount"] for inv in investors], Decimal(0))
+                cash_account = Account.objects.filter(name__iexact="Наличные").first()
+                cash_balance = cash_account.balance if cash_account else Decimal(0)
+
+                safe_amount += cash_balance
+
+                # investors = list(Investor.objects.values("name", "balance"))
+                # investors = [{"name": inv["name"], "amount": inv["balance"]} for inv in investors]
+                # investors_total = sum([inv["amount"] for inv in investors], Decimal(0))
 
                 bonuses = sum((t.bonus_debt or Decimal(0)) for t in Transaction.objects.all())
-                client_debts = sum((t.client_debt or Decimal(0)) for t in Transaction.objects.all())
 
-                assets_total = equipment + Decimal(0) + total_debtors + safe_amount + investors_total
+                client_debts = sum((t.client_debt or Decimal(0)) for t in Transaction.objects.filter(paid_amount__gt=0).all())
+
+                # assets_total = equipment + Decimal(0) + total_debtors + safe_amount + investors_total
+                assets_total = equipment + Decimal(0) + total_debtors + safe_amount
                 liabilities_total = credit + client_debts + short_term + bonuses
                 capital = assets_total - liabilities_total
 
@@ -3060,8 +3067,10 @@ def settle_supplier_debt(request, pk: int):
                     "current_assets": {
                         "inventory": {"total": 0, "items": []},
                         "debtors": {"total": total_debtors, "items": debtors},
-                        "cash": {"total": safe_amount + investors_total,
-                                "items": [{"name": "Счета, Карты и Сейф", "amount": safe_amount}] + investors},
+                        # "cash": {"total": safe_amount + investors_total,
+                        "cash": {"total": safe_amount,
+                                # "items": [{"name": "Счета, Карты и Сейф", "amount": safe_amount}] + investors},
+                                "items": [{"name": "Счета, Карты и Сейф", "amount": safe_amount}]},
                     },
                     "assets": assets_total,
                     "liabilities": {
@@ -3598,15 +3607,21 @@ def company_balance_stats(request):
         supplier__visible_in_summary=True
     ).aggregate(total=Sum("balance"))["total"] or Decimal(0)
 
-    investors = list(Investor.objects.values("name", "initial_balance"))
-    investors = [{"name": inv["name"], "amount": inv["initial_balance"]} for inv in investors]
-    investors_total = sum([inv["amount"] for inv in investors], Decimal(0))
+    cash_account = Account.objects.filter(name__iexact="Наличные").first()
+    cash_balance = cash_account.balance if cash_account else Decimal(0)
+
+    safe_amount += cash_balance
+
+    # investors = list(Investor.objects.values("name", "initial_balance"))
+    # investors = [{"name": inv["name"], "amount": inv["initial_balance"]} for inv in investors]
+    # investors_total = sum([inv["amount"] for inv in investors], Decimal(0))
 
     bonuses = sum((t.bonus_debt or Decimal(0)) for t in Transaction.objects.all())
 
     client_debts = sum((t.client_debt or Decimal(0)) for t in Transaction.objects.filter(paid_amount__gt=0).all())
 
-    assets_total = equipment + Decimal(0) + total_debtors + safe_amount + investors_total
+    # assets_total = equipment + Decimal(0) + total_debtors + safe_amount + investors_total
+    assets_total = equipment + Decimal(0) + total_debtors + safe_amount
 
     liabilities_total = credit + client_debts + short_term + bonuses
     
@@ -3646,8 +3661,10 @@ def company_balance_stats(request):
         "current_assets": {
             "inventory": {"total": 0, "items": []},
             "debtors": {"total": total_debtors, "items": debtors},
-            "cash": {"total": safe_amount + investors_total,
-                     "items": [{"name": "Счета, Карты и Сейф", "amount": safe_amount}] + investors},
+            # "cash": {"total": safe_amount + investors_total,
+            #          "items": [{"name": "Счета, Карты и Сейф", "amount": safe_amount}] + investors},
+            "cash": {"total": safe_amount,
+                     "items": [{"name": "Счета, Карты и Сейф", "amount": safe_amount}]},
         },
         "assets": assets_total,
         "liabilities": {

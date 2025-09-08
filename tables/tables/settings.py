@@ -12,9 +12,12 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = 'django-insecure-7$m0khwvsrv67jtr7a*9ei3)3*datk7v+ub1*xto3+b0&yvykj'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = False
 
-ALLOWED_HOSTS = ["*"]
+ALLOWED_HOSTS = [
+    "Yarche.mysql.pythonanywhere-services.com",
+    "Yarche.pythonanywhere.com",
+]
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
 
@@ -25,31 +28,55 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    "users",    "main",
+	"users",
+	"main",
 ]
-MIDDLEWARE = [    'django.middleware.security.SecurityMiddleware',
-    'django.contrib.sessions.middleware.SessionMiddleware',    'django.middleware.common.CommonMiddleware',
-    'django.middleware.csrf.CsrfViewMiddleware',    'django.contrib.auth.middleware.AuthenticationMiddleware',
-    'django.contrib.messages.middleware.MessageMiddleware',    'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    'main.middleware.BlockSiteMiddleware',    "users.middleware.AuthMiddleware",
+
+MIDDLEWARE = [
+    'django.middleware.security.SecurityMiddleware',
+    'django.contrib.sessions.middleware.SessionMiddleware',
+    'django.middleware.common.CommonMiddleware',
+    'django.middleware.csrf.CsrfViewMiddleware',
+    'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'django.contrib.messages.middleware.MessageMiddleware',
+    'django.middleware.clickjacking.XFrameOptionsMiddleware',
+	'main.middleware.BlockSiteMiddleware',
+	"users.middleware.AuthMiddleware",
 ]
+
 ROOT_URLCONF = 'tables.urls'
-TEMPLATES = [    {
-        'BACKEND': 'django.template.backends.django.DjangoTemplates',        'DIRS': ["templates"],
-        'APP_DIRS': True,        'OPTIONS': {
+
+TEMPLATES = [
+    {
+        'BACKEND': 'django.template.backends.django.DjangoTemplates',
+        'DIRS': ["templates"],
+        'APP_DIRS': True,
+        'OPTIONS': {
             'context_processors': [
-                "django.template.context_processors.debug",                'django.template.context_processors.request',
-                'django.contrib.auth.context_processors.auth',                'django.contrib.messages.context_processors.messages',
-            ],        },
-    },]
+				"django.template.context_processors.debug",
+                'django.template.context_processors.request',
+                'django.contrib.auth.context_processors.auth',
+                'django.contrib.messages.context_processors.messages',
+            ],
+        },
+    },
+]
+
 WSGI_APPLICATION = 'tables.wsgi.application'
 
-# Database# https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
-DATABASES = {    "default": {
-        "ENGINE": "django.db.backends.mysql",        "NAME": "tables",
-        "USER": "root",        "PASSWORD": "root",
-        "HOST": "localhost",        "PORT": "3306",
+# Database
+# https://docs.djangoproject.com/en/5.2/ref/settings/#databases
+
+
+DATABASES = {
+    "default": {
+        "ENGINE": "django.db.backends.mysql",
+        "NAME": "Yarche$tables2",
+        "USER": "Yarche",
+        "PASSWORD": "zPD1XNMlrK",
+        "HOST": "Yarche.mysql.pythonanywhere-services.com",
+        "PORT": "3306",
         "OPTIONS": {
             "init_command": "SET sql_mode='STRICT_TRANS_TABLES'",
             "charset": "utf8mb4",
@@ -107,6 +134,6 @@ AUTH_USER_MODEL = "users.User"
 
 LOGIN_URL = "login"
 
-# LOGOUT_REDIRECT_URL = "login"
+LOGOUT_REDIRECT_URL = "login"
 
 SESSION_COOKIE_AGE = 2592000
