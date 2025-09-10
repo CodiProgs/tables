@@ -962,11 +962,11 @@ def client_edit(request, pk=None):
             client.percentage = float(percentage)
             client.comment = comment
 
-            if old_percentage != new_percentage:
-                Transaction.objects.filter(
-                    client=client,
-                    client_percentage=old_percentage
-                ).update(client_percentage=new_percentage)
+            # if old_percentage != new_percentage:
+            #     Transaction.objects.filter(
+            #         client=client,
+            #         client_percentage=old_percentage
+            #     ).update(client_percentage=new_percentage)
 
             client.save()
             context = {
