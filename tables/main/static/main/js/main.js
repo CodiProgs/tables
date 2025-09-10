@@ -2828,7 +2828,9 @@ const handleSupplierAccounts = async () => {
 	try {
 		const summaryContainer = document.getElementById('summary-container')
 		if (summaryContainer) {
-			summaryContainer.innerHTML = '<div class="loader"></div>'
+			const loader = createLoader()
+			summaryContainer.innerHTML = ''
+			summaryContainer.appendChild(loader)
 			const response = await fetch('/money_logs/')
 			if (!response.ok) throw new Error('Ошибка загрузки логов')
 			const data = await response.json()
@@ -2878,7 +2880,9 @@ const handleSupplierAccounts = async () => {
 
 				refreshBtn.addEventListener('click', async () => {
 					refreshBtn.disabled = true
-					summaryContainer.innerHTML = '<div class="loader"></div>'
+					const loader = createLoader()
+					summaryContainer.innerHTML = ''
+					summaryContainer.appendChild(loader)
 					try {
 						const response = await fetch('/money_logs/')
 						if (!response.ok) throw new Error('Ошибка загрузки логов')

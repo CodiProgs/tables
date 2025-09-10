@@ -23,6 +23,7 @@ from django.utils import timezone
 from users.models import User, UserType
 import math
 
+
 locale.setlocale(locale.LC_ALL, "ru_RU.UTF-8")
 locale.setlocale(locale.LC_TIME, "ru_RU.UTF-8")
 
@@ -1356,11 +1357,11 @@ def supplier_edit(request, pk=None):
                 )
                 supplier.user = user
 
-            if old_cost_percentage != new_cost_percentage:
-                Transaction.objects.filter(
-                    supplier=supplier,
-                    supplier_percentage=old_cost_percentage
-                ).update(supplier_percentage=new_cost_percentage)
+            # if old_cost_percentage != new_cost_percentage:
+            #     Transaction.objects.filter(
+            #         supplier=supplier,
+            #         supplier_percentage=old_cost_percentage
+            #     ).update(supplier_percentage=new_cost_percentage)
 
             supplier.save()
 
