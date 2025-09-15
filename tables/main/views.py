@@ -1713,9 +1713,14 @@ def account_list(request):
 
     accounts = accounts.exclude(name="Наличные")
 
+    cash_account = Account.objects.filter(name__iexact="Наличные").first()
     account_data = [
-        {"id": acc.id, "name": acc.name} for acc in accounts
+        {"id": acc.id, "name": acc.name} for acc in accounts.exclude(name="Наличные")
     ]
+
+    if cash_account:
+        account_data.append({"id": cash_account.id, "name": "Наличные"})
+
     return JsonResponse(account_data, safe=False)
 
 @forbid_supplier
@@ -2663,7 +2668,7 @@ def debtors(request):
     branch_debts = defaultdict(float)
     for t in transactions:
         branch = t.supplier.branch if t.supplier and t.supplier.branch else None
-        if branch and branch.name != "Филиал 1":
+        if branch and branch.name != "Филиал 1" and branch.name != "Наши Ип":
             branch_debts[branch.name] += float(getattr(t, 'supplier_debt', 0))
 
     branch_debts_list = [
@@ -2672,7 +2677,7 @@ def debtors(request):
     ]
 
     total_branch_debts = sum(
-        branch['debt'] for branch in branch_debts_list if branch['branch'] != "Филиал 1"
+        branch['debt'] for branch in branch_debts_list if branch['branch'] != "Филиал 1" and branch['branch'] != "Наши Ип"
     )
 
     total_bonuses = sum(float(t.bonus_debt) for t in transactions)
@@ -2822,7 +2827,7 @@ def settle_supplier_debt(request, pk: int):
                         ]
                     }))
 
-                transactions = Transaction.objects.filter(paid_amount__gt=0).exclude(supplier__branch__name="Филиал 1")
+                transactions = Transaction.objects.filter(paid_amount__gt=0).exclude(supplier__branch__name="Филиал 1").exclude(supplier__branch__name="Наши Ип")
                 all_branches_total_debt = sum(float(t.supplier_debt) for t in transactions)
 
                 return JsonResponse({
@@ -2990,14 +2995,21 @@ def settle_supplier_debt(request, pk: int):
 
                 investor = get_object_or_404(Investor, id=pk)
 
+                cash_account = Account.objects.filter(name__iexact="Наличные").first()
+                if not cash_account:
+                    return JsonResponse({"status": "error", "message": "Счет 'Наличные' не найден"}, status=400)
+
                 if operation_type == "deposit":
-                    investor.balance += amount_value 
+                    investor.balance += amount_value
+                    # cash_account.balance += amount_value
                 elif operation_type == "withdrawal":
                     if investor.balance < amount_value:
                         return JsonResponse({"status": "error", "message": "Недостаточно средств для снятия"}, status=400)
-                    investor.balance -= amount_value 
+                    investor.balance -= amount_value
+                    # cash_account.balance -= amount_value
 
                 investor.save()
+                # cash_account.save()
 
                 investorDebtOperation = InvestorDebtOperation.objects.create(
                     investor=investor,
@@ -3126,7 +3138,7 @@ def settle_supplier_debt(request, pk: int):
                 total_debtors = Decimal(0)
                 for branch in Supplier.objects.exclude(branch=None).values_list("branch__id", "branch__name").distinct():
                     branch_id, branch_name = branch
-                    if branch_name != "Филиал 1":
+                    if branch_name != "Филиал 1" and branch_name != "Наши Ип":
                         branch_debt = sum(
                             (t.supplier_debt or Decimal(0))
                             for t in Transaction.objects.filter(supplier__branch_id=branch_id, paid_amount__gt=0)
@@ -3152,8 +3164,23 @@ def settle_supplier_debt(request, pk: int):
                 client_debts = sum((t.client_debt or Decimal(0)) for t in Transaction.objects.filter(paid_amount__gt=0).all())
 
                 # assets_total = equipment + Decimal(0) + total_debtors + safe_amount + investors_total
+
+                transactionsInvestors = [
+                    t for t in Transaction.objects.filter(paid_amount__gt=0)
+                    if getattr(t, 'bonus_debt', 0) == 0
+                    and getattr(t, 'client_debt', 0) == 0
+                    # and getattr(t, 'supplier_debt', 0) == 0
+                    and getattr(t, 'profit', 0) > 0
+                ]
+
+                cashflows = CashFlow.objects.filter(
+                    purpose__operation_type=PaymentPurpose.INCOME
+                ).exclude(purpose__name="Оплата")
+
+                total_profit = sum(float(t.profit - t.returned_to_investor) for t in transactionsInvestors) + sum(float(cf.amount - (cf.returned_to_investor or 0)) for cf in cashflows)
+
                 assets_total = equipment + Decimal(0) + total_debtors + safe_amount
-                liabilities_total = credit + client_debts + short_term + bonuses
+                liabilities_total = credit + client_debts + short_term + bonuses + Decimal(total_profit)
                 capital = assets_total - liabilities_total
 
                 data = {
@@ -3177,6 +3204,7 @@ def settle_supplier_debt(request, pk: int):
                             {"name": "Кредиторская задолженность", "amount": client_debts},
                             {"name": "Краткосрочные обязательства", "amount": short_term},
                             {"name": "Бонусы", "amount": bonuses},
+                            {"name": "Долг инвесторам", "amount": total_profit},
                         ],
                     },
                     "capital": capital,
@@ -3715,7 +3743,7 @@ def company_balance_stats(request):
     total_debtors = Decimal(0)
     for branch in Supplier.objects.exclude(branch=None).values_list("branch__id", "branch__name").distinct():
         branch_id, branch_name = branch
-        if branch_name != "Филиал 1":
+        if branch_name != "Филиал 1" and branch_name != "Наши Ип":
             branch_debt = sum(
                 (t.supplier_debt or Decimal(0))
                 for t in Transaction.objects.filter(supplier__branch_id=branch_id, paid_amount__gt=0)
@@ -3732,23 +3760,31 @@ def company_balance_stats(request):
 
     safe_amount += cash_balance
 
-    # investors = list(Investor.objects.values("name", "initial_balance"))
-    # investors = [{"name": inv["name"], "amount": inv["initial_balance"]} for inv in investors]
-    # investors_total = sum([inv["amount"] for inv in investors], Decimal(0))
-
     bonuses = sum((t.bonus_debt or Decimal(0)) for t in Transaction.objects.all())
 
     client_debts = sum((t.client_debt or Decimal(0)) for t in Transaction.objects.filter(paid_amount__gt=0).all())
 
-    # assets_total = equipment + Decimal(0) + total_debtors + safe_amount + investors_total
     assets_total = equipment + Decimal(0) + total_debtors + safe_amount
 
-    liabilities_total = credit + client_debts + short_term + bonuses
+    transactionsInvestors = [
+        t for t in Transaction.objects.filter(paid_amount__gt=0)
+        if getattr(t, 'bonus_debt', 0) == 0
+        and getattr(t, 'client_debt', 0) == 0
+        # and getattr(t, 'supplier_debt', 0) == 0
+        and getattr(t, 'profit', 0) > 0
+    ]
+
+    cashflows = CashFlow.objects.filter(
+        purpose__operation_type=PaymentPurpose.INCOME
+    ).exclude(purpose__name="Оплата")
+
+    total_profit = sum(float(t.profit - t.returned_to_investor) for t in transactionsInvestors) + sum(float(cf.amount - (cf.returned_to_investor or 0)) for cf in cashflows)
+
+    liabilities_total = credit + client_debts + short_term + bonuses + Decimal(total_profit)
     
     current_capital = assets_total - liabilities_total
 
     current_year = datetime.now().year
-    current_month = datetime.now().month
     capitals = []
     
     MONTHS_RU = [
@@ -3758,12 +3794,6 @@ def company_balance_stats(request):
     months = [MONTHS_RU[month-1] for month in range(1, 13)]
 
     for month in range(1, 13):
-        # if month == current_month:
-        #     capital = float(get_monthly_capital(current_year, month))
-        # else:
-        #     mc = MonthlyCapital.objects.filter(year=current_year, month=month).first()
-        #     capital = float(mc.capital) if mc else 0
-
         capital = float(get_monthly_capital(current_year, month))
 
         capitals.append(capital)
@@ -3781,8 +3811,6 @@ def company_balance_stats(request):
         "current_assets": {
             "inventory": {"total": 0, "items": []},
             "debtors": {"total": total_debtors, "items": debtors},
-            # "cash": {"total": safe_amount + investors_total,
-            #          "items": [{"name": "Счета, Карты и Сейф", "amount": safe_amount}] + investors},
             "cash": {"total": safe_amount,
                      "items": [{"name": "Счета, Карты и Сейф", "amount": safe_amount}]},
         },
@@ -3794,6 +3822,7 @@ def company_balance_stats(request):
                 {"name": "Кредиторская задолженность", "amount": client_debts},
                 {"name": "Краткосрочные обязательства", "amount": short_term},
                 {"name": "Бонусы", "amount": bonuses},
+                {"name": "Выплата инвесторам", "amount": total_profit}
             ],
         },
         "capital": current_capital,

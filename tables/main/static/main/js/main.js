@@ -3661,7 +3661,9 @@ const handleDebtors = async () => {
 											setIds(data.repayment_ids, data.repayments_table_id)
 											if (
 												data.transactions_table_id !==
-												'branch-transactions-Филиал_1'
+													'branch-transactions-Филиал_1' &&
+												data.transactions_table_id !==
+													'branch-transactions-Наши_ИП'
 											) {
 												TableManager.calculateTableSummary(
 													data.transactions_table_id,
@@ -4265,7 +4267,11 @@ const handleDebtors = async () => {
 								: 'branch-debts-header'
 						)
 
-						if (debtsHeader && result.branch !== 'Филиал_1') {
+						if (
+							debtsHeader &&
+							result.branch !== 'Филиал_1' &&
+							result.branch !== 'Наши_ИП'
+						) {
 							const totalSpan = debtsHeader.querySelector('span.debtors-total')
 							if (totalSpan) {
 								let number = Number(
@@ -4297,7 +4303,7 @@ const handleDebtors = async () => {
 						}
 
 						if (result.type === 'Поставщики') {
-							if (result.branch !== 'Филиал_1') {
+							if (result.branch !== 'Филиал_1' && result.branch !== 'Наши_ИП') {
 								TableManager.calculateTableSummary(
 									`branch-transactions-${result.branch}`,
 									['supplier_debt']
@@ -4366,7 +4372,11 @@ const handleDebtors = async () => {
 								}
 							}
 
-							if (branchKey && branchKey !== 'Филиал_1') {
+							if (
+								branchKey &&
+								branchKey !== 'Филиал_1' &&
+								branchKey !== 'Наши_ИП'
+							) {
 								const branchSpan = branchSpans.find(
 									span =>
 										span.textContent.trim() ===
