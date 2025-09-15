@@ -521,11 +521,13 @@ const addMenuHandler = () => {
 								settleDebtButton.style.display = 'block'
 								settleDebtButton.textContent = 'Изменить сумму'
 								settleDebtButton.dataset.type = 'initial'
-							} else if (colName === 'balance') {
-								settleDebtButton.style.display = 'block'
-								settleDebtButton.textContent = 'Изменить сумму'
-								settleDebtButton.dataset.type = 'balance'
-							} else {
+							}
+							// else if (colName === 'balance') {
+							// 	settleDebtButton.style.display = 'block'
+							// 	settleDebtButton.textContent = 'Изменить сумму'
+							// 	settleDebtButton.dataset.type = 'balance'
+							// }
+							else {
 								settleDebtButton.style.display = 'none'
 								settleDebtButton.dataset.type = ''
 							}
