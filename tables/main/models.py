@@ -181,6 +181,9 @@ class Transaction(models.Model):
 
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="Дата создания")
 
+    def __str__(self):
+        return f"Транзакция {self.id} - {self.amount} р., клиент: {self.client.name if self.client else 'N/A'}, поставщик: {self.supplier.name if self.supplier else 'N/A'}"
+
     class Meta:
         default_permissions = ()
         verbose_name = "Транзакция"
