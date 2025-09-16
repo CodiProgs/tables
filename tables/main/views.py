@@ -122,9 +122,8 @@ def index(request):
     ]
 
     bonus_debts = [
-        getattr(t, 'bonus_debt', 0) 
-        for t in page.object_list 
-        if getattr(t, 'bonus', 0) != 0
+        round(float(t.amount or 0) * float(t.bonus_percentage or 0) / 100 - float(t.returned_bonus or 0), 2)
+        for t in page.object_list
     ]
 
     investor_debts = [
