@@ -75,6 +75,43 @@ const postData = async (url, data) => {
 	}
 }
 
+function saveHiddenRowsState(tableId) {
+	const rows = document.querySelectorAll(`#${tableId} tbody tr[data-id]`)
+	const hiddenIds = []
+	rows.forEach(row => {
+		if (row.classList.contains('hidden-row')) {
+			hiddenIds.push(row.getAttribute('data-id'))
+		}
+	})
+	localStorage.setItem(`${tableId}-hidden-rows`, JSON.stringify(hiddenIds))
+	localStorage.setItem(`${tableId}-show-all`, 'false')
+}
+
+function saveShowAllState(tableId) {
+	localStorage.setItem(`${tableId}-hidden-rows`, JSON.stringify([]))
+	localStorage.setItem(`${tableId}-show-all`, 'true')
+}
+
+function restoreHiddenRowsState(tableId) {
+	const showAll = localStorage.getItem(`${tableId}-show-all`)
+	const hiddenIds = JSON.parse(
+		localStorage.getItem(`${tableId}-hidden-rows`) || '[]'
+	)
+	const rows = document.querySelectorAll(`#${tableId} tbody tr[data-id]`)
+	if (showAll === 'true') {
+		rows.forEach(row => row.classList.remove('hidden-row'))
+	} else {
+		rows.forEach(row => {
+			const id = row.getAttribute('data-id')
+			if (hiddenIds.includes(id)) {
+				row.classList.add('hidden-row')
+			} else {
+				row.classList.remove('hidden-row')
+			}
+		})
+	}
+}
+
 const setupCurrencyInput = inputId => {
 	const input = document.getElementById(inputId)
 	if (!input) {
@@ -338,6 +375,7 @@ const hideCompletedTransactions = debts => {
 	})
 
 	updateHiddenRowsCounter()
+	saveHiddenRowsState(`${TRANSACTION}-table`)
 }
 
 const toggleTransactionVisibility = rowId => {
@@ -2661,12 +2699,14 @@ const handleTransactions = async config => {
 	const hideButton = document.getElementById('hide-button')
 	const showAllButton = document.getElementById('show-all-button')
 	const hideAllButton = document.getElementById('hide-all-button')
+	const tableId = `${TRANSACTION}-table`
 
 	if (hideButton) {
 		hideButton.addEventListener('click', function () {
 			const rowId = TableManager.getSelectedRowId(`${TRANSACTION}-table`)
 			if (rowId) {
 				toggleTransactionVisibility(rowId)
+				saveHiddenRowsState(tableId)
 			}
 		})
 	}
@@ -2674,12 +2714,14 @@ const handleTransactions = async config => {
 	if (showAllButton) {
 		showAllButton.addEventListener('click', function () {
 			toggleAllTransactions(true, supplierDebtsAll)
+			saveShowAllState(tableId)
 		})
 	}
 
 	if (hideAllButton) {
 		hideAllButton.addEventListener('click', function () {
 			toggleAllTransactions(false, supplierDebtsAll)
+			saveHiddenRowsState(tableId)
 		})
 	}
 }
@@ -4751,5 +4793,6 @@ document.addEventListener('DOMContentLoaded', function () {
 		}
 	} else if (urlName === null && pathname === '/') {
 		handleTransactions(mainConfig)
+		restoreHiddenRowsState(`${TRANSACTION}-table`)
 	}
 })
