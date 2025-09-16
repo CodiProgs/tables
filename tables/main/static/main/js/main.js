@@ -385,12 +385,13 @@ const hideCompletedTransactions = debts => {
 		}
 	})
 
-	updateHiddenRowsCounter()
 	localStorage.setItem(
 		`${TRANSACTION}-table-hidden-rows`,
 		JSON.stringify(Array.from(hiddenIds))
 	)
 	localStorage.setItem(`${TRANSACTION}-table-show-all`, 'false')
+
+	updateHiddenRowsCounter()
 }
 
 const toggleTransactionVisibility = rowId => {
@@ -4809,5 +4810,6 @@ document.addEventListener('DOMContentLoaded', function () {
 	} else if (urlName === null && pathname === '/') {
 		handleTransactions(mainConfig)
 		restoreHiddenRowsState(`${TRANSACTION}-table`)
+		updateHiddenRowsCounter()
 	}
 })
