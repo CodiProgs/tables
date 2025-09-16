@@ -315,6 +315,15 @@ const hideCompletedTransactions = debts => {
 	if (debtColumnIndex === -1 || docsColumnIndex === -1) return
 
 	const rows = table.querySelectorAll('tbody tr:not(.table__row--summary)')
+	let manualHiddenIds = []
+	try {
+		manualHiddenIds = JSON.parse(
+			localStorage.getItem(`${TRANSACTION}-table-hidden-rows`) || '[]'
+		)
+	} catch (e) {}
+
+	let hiddenIds = new Set(manualHiddenIds)
+
 	rows.forEach((row, idx) => {
 		const debtCell = row.querySelectorAll('td')[debtColumnIndex]
 		const docsCell = row.querySelectorAll('td')[docsColumnIndex]
@@ -371,11 +380,17 @@ const hideCompletedTransactions = debts => {
 			isInvestorDebtZero
 		) {
 			row.classList.add('hidden-row', 'row-done')
+			const rowId = row.getAttribute('data-id')
+			if (rowId) hiddenIds.add(rowId)
 		}
 	})
 
 	updateHiddenRowsCounter()
-	saveHiddenRowsState(`${TRANSACTION}-table`)
+	localStorage.setItem(
+		`${TRANSACTION}-table-hidden-rows`,
+		JSON.stringify(Array.from(hiddenIds))
+	)
+	localStorage.setItem(`${TRANSACTION}-table-show-all`, 'false')
 }
 
 const toggleTransactionVisibility = rowId => {
