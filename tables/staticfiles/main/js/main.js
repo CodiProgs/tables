@@ -1401,7 +1401,12 @@ const colorizeZeroDebts = tableId => {
 		if (!debtCell) return
 
 		const debtValue = debtCell.textContent.trim()
-		if (debtValue === '0' || debtValue === '0 р.' || debtValue === '0,00 р.') {
+		if (
+			debtValue === '0' ||
+			debtValue === '0 р.' ||
+			debtValue === '0,00 р.' ||
+			debtValue === '0.00'
+		) {
 			row.classList.add('row-done')
 
 			debtCell.textContent = '0 р.'
@@ -1443,6 +1448,7 @@ const colorizeRemainingAmountByDebts = (debts = {}) => {
 		if (remainingAmountCol !== -1 && debts) {
 			const cell = row.querySelectorAll('td')[remainingAmountCol]
 			const debt = debts.supplier_debts[idx]
+
 			if (cell) {
 				if (
 					debt === 0 ||

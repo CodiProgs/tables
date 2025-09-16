@@ -112,13 +112,11 @@ def index(request):
     supplier_debts = [
         getattr(t, 'supplier_debt', 0) 
         for t in page.object_list 
-        if getattr(t, 'paid_amount', 0) != 0
     ]
 
     client_debts = [
         getattr(t, 'client_debt', 0) 
         for t in page.object_list 
-        if getattr(t, 'remaining_amount', 0) != 0
     ]
 
     bonus_debts = [
@@ -129,7 +127,6 @@ def index(request):
     investor_debts = [
         getattr(t, 'investor_debt', 0) 
         for t in page.object_list 
-        if getattr(t, 'profit', 0) != 0
     ]
 
     context = {
