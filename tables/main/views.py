@@ -398,9 +398,10 @@ def transaction_edit(request, pk=None):
                 )
 
             new_supplier_fee = Decimal(math.floor(float(new_amount * new_supplier_percentage / Decimal('100'))))
-            if trans.returned_by_supplier > (trans.paid_amount - new_supplier_fee):
+            limit = Decimal(trans.paid_amount) - new_supplier_fee
+            if limit >= 0 and Decimal(trans.returned_by_supplier) > limit:
                 return JsonResponse(
-                    {"status": "error", "message": "Возвращено поставщиком больше, чем новый долг поставщика. Измените процент или уменьшите возврат."},
+                    {"status": "error", "message": "Возвращено поставщику больше, чем новый долг поставщика. Измените процент или уменьшите возврат."},
                     status=400,
                 )
 
@@ -1718,7 +1719,7 @@ def account_list(request):
         {"id": acc.id, "name": acc.name} for acc in accounts.exclude(name="Наличные")
     ]
 
-    if cash_account:
+    if cash_account and not is_collection:
         account_data.append({"id": cash_account.id, "name": "Наличные"})
 
     return JsonResponse(account_data, safe=False)

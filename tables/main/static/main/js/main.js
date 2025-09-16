@@ -3968,7 +3968,7 @@ const handleDebtors = async () => {
 				}
 			}
 			window.drawCharts = drawCharts
-			window.addEventListener('resize', resizeCharts)
+			// window.addEventListener('resize', resizeCharts)
 
 			if (data.capitals_by_month) {
 				window.lastBalanceData = data
