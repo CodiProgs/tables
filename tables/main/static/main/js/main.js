@@ -535,8 +535,16 @@ const addMenuHandler = () => {
 
 	function showMenu(x, y) {
 		menu.style.display = 'block'
+		const menuHeight = menu.offsetHeight || 180
+		const windowHeight = window.innerHeight
+
+		let top = y
+		if (y > windowHeight * (2 / 3)) {
+			top = y - menuHeight
+			if (top < 10) top = 10
+		}
 		menu.style.left = `${x + 10}px`
-		menu.style.top = `${y}px`
+		menu.style.top = `${top}px`
 	}
 
 	if (menu) {
@@ -1669,6 +1677,27 @@ const setupSupplierAccountSelects = (isCollection = false) => {
 		accountSelect.classList.remove('has-value')
 	}
 
+	let otherSuppliers = []
+	fetch('/suppliers/list/others/')
+		.then(res => res.json())
+		.then(data => {
+			otherSuppliers = data.map(s => String(s.id))
+		})
+
+	const selectVtbAccount = () => {
+		const vtbOption = Array.from(
+			accountDropdown.querySelectorAll('.select__option')
+		).find(opt => opt.textContent.trim() === 'Р/с Втб')
+		if (vtbOption) {
+			accountInput.value = vtbOption.dataset.value
+			accountText.textContent = vtbOption.textContent
+			accountText.classList.remove('select__placeholder')
+			accountSelect.classList.add('has-value')
+			const event = new Event('change', { bubbles: true })
+			accountInput.dispatchEvent(event)
+		}
+	}
+
 	let loadToken = 0
 	const loadAccountsForSupplier = async supplierId => {
 		const myToken = ++loadToken
@@ -1684,12 +1713,15 @@ const setupSupplierAccountSelects = (isCollection = false) => {
 		if (myToken !== loadToken) return
 		SelectHandler.updateSelectOptions(accountSelect, data)
 
-		// Восстанавливаем выбранное значение из input.value или атрибута value
 		requestAnimationFrame(() => {
 			if (accountInput) {
 				const currentVal =
 					accountInput.value || accountInput.getAttribute('value')
 				SelectHandler.restoreSelectValue(accountSelect, currentVal)
+			}
+			// --- Если выбран чужой поставщик, выбираем Р/с Втб ---
+			if (otherSuppliers.includes(String(supplierId))) {
+				selectVtbAccount()
 			}
 		})
 	}
@@ -2143,8 +2175,8 @@ const mainConfig = createConfig(TRANSACTION, {
 	modalConfig: {
 		addModalUrl: '/components/main/add_transaction/',
 		editModalUrl: '/components/main/add_transaction/',
-		addModalTitle: 'Добавить транзакцию',
-		editModalTitle: 'Редактировать транзакцию',
+		addModalTitle: 'Добавить сделку',
+		editModalTitle: 'Редактировать сделку',
 	},
 })
 
@@ -2298,8 +2330,8 @@ const cashflowConfig = createConfig(CASH_FLOW, {
 	modalConfig: {
 		addModalUrl: '/components/main/add_cashflow/',
 		editModalUrl: '/components/main/add_cashflow/',
-		addModalTitle: 'Добавить транзакцию',
-		editModalTitle: 'Редактировать транзакцию',
+		addModalTitle: 'Добавить сделку',
+		editModalTitle: 'Редактировать сделку',
 	},
 })
 
@@ -2325,8 +2357,8 @@ const moneyTransfersConfig = createConfig(MONEY_TRANSFERS, {
 	modalConfig: {
 		addModalUrl: '/components/main/add_money_transfers/',
 		editModalUrl: '/components/main/add_money_transfers/',
-		addModalTitle: 'Добавить транзакцию',
-		editModalTitle: 'Редактировать транзакцию',
+		addModalTitle: 'Добавить сделку',
+		editModalTitle: 'Редактировать сделку',
 	},
 })
 
@@ -3200,7 +3232,7 @@ const handleCashFlow = async config => {
 									anchor: 'end',
 									align: 'end',
 									font: { size: 10, weight: 'bold' },
-									color: '#000',
+									color: '#1976d2',
 									formatter: value => value.toLocaleString('ru-RU') + ' р.',
 								},
 							},
@@ -3746,8 +3778,30 @@ const handleDebtors = async () => {
 								data.html +
 								'<div class="debtors-details-title">Инвесторы</div>' +
 								(data.html_investors || '') +
-								'<div class="debtors-details-title">Операции</div>' +
-								(data.html_operations || '')
+								`<div class="debtors-office-list__row" data-target="investor-operations-details">
+									<button class="debtors-office-list__toggle" type="button" aria-label="Подробнее">+</button>
+									<span class="debtors-details-title">Операции</span>
+								</div>
+								<div class="debtors-office-list__details" id="investor-operations-details" style="display:none;">
+									${data.html_operations || ''}
+								</div>`
+
+							const operationsRow = details.querySelector(
+								'[data-target="investor-operations-details"]'
+							)
+							const operationsDetails = details.querySelector(
+								'#investor-operations-details'
+							)
+							if (operationsRow && operationsDetails) {
+								operationsRow.addEventListener('click', function () {
+									const btn = operationsRow.querySelector(
+										'.debtors-office-list__toggle'
+									)
+									btn.classList.toggle('open')
+									const isOpen = operationsDetails.style.display !== 'none'
+									operationsDetails.style.display = isOpen ? 'none' : 'block'
+								})
+							}
 
 							const profitTable = details.querySelector(`#${data.table_id}`)
 							if (profitTable) {
@@ -3954,7 +4008,7 @@ const handleDebtors = async () => {
 								anchor: 'end',
 								align: 'end',
 								font: { size: 10, weight: 'bold' },
-								color: '#000',
+								color: '#1976d2',
 								formatter: value => value,
 							},
 						},
@@ -3991,7 +4045,7 @@ const handleDebtors = async () => {
 								anchor: 'end',
 								align: 'end',
 								font: { size: 10, weight: 'bold' },
-								color: '#000',
+								color: '#1976d2',
 								formatter: value => value,
 							},
 						},

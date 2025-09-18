@@ -10,7 +10,7 @@
                 {% for field in fields %}
                     <th class="table__cell-header {% if field.is_type_sign %}table__cell-header-sign{% endif %}"
                         data-column="{{ forloop.counter0 }}"
-                        data-column-type="{% if field.is_boolean %}checkbox{% elif field.is_relation or field.is_enum_field or field.is_type_sign %}select{% elif field.is_amount %}amount{% elif field.is_boolean %}boolean{% elif field.is_percent %}percent{% elif field.is_number %}number{% else %}text{% endif %}"
+                        data-column-type="{% if field.is_boolean %}checkbox{% elif field.is_relation or field.is_enum_field or field.is_type_sign %}select{% elif field.is_amount %}amount{% elif field.is_boolean %}boolean{% elif field.is_date %}date{% elif field.is_percent %}percent{% elif field.is_number %}number{% else %}text{% endif %}"
                         data-name="{{ field.name }}">
                         {{ field.verbose_name }}
                         <div class="table__resize-handle"></div>

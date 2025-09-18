@@ -62,6 +62,7 @@ urlpatterns = [
 	),
 	path("suppliers/debtors/details/", views.debtor_details, name="debtor_details"),
 	path("suppliers/list/", views.supplier_list, name="supplier_list"),
+    path("suppliers/list/others/", views.other_suppliers, name="other_suppliers"),
 	path("suppliers/<int:pk>/", views.supplier_detail, name="supplier_detail"),
 	path("suppliers/add/", views.supplier_create, name="supplier_create"),
 	path("suppliers/edit/<int:pk>/", views.supplier_edit, name="supplier_edit"),

@@ -39,4 +39,41 @@ document.addEventListener('DOMContentLoaded', () => {
 	})
 
 	observerInputs.observe(document.body, { childList: true, subtree: true })
+
+	document.querySelectorAll('.nav-list .nav-item').forEach(li => {
+		let timeout
+		let tooltip
+
+		li.addEventListener('touchstart', e => {
+			timeout = setTimeout(() => {
+				const icon = li.querySelector('.icon[data-hint]')
+				if (!icon) return
+				const hint = icon.dataset.hint
+				tooltip = document.createElement('div')
+				tooltip.className = 'icon-tooltip'
+				tooltip.textContent = hint
+				document.body.appendChild(tooltip)
+
+				const rect = li.getBoundingClientRect()
+				tooltip.style.left = rect.left + rect.width / 2 + 'px'
+				tooltip.style.top = rect.top - 8 + 'px'
+			}, 500)
+		})
+
+		li.addEventListener('touchend', e => {
+			clearTimeout(timeout)
+			if (tooltip) {
+				tooltip.remove()
+				tooltip = null
+			}
+		})
+
+		li.addEventListener('touchmove', e => {
+			clearTimeout(timeout)
+			if (tooltip) {
+				tooltip.remove()
+				tooltip = null
+			}
+		})
+	})
 })

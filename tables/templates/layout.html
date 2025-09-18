@@ -38,33 +38,105 @@
                 <nav class="sidebar-nav">
                     <ul class="nav-list">
                         <li class="nav-item {% if request.path == '/' %}active{% endif %}">
-                            <a href="{% url 'main:index' %}">Главная</a>
+                            <a href="{% url 'main:index' %}">
+                                <img src="{% static 'images/nav/house.svg' %}"
+                                    alt="Главная"
+                                    class="icon"
+                                    data-hint="Главная"
+                                    height="12"
+                                    width="12">
+                                <span>Главная</span>
+                            </a>
                         </li>
                         <li class="nav-item {% if request.resolver_match.url_name == 'debtors' %}active{% endif %}">
-                            <a href="{% url 'main:debtors' %}">Долги</a>
+                            <a href="{% url 'main:debtors' %}">
+                                <img src="{% static 'images/nav/money-bill-wave.svg' %}"
+                                    alt="Долги"
+                                    class="icon"
+                                    data-hint="Долги"
+                                    height="12"
+                                    width="12">
+                                <span>Долги</span>
+                            </a>
                         </li>
                         <li class="nav-item {% if request.resolver_match.url_name == 'cash_flow' %}active{% endif %}">
-                            <a href="{% url 'main:cash_flow' %}">ДДС</a>
+                            <a href="{% url 'main:cash_flow' %}">
+                                <img src="{% static 'images/nav/chart-line.svg' %}"
+                                    alt="ДДС"
+                                    class="icon"
+                                    data-hint="ДДС"
+                                    height="12"
+                                    width="12">
+                                <span>ДДС</span>
+                            </a>
                         </li>
                         <li class="nav-item {% if 'accounts' in request.path %}active{% endif %}">
-                            <a href="{% url 'main:supplier_accounts' %}">Остатки на счетах</a>
+                            <a href="{% url 'main:supplier_accounts' %}">
+                                <img src="{% static 'images/nav/wallet.svg' %}"
+                                    alt="Остатки на счетах"
+                                    class="icon"
+                                    data-hint="Остатки на счетах"
+                                    height="12"
+                                    width="12">
+                                <span>Остатки на счетах</span>
+                            </a>
                         </li>
                         <li class="nav-item {% if request.resolver_match.url_name == 'suppliers' %}active{% endif %}">
-                            <a href="{% url 'main:suppliers' %}">Поставщики</a>
+                            <a href="{% url 'main:suppliers' %}">
+                                <img src="{% static 'images/nav/truck.svg' %}"
+                                    alt="Поставщики"
+                                    class="icon"
+                                    data-hint="Поставщики"
+                                    height="12"
+                                    width="12">
+                                <span>Поставщики</span>
+                            </a>
                         </li>
                         <li class="nav-item {% if 'clients' in request.path %}active{% endif %}">
-                            <a href="{% url 'main:clients' %}">Клиенты</a>
+                            <a href="{% url 'main:clients' %}">
+                                <img src="{% static 'images/nav/user-group.svg' %}"
+                                    alt="Клиенты"
+                                    class="icon"
+                                    data-hint="Клиенты"
+                                    height="12"
+                                    width="12">
+                                <span>Клиенты</span>
+                            </a>
                         </li>
                         <li class="nav-item {% if request.resolver_match.url_name == 'cash_flow_report' %}active{% endif %}">
-                            <a href="{% url 'main:cash_flow_report' %}">Отчет ДДС</a>
+                            <a href="{% url 'main:cash_flow_report' %}">
+                                <img src="{% static 'images/nav/file-invoice-dollar.svg' %}"
+                                    alt="Отчет ДДС"
+                                    class="icon"
+                                    data-hint="Отчет ДДС"
+                                    height="12"
+                                    width="12">
+                                <span>Отчет ДДС</span>
+                            </a>
                         </li>
                         {% if request.user.is_authenticated and request.user.user_type.name == "Администратор" %}
                         <li class="nav-item {% if request.resolver_match.url_name == 'users' %}active{% endif %}">
-                            <a href="{% url 'main:users' %}">Пользователи</a>
+                            <a href="{% url 'main:users' %}">
+                                <img src="{% static 'images/nav/users-gear.svg' %}"
+                                    alt="Пользователи"
+                                    class="icon"
+                                    data-hint="Пользователи"
+                                    height="12"
+                                    width="12">
+                                <span>Пользователи</span>
+                            </a>
                         </li>
                         {% endif %}
                         <li class="nav-item {% if request.resolver_match.url_name == 'exchange' %}active{% endif %}">
-                            <a href="{% url 'main:exchange' %}">Обмен</a>
+                            <a href="{% url 'main:exchange' %}">
+                                <img src="{% static 'images/nav/arrow-right-arrow-left.svg' %}"
+                                    alt="Обмен"
+                                    class="icon"
+                                    data-hint="Обмен"
+                                    height="12"
+                                    width="12">
+                                <span>Обмен</span>
+                            </a>
                         </li>
                         {% comment %} <li class="nav-item {% if request.resolver_match.url_name == 'money_transfers' %}active{% endif %}">
                             <a href="{% url 'main:money_transfers' %}">Перемещение ₽</a>
@@ -76,5 +148,6 @@
                 </nav>
             {% endif %}
         </div>
+        <script src="{% static 'js/scripts.js' %}"></script>
     </body>
 </html>

@@ -10,6 +10,7 @@
                    name="paid_amount"
                    spellcheck="false"
                    placeholder="Введите оплаченную сумму"
+                   autocomplete="off"
                    {% if request.user.is_authenticated and request.user.user_type.name == "Ассистент" %} hidden {% endif %}
             />
         </div>

@@ -234,6 +234,19 @@ def supplier_list(request):
 
 @forbid_supplier
 @login_required
+def other_suppliers(request):
+    suppliers_data = Supplier.objects.filter(visible_for_assistant=False).values('id', 'name')
+    result = [
+        {
+            'id': s['id'],
+            'name': s['name']
+        }
+        for s in suppliers_data
+    ]
+    return JsonResponse(result, safe=False)
+
+@forbid_supplier
+@login_required
 @require_http_methods(["POST"])
 def transaction_create(request):
     try:
@@ -2776,7 +2789,7 @@ def settle_supplier_debt(request, pk: int):
                     supplier_fee = Decimal(math.floor(float(t.amount) * float(t.supplier_percentage) / 100))
                     row.supplier_debt = paid - supplier_fee - t.returned_by_supplier
                     fields = [
-                        {"name": "created_at", "verbose_name": "Дата"},
+                        {"name": "created_at", "verbose_name": "Дата", "is_date": True},
                         {"name": "supplier", "verbose_name": "Поставщик"},
                         {"name": "supplier_debt", "verbose_name": "Сумма", "is_amount": True},
                         {"name": "supplier_percentage", "verbose_name": "%", "is_percent": True},
@@ -2818,7 +2831,7 @@ def settle_supplier_debt(request, pk: int):
                     html_debt_repayments.append(render_to_string("components/table_row.html", {
                         "item": debtRepayment,
                         "fields": [
-                            {"name": "created_at", "verbose_name": "Дата"},
+                            {"name": "created_at", "verbose_name": "Дата", "is_date": True},
                             {"name": "amount", "verbose_name": "Сумма", "is_amount": True},
                             {"name": "comment", "verbose_name": "Комментарий"}
                         ]
@@ -2854,7 +2867,7 @@ def settle_supplier_debt(request, pk: int):
                     "bonus_debt": trans.bonus_debt,
                 })()
                 fields = [
-                    {"name": "created_at", "verbose_name": "Дата"},
+                    {"name": "created_at", "verbose_name": "Дата", "is_date": True},
                     {"name": "client", "verbose_name": "Клиент"},
                     {"name": "bonus_percentage", "verbose_name": "%", "is_percent": True},
                     {"name": "bonus_debt", "verbose_name": "Бонус", "is_amount": True},
@@ -2933,13 +2946,13 @@ def settle_supplier_debt(request, pk: int):
                 row = type("Row", (), {
                     "created_at": timezone.localtime(trans.created_at).strftime("%d.%m.%Y") if trans.created_at else "",
                     "client": str(trans.client) if trans.client else "",
-                    "client_percentage": trans.client_percentage,
+                    "amount": trans.amount,
                     "client_debt_paid": trans.client_debt_paid,
                 })()
                 fields = [
-                    {"name": "created_at", "verbose_name": "Дата"},
+                    {"name": "created_at", "verbose_name": "Дата", "is_date": True},
                     {"name": "client", "verbose_name": "Клиент"},
-                    {"name": "client_percentage", "verbose_name": "%", "is_percent": True},
+                    {"name": "amount", "verbose_name": "Сумма сделки", "is_amount": True},
                     {"name": "client_debt_paid", "verbose_name": "Выдать", "is_amount": True},
                 ]
                 html = render_to_string("components/table_row.html", {"item": row, "fields": fields})
@@ -3046,7 +3059,7 @@ def settle_supplier_debt(request, pk: int):
                 html_investor_debt_operation = render_to_string("components/table_row.html", {
                     "item": investorDebtOperation,
                     "fields": [
-                        {"name": "created_at", "verbose_name": "Дата"},
+                        {"name": "created_at", "verbose_name": "Дата", "is_date": True},
                         {"name": "investor", "verbose_name": "Инвестор"},
                         {"name": "operation_type", "verbose_name": "Тип операции"},
                         {"name": "amount", "verbose_name": "Сумма", "is_amount": True},
@@ -3272,7 +3285,7 @@ def settle_supplier_debt(request, pk: int):
 
                 
                 fields = [
-                    {"name": "created_at", "verbose_name": "Дата"},
+                    {"name": "created_at", "verbose_name": "Дата", "is_date": True},
                     {"name": "client", "verbose_name": "Клиент"},
                     {"name": "amount", "verbose_name": "Сумма", "is_amount": True},
                     {"name": "profit", "verbose_name": "Прибыль", "is_amount": True},
@@ -3285,7 +3298,7 @@ def settle_supplier_debt(request, pk: int):
                 html_investor_debt_operation = render_to_string("components/table_row.html", {
                     "item": investorDebtOperation,
                     "fields": [
-                        {"name": "created_at", "verbose_name": "Дата"},
+                        {"name": "created_at", "verbose_name": "Дата", "is_date": True},
                         {"name": "investor", "verbose_name": "Инвестор"},
                         {"name": "operation_type", "verbose_name": "Тип операции"},
                         {"name": "amount", "verbose_name": "Сумма", "is_amount": True},
@@ -3456,7 +3469,7 @@ def profit_distribution(request):
     is_admin = request.user.user_type.name == 'Администратор' if hasattr(request.user, 'user_type') else False
 
     fields = [
-        {"name": "created_at", "verbose_name": "Дата"},
+        {"name": "created_at", "verbose_name": "Дата", "is_date": True},
         {"name": "client", "verbose_name": "Клиент"},
         {"name": "supplier", "verbose_name": "Поставщик"},
         {"name": "amount", "verbose_name": "Сумма", "is_amount": True},
@@ -3498,7 +3511,7 @@ def debtor_details(request):
         )
 
         transaction_fields = [
-            {"name": "created_at", "verbose_name": "Дата"},
+            {"name": "created_at", "verbose_name": "Дата", "is_date": True},
             {"name": "supplier", "verbose_name": "Поставщик"},
             {"name": "supplier_debt", "verbose_name": "Сумма", "is_amount": True},
             {"name": "supplier_percentage", "verbose_name": "%", "is_percent": True},
@@ -3514,7 +3527,7 @@ def debtor_details(request):
 
         repayments = SupplierDebtRepayment.objects.filter(supplier_id__in=supplier_ids)
         repayment_fields = [
-            {"name": "created_at", "verbose_name": "Дата"},
+            {"name": "created_at", "verbose_name": "Дата", "is_date": True},
             {"name": "amount", "verbose_name": "Сумма", "is_amount": True},
             {"name": "comment", "verbose_name": "Комментарий"}
         ]
@@ -3550,9 +3563,9 @@ def debtor_details(request):
                 if getattr(t, 'client_debt_paid', 0) != 0
             ]
             fields = [
-                {"name": "created_at", "verbose_name": "Дата"},
+                {"name": "created_at", "verbose_name": "Дата", "is_date": True},
                 {"name": "client", "verbose_name": "Клиент"},
-                {"name": "client_percentage", "verbose_name": "%", "is_percent": True},
+                {"name": "amount", "verbose_name": "Сумма сделки", "is_amount": True},
                 {"name": "client_debt_paid", "verbose_name": "Выдать", "is_amount": True},
             ]
             data = []
@@ -3560,7 +3573,7 @@ def debtor_details(request):
                 data.append(type("Row", (), {
                     "created_at": timezone.localtime(t.created_at).strftime("%d.%m.%Y") if t.created_at else "",
                     "client": str(t.client) if t.client else "",
-                    "client_percentage": t.client_percentage,
+                    "amount": t.amount,
                     "client_debt_paid": t.client_debt_paid,
                 })())
             table_id = "summary-remaining"
@@ -3575,7 +3588,7 @@ def debtor_details(request):
         elif value == "Бонусы":
             transactions = Transaction.objects.filter(paid_amount__gt=0)
             fields = [
-                {"name": "created_at", "verbose_name": "Дата"},
+                {"name": "created_at", "verbose_name": "Дата", "is_date": True},
                 {"name": "client", "verbose_name": "Клиент"},
                 {"name": "bonus_percentage", "verbose_name": "%", "is_percent": True},
                 {"name": "bonus_debt", "verbose_name": "Бонус", "is_amount": True},
@@ -3633,7 +3646,7 @@ def debtor_details(request):
                 ))
 
             fields = [
-                {"name": "created_at", "verbose_name": "Дата"},
+                {"name": "created_at", "verbose_name": "Дата", "is_date": True},
                 {"name": "client", "verbose_name": "Клиент"},
                 {"name": "amount", "verbose_name": "Сумма", "is_amount": True},
                 {"name": "profit", "verbose_name": "Прибыль", "is_amount": True},
@@ -3670,7 +3683,7 @@ def debtor_details(request):
 
             investor_operations = InvestorDebtOperation.objects.all()
             operation_fields = [
-                {"name": "created_at", "verbose_name": "Дата"},
+                {"name": "created_at", "verbose_name": "Дата", "is_date": True},
                 {"name": "investor", "verbose_name": "Инвестор"},
                 {"name": "operation_type", "verbose_name": "Тип операции"},
                 {"name": "amount", "verbose_name": "Сумма", "is_amount": True},
@@ -4137,7 +4150,7 @@ def edit_supplier_debt_repayment(request, pk=None):
             context = {
                 "item": debt_repay,
                 "fields": [
-                    {"name": "created_at", "verbose_name": "Дата"},
+                    {"name": "created_at", "verbose_name": "Дата", "is_date": True},
                     {"name": "amount", "verbose_name": "Сумма", "is_amount": True},
                     {"name": "comment", "verbose_name": "Комментарий"}
                 ]
@@ -4340,7 +4353,7 @@ def close_investor_debt(request, pk):
                                 "profit": obj.amount - obj.returned_to_investor,
                             })()
                             fields = [
-                                {"name": "created_at", "verbose_name": "Дата"},
+                                {"name": "created_at", "verbose_name": "Дата", "is_date": True},
                                 {"name": "client", "verbose_name": "Клиент"},
                                 {"name": "amount", "verbose_name": "Сумма", "is_amount": True},
                                 {"name": "profit", "verbose_name": "Прибыль", "is_amount": True},
@@ -4364,7 +4377,7 @@ def close_investor_debt(request, pk):
                                 "profit": t.profit - t.returned_to_investor,
                             })()
                             fields = [
-                                {"name": "created_at", "verbose_name": "Дата"},
+                                {"name": "created_at", "verbose_name": "Дата", "is_date": True},
                                 {"name": "client", "verbose_name": "Клиент"},
                                 {"name": "amount", "verbose_name": "Сумма", "is_amount": True},
                                 {"name": "profit", "verbose_name": "Прибыль", "is_amount": True},
@@ -4385,7 +4398,7 @@ def close_investor_debt(request, pk):
             html_investor_debt_operation = render_to_string("components/table_row.html", {
                 "item": investorDebtOperation,
                 "fields": [
-                    {"name": "created_at", "verbose_name": "Дата"},
+                    {"name": "created_at", "verbose_name": "Дата", "is_date": True},
                     {"name": "investor", "verbose_name": "Инвестор"},
                     {"name": "operation_type", "verbose_name": "Тип операции"},
                     {"name": "amount", "verbose_name": "Сумма", "is_amount": True},

@@ -59,6 +59,7 @@ class ColumnSizeCalculator {
 		checkbox: { min: 50, max: 100 },
 		percent: { min: 50, max: 80 },
 		boolean: { min: 50, max: 80 },
+		date: { min: 100, max: 100 },
 	}
 
 	constructor(tableElement, headerCells, initialWidths) {
@@ -948,6 +949,18 @@ export const TableManager = {
 		})
 		this.setInitialCellSelection()
 		this.attachGlobalCellClickHandler()
+
+		if (!document.querySelector('.table-sum-indicator')) {
+			const sumDiv = document.createElement('div')
+			sumDiv.className = 'table-sum-indicator'
+			sumDiv.style.display = 'none'
+			const container = document.querySelector('.page-table-container')
+			if (container) {
+				container.appendChild(sumDiv)
+			} else {
+				document.body.appendChild(sumDiv)
+			}
+		}
 	},
 
 	initTable(tableId) {
@@ -1025,15 +1038,51 @@ export const TableManager = {
 			event.preventDefault()
 			this.onTableCellClick(event, true)
 		})
+
+		// document.addEventListener(
+		// 	'click',
+		// 	event => {
+		// 		const cell = event.target.closest('.table__cell')
+		// 		const table = event.target.closest('.table')
+		// 		if (!cell && !table) {
+		// 			const tables = document.querySelectorAll('.table')
+		// 			tables.forEach(tableEl => {
+		// 				const selectedCells = tableEl.querySelectorAll(
+		// 					'.table__cell--selected'
+		// 				)
+		// 				if (selectedCells.length <= 1) return
+
+		// 				const rows = Array.from(
+		// 					tableEl.querySelectorAll('.table__row')
+		// 				).filter(row => !row.classList.contains('hidden-row'))
+		// 				const firstRow = rows[0]
+		// 				const firstCell = firstRow?.querySelector('.table__cell')
+
+		// 				tableEl.querySelectorAll('.table__cell--selected').forEach(el => {
+		// 					el.classList.remove('table__cell--selected')
+		// 				})
+		// 				tableEl.querySelectorAll('.table__row--selected').forEach(el => {
+		// 					el.classList.remove('table__row--selected')
+		// 				})
+
+		// 				if (firstRow) firstRow.classList.add('table__row--selected')
+		// 				if (firstCell) firstCell.classList.add('table__cell--selected')
+		// 			})
+
+		// 			const sumDiv = document.querySelector('.table-sum-indicator')
+		// 			if (sumDiv) sumDiv.style.display = 'none'
+		// 		}
+		// 	},
+		// 	true
+		// )
 	},
 
 	onTableCellClick(event) {
 		const cell = event.target.closest('.table__cell')
 		if (!cell) return
-
-		document.querySelectorAll('.table__cell--selected').forEach(el => {
-			el.classList.remove('table__cell--selected')
-		})
+		if (event.ctrlKey) {
+			event.preventDefault()
+		}
 
 		const table = cell.closest('.table')
 		if (table) {
@@ -1042,9 +1091,48 @@ export const TableManager = {
 			})
 		}
 
-		cell.classList.add('table__cell--selected')
+		const sumDiv = document.querySelector('.table-sum-indicator')
 
-		cell.parentElement.classList.add('table__row--selected')
+		if (event.ctrlKey) {
+			if (cell.classList.contains('table__cell--selected')) {
+				cell.classList.remove('table__cell--selected')
+				cell.parentElement.classList.remove('table__row--selected')
+			} else {
+				cell.classList.add('table__cell--selected')
+				cell.parentElement.classList.add('table__row--selected')
+			}
+
+			let sum = 0
+			let allRub = true
+			let allPercent = true
+
+			const selectedCells = document.querySelectorAll('.table__cell--selected')
+			selectedCells.forEach(selectedCell => {
+				const text = selectedCell.textContent.trim()
+				const val = text.replace(/[^\d.,-]/g, '').replace(',', '.')
+				const num = parseFloat(val)
+				if (!isNaN(num)) sum += num
+
+				if (!/р\.$/.test(text)) allRub = false
+				if (!/%$/.test(text)) allPercent = false
+			})
+
+			let suffix = ''
+			if (allRub) suffix = ' р.'
+			else if (allPercent) suffix = '%'
+
+			sumDiv.textContent = 'Сумма: ' + TableManager.formatNumber(sum) + suffix
+			sumDiv.style.display = 'block'
+		} else {
+			document.querySelectorAll('.table__cell--selected').forEach(el => {
+				el.classList.remove('table__cell--selected')
+			})
+
+			cell.classList.add('table__cell--selected')
+			cell.parentElement.classList.add('table__row--selected')
+
+			if (sumDiv) sumDiv.style.display = 'none'
+		}
 	},
 
 	setInitialCellSelection() {
@@ -2114,36 +2202,85 @@ document.addEventListener('DOMContentLoaded', function () {
 		}
 	}
 
-	// function resizeCharts() {
-	// 	const statsChart = document.getElementById('statsChart')
-	// 	const profitChart = document.getElementById('profitChart')
-	// 	if (!statsChart || !profitChart) return
-	// 	const w = statsChart.parentElement.offsetWidth
-	// 	let h = 264
-	// 	let profitW = 40
-	// 	if (window.innerWidth <= 600) {
-	// 		h = 200
-	// 		profitW = 35
-	// 	} else if (window.innerWidth <= 1024) {
-	// 		h = 180
-	// 	}
-	// 	statsChart.width = w
-	// 	statsChart.height = h
-	// 	profitChart.width = profitW
-	// 	profitChart.height = h
+	document.addEventListener('keydown', function (e) {
+		const selectedCell = document.querySelector('.table__cell--selected')
+		if (!selectedCell) return
 
-	// 	if (window.capitalChart) {
-	// 		window.capitalChart.destroy()
-	// 		window.capitalChart = null
-	// 	}
-	// 	if (window.profitChartInstance) {
-	// 		window.profitChartInstance.destroy()
-	// 		window.profitChartInstance = null
-	// 	}
-	// 	if (window.drawCharts) {
-	// 		window.drawCharts()
-	// 	}
-	// }
-	// window.addEventListener('resize', resizeCharts)
-	// resizeCharts()
+		if (
+			e.ctrlKey &&
+			(e.key === 'c' ||
+				e.key === 'C' ||
+				e.key === 'с' ||
+				e.key === 'С' ||
+				e.code === 'KeyC')
+		) {
+			const text = selectedCell.textContent.trim()
+
+			if (text) {
+				navigator.clipboard.writeText(text).catch(() => {
+					const textarea = document.createElement('textarea')
+					textarea.value = text
+					document.body.appendChild(textarea)
+					textarea.select()
+					document.execCommand('copy')
+					document.body.removeChild(textarea)
+				})
+			}
+			e.preventDefault()
+			return
+		}
+
+		const row = selectedCell.parentElement
+		const table = row.closest('.table')
+		if (!table) return
+
+		const rows = Array.from(
+			table.querySelectorAll('.table__row:not(.hidden-row)')
+		)
+		const rowIndex = rows.indexOf(row)
+		const cells = Array.from(row.querySelectorAll('.table__cell:not(.hidden)'))
+		const cellIndex = cells.indexOf(selectedCell)
+
+		let newRowIndex = rowIndex
+		let newCellIndex = cellIndex
+
+		if (e.key === 'ArrowRight') {
+			newCellIndex = cellIndex + 1
+			if (newCellIndex >= cells.length) {
+				newCellIndex = 0
+			}
+		} else if (e.key === 'ArrowLeft') {
+			newCellIndex = cellIndex - 1
+			if (newCellIndex < 0) {
+				newCellIndex = cells.length - 1
+			}
+		} else if (e.key === 'ArrowDown') {
+			newRowIndex = rowIndex + 1
+			if (newRowIndex >= rows.length) newRowIndex = 0
+		} else if (e.key === 'ArrowUp') {
+			newRowIndex = rowIndex - 1
+			if (newRowIndex < 0) newRowIndex = rows.length - 1
+		} else {
+			return
+		}
+
+		const targetRow = rows[newRowIndex]
+		const targetCells = Array.from(
+			targetRow.querySelectorAll('.table__cell:not(.hidden)')
+		)
+		const targetCell = targetCells[newCellIndex] || targetCells[0]
+
+		if (targetCell) {
+			document.querySelectorAll('.table__cell--selected').forEach(cell => {
+				cell.classList.remove('table__cell--selected')
+			})
+			document.querySelectorAll('.table__row--selected').forEach(r => {
+				r.classList.remove('table__row--selected')
+			})
+			targetCell.classList.add('table__cell--selected')
+			targetRow.classList.add('table__row--selected')
+			targetCell.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+			e.preventDefault()
+		}
+	})
 })

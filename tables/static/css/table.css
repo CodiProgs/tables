@@ -645,7 +645,7 @@ td.hidden {
 
 .hidden-rows-counter {
 	position: absolute;
-	bottom: 5px;
+	bottom: 50px;
 	right: 10px;
 	background-color: #f0f0f0;
 	border: 1px solid #ccc;
@@ -660,10 +660,6 @@ td.hidden {
 }
 
 @media (max-width: 525px) {
-	.hidden-rows-counter {
-		bottom: 45px;
-	}
-
 	.pagination-controls {
 		justify-content: center;
 	}

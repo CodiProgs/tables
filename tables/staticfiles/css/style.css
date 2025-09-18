@@ -493,6 +493,10 @@ textarea::placeholder {
 	border-bottom: 1px solid #e1e6eb;
 }
 
+.nav-list img {
+	display: none;
+}
+
 .nav-item a {
 	display: block;
 	padding: 6px 20px;
@@ -524,7 +528,7 @@ textarea::placeholder {
 
 @media (max-width: 1024px) {
 	.nav-list {
-		grid-template-columns: repeat(3, minmax(150px, 1fr)) !important;
+		grid-template-columns: repeat(3, minmax(auto, 1fr)) !important;
 		grid-template-rows: auto;
 	}
 
@@ -534,20 +538,37 @@ textarea::placeholder {
 }
 
 @media (max-width: 525px) {
-	.nav-list {
-		grid-template-columns: repeat(2, minmax(150px, 1fr)) !important;
-	}
-
-	.nav-item a {
-		padding: 6px 12px;
-	}
-
 	html,
 	body,
 	* {
 		user-select: none;
 		-webkit-user-select: none;
 		-ms-user-select: none;
+	}
+}
+
+@media (max-width: 600px) {
+	.nav-list {
+		grid-template-columns: repeat(9, minmax(auto, 1fr)) !important;
+	}
+	.nav-list img {
+		display: inline-block;
+	}
+
+	.nav-item a {
+		padding: 8px 0;
+	}
+	.nav-item a span {
+		display: none;
+	}
+
+	.nav-item .icon {
+		width: 18px;
+		height: 18px;
+	}
+
+	.nav-item.active a {
+		background-color: #4f8ad9;
 	}
 }
 
@@ -1037,4 +1058,52 @@ textarea::placeholder {
 #summary-2 .table-container,
 #summary-3 .table-container {
 	max-height: 400px;
+}
+
+.table-sum-indicator {
+	position: absolute;
+	bottom: 50px;
+	left: 10px;
+	background-color: #f0f0f0;
+	border: 1px solid #ccc;
+	padding: 5px 10px;
+	border-radius: 4px;
+	font-size: 12px;
+	box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+	z-index: 100;
+	display: none;
+	margin-left: auto;
+	margin-top: 10px;
+}
+
+@media (max-width: 525px) {
+	.hidden-rows-counter {
+		bottom: 45px;
+	}
+}
+
+#investor-operations-details {
+	padding: 4px 0;
+}
+
+#summary-3 .debtors-office-list__row {
+	background-color: transparent;
+	margin-top: 10px;
+}
+
+#summary-3 .debtors-office-list__row .debtors-details-title {
+	border: none;
+}
+
+.icon-tooltip {
+	position: absolute;
+	background: #333;
+	color: #fff;
+	font-size: 12px;
+	padding: 4px 8px;
+	border-radius: 4px;
+	white-space: nowrap;
+	z-index: 1000;
+	pointer-events: none;
+	transform: translate(-50%, -120%);
 }
