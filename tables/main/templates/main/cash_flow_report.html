@@ -4,9 +4,23 @@
     <div class="page-table-container" id="cash_flow_report-container">
         {% include "components/table.html" with id="cash_flow_report-table" fields=fields data=data %}
     </div>
+    <div id="context-menu" class="dropdown-menu">
+        <a class="dropdown-item context-action"
+            id="show-button"
+            data-action="show">Добавить</a>
+    </div>
 {% endblock content %}
 {% block extra_scripts %}
     {{ block.super }}
     <script src="{% static 'main/js/main.js' %}" type="module"></script>
     <script src="{% static 'main/js/autonumeric.js' %}"></script>
 {% endblock extra_scripts %}
+
+
+{% comment %} фамилия имя отчество удалить
+
+отзеркалить
+
+сохранять в бд у пользователя скрытые строки
+
+баланс отдельно {% endcomment %}

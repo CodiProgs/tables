@@ -1089,9 +1089,16 @@ const setupSelectListener = () => {
 				try {
 					const { data } = await fetchData(`${BASE_URL}clients/${optionValue}/`)
 					const percentageInput = document.getElementById('client_percentage')
+					const bonusPercentageInput =
+						document.getElementById('bonus_percentage')
 					if (percentageInput && data.percentage !== undefined) {
 						percentageInput.value = data.percentage
 						setupPercentInput('client_percentage')
+					}
+
+					if (bonusPercentageInput && data.bonus_percentage !== undefined) {
+						bonusPercentageInput.value = data.bonus_percentage
+						setupPercentInput('bonus_percentage')
 					}
 				} catch (error) {
 					console.error('Ошибка при обработке значения клиента:', error)
@@ -2225,9 +2232,11 @@ const usersConfig = createConfig('users', {
 const clientsConfig = createConfig(CLIENTS, {
 	editFunc: () => {
 		setupPercentInput('percentage')
+		setupPercentInput('bonus_percentage')
 	},
 	addFunc: () => {
 		setupPercentInput('percentage')
+		setupPercentInput('bonus_percentage')
 	},
 	afterAddFunc: result => refreshData(`${CLIENTS}-table`, result.id),
 	afterEditFunc: result => refreshData(`${CLIENTS}-table`),

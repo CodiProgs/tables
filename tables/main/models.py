@@ -15,6 +15,12 @@ class Client(models.Model):
         null=True,
         verbose_name="Комментарий"
     )
+    bonus_percentage = models.DecimalField(
+        max_digits=5,
+        decimal_places=1,
+        default=0.0,
+        verbose_name="%"
+    )
 
     def __str__(self):
         return self.name

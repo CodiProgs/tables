@@ -2,9 +2,11 @@
 {% load static %}
 {% block content %}
     <div class="page-table-container" id="suppliers-account-container">
-                {% include "components/table.html" with id="suppliers-account-table" fields=fields data=data %}
-                <div id="summary-container" class="summary-container">
-                </div>
+        <div id="table-container">
+        {% include "components/table.html" with id="suppliers-account-table" fields=fields data=data %}
+        </div>
+        <div id="summary-container" class="summary-container">
+        </div>
         <div id="context-menu"
              class="dropdown-menu"
              data-is-admin="{{ is_admin|yesno:'true,false' }}">

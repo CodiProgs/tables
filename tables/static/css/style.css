@@ -1107,3 +1107,13 @@ textarea::placeholder {
 	pointer-events: none;
 	transform: translate(-50%, -120%);
 }
+
+#table-container {
+	height: 100%;
+}
+
+#table-container .table-container {
+	overflow-y: hidden;
+	flex: 0 0 auto;
+	height: max-content;
+}

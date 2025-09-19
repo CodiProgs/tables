@@ -893,6 +893,7 @@ def get_client_fields():
     excluded = [
         "id",
         "percentage",
+        "bonus_percentage"
     ]
     fields = get_model_fields(
         Client,
@@ -901,6 +902,7 @@ def get_client_fields():
 
     insertions = [
         (1, {"name": "percentage", "verbose_name": "%", "is_percent": True, }),
+        (3, {"name": "bonus_percentage", "verbose_name": "%", "is_percent": True, }),
     ]
 
     for pos, field in insertions:
@@ -917,6 +919,7 @@ def client_create(request):
             name = request.POST.get("name")
             percentage = clean_percentage(request.POST.get("percentage"))
             comment = request.POST.get("comment", "")
+            bonus_percentage = clean_percentage(request.POST.get("bonus_percentage", "0"))
 
             if not name or not percentage:
                 return JsonResponse(
@@ -928,6 +931,7 @@ def client_create(request):
                 name=name,
                 percentage=float(percentage),
                 comment=comment,
+                bonus_percentage=float(bonus_percentage) if bonus_percentage is not None else 0,
             )
 
             context = {
@@ -958,6 +962,7 @@ def client_edit(request, pk=None):
             name = request.POST.get("name")
             percentage = clean_percentage(request.POST.get("percentage"))
             comment = request.POST.get("comment", "")
+            bonus_percentage = clean_percentage(request.POST.get("bonus_percentage", "0"))
 
             if not name or not percentage:
                 return JsonResponse(
@@ -971,6 +976,7 @@ def client_edit(request, pk=None):
             client.name = name
             client.percentage = float(percentage)
             client.comment = comment
+            client.bonus_percentage = float(bonus_percentage) if bonus_percentage is not None else 0
 
             # if old_percentage != new_percentage:
             #     Transaction.objects.filter(
@@ -2788,12 +2794,15 @@ def settle_supplier_debt(request, pk: int):
                     paid = t.paid_amount or Decimal(0)
                     supplier_fee = Decimal(math.floor(float(t.amount) * float(t.supplier_percentage) / 100))
                     row.supplier_debt = paid - supplier_fee - t.returned_by_supplier
+                    row.amount = t.amount
                     fields = [
                         {"name": "created_at", "verbose_name": "Дата", "is_date": True},
                         {"name": "supplier", "verbose_name": "Поставщик"},
-                        {"name": "supplier_debt", "verbose_name": "Сумма", "is_amount": True},
+                        {"name": "amount", "verbose_name": "Сумма сделки", "is_amount": True},
                         {"name": "supplier_percentage", "verbose_name": "%", "is_percent": True},
+                        {"name": "supplier_debt", "verbose_name": "Сумма", "is_amount": True},
                     ]
+                    
                     changed_html_rows.append(render_to_string("components/table_row.html", {"item": row, "fields": fields}))
                     changed_ids.append(t.id)
 
@@ -3169,7 +3178,7 @@ def settle_supplier_debt(request, pk: int):
                 # investors = [{"name": inv["name"], "amount": inv["balance"]} for inv in investors]
                 # investors_total = sum([inv["amount"] for inv in investors], Decimal(0))
 
-                bonuses = sum((t.bonus_debt or Decimal(0)) for t in Transaction.objects.all())
+                bonuses = sum((t.bonus_debt or Decimal(0)) for t in Transaction.objects.filter(paid_amount__gt=0))
 
                 client_debts = sum((t.client_debt or Decimal(0)) for t in Transaction.objects.filter(paid_amount__gt=0).all())
 
@@ -3214,7 +3223,7 @@ def settle_supplier_debt(request, pk: int):
                             {"name": "Кредиторская задолженность", "amount": client_debts},
                             {"name": "Краткосрочные обязательства", "amount": short_term},
                             {"name": "Бонусы", "amount": bonuses},
-                            {"name": "Долг инвесторам", "amount": total_profit},
+                            {"name": "Выплата инвесторам", "amount": total_profit},
                         ],
                     },
                     "capital": capital,
@@ -3513,16 +3522,18 @@ def debtor_details(request):
         transaction_fields = [
             {"name": "created_at", "verbose_name": "Дата", "is_date": True},
             {"name": "supplier", "verbose_name": "Поставщик"},
-            {"name": "supplier_debt", "verbose_name": "Сумма", "is_amount": True},
+            {"name": "amount", "verbose_name": "Сумма сделки", "is_amount": True},
             {"name": "supplier_percentage", "verbose_name": "%", "is_percent": True},
+            {"name": "supplier_debt", "verbose_name": "Сумма", "is_amount": True},
         ]
         transaction_data = []
         for t in transactions:
             transaction_data.append(type("Row", (), {
                 "created_at": timezone.localtime(t.created_at).strftime("%d.%m.%Y") if t.created_at else "",
                 "supplier": str(t.supplier) if t.supplier else "",
-                "supplier_debt": t.supplier_debt,
+                "amount": t.amount,
                 "supplier_percentage": t.supplier_percentage,
+                "supplier_debt": t.supplier_debt,
             })())
 
         repayments = SupplierDebtRepayment.objects.filter(supplier_id__in=supplier_ids)
@@ -3770,7 +3781,7 @@ def company_balance_stats(request):
 
     safe_amount += cash_balance
 
-    bonuses = sum((t.bonus_debt or Decimal(0)) for t in Transaction.objects.all())
+    bonuses = sum((t.bonus_debt or Decimal(0)) for t in Transaction.objects.filter(paid_amount__gt=0))
 
     client_debts = sum((t.client_debt or Decimal(0)) for t in Transaction.objects.filter(paid_amount__gt=0).all())
 

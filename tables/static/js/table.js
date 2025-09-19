@@ -2203,6 +2203,17 @@ document.addEventListener('DOMContentLoaded', function () {
 	}
 
 	document.addEventListener('keydown', function (e) {
+		const active = document.activeElement
+		if (
+			active &&
+			(active.tagName === 'INPUT' ||
+				active.tagName === 'TEXTAREA' ||
+				active.tagName === 'SELECT' ||
+				active.isContentEditable)
+		) {
+			return
+		}
+
 		const selectedCell = document.querySelector('.table__cell--selected')
 		if (!selectedCell) return
 
