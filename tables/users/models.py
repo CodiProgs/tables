@@ -39,15 +39,9 @@ class UserType(models.Model):
 
 class User(AbstractUser):
     username = models.CharField(max_length=150, unique=True, verbose_name="Логин")
-    last_name = models.CharField(
-        max_length=150, blank=True, null=True, verbose_name="Фамилия"
-    )
-    first_name = models.CharField(
-        max_length=150, blank=True, null=True, verbose_name="Имя"
-    )
-    patronymic = models.CharField(
-        max_length=150, blank=True, null=True, verbose_name="Отчество"
-    )
+    last_name = None
+    first_name = None
+    
     date_joined = models.DateTimeField(auto_now_add=True, verbose_name="Создан")
     is_active = models.BooleanField(default=True, verbose_name="Активен")
     user_type = models.ForeignKey(
@@ -107,3 +101,11 @@ class WebAuthnCredential(models.Model):
         ]
         verbose_name = "WebAuthn Credential"
         verbose_name_plural = "WebAuthn Credentials"
+
+class HiddenRows(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='hidden_rows')
+    table = models.CharField(max_length=100)
+    hidden_ids = models.JSONField(default=list)
+
+    class Meta:
+        unique_together = ('user', 'table')

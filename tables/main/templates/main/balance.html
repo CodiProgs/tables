@@ -1,0 +1,58 @@
+{% extends "layout.html" %}
+{% load static %}
+{% block content %}
+    <div class="page-table-container" id="debtors-container">
+        <div id="context-menu" class="dropdown-menu">
+            {% if not is_supplier %}
+            <a class="dropdown-item context-action"
+                id="settle-debt-button"
+                data-action="settle-debt">Погасить долг</a>
+            <a class="dropdown-item context-action"
+                id="settle-debt-all-button"
+                data-action="settle-debt-all">Погасить долг по всем</a>
+            <a class="dropdown-item context-action"
+                id="repayment-edit-button"
+                data-action="repayment-edit">Изменить</a>
+            {% endif %}
+            <div class="dropdown-divider">
+            </div>
+            <a class="dropdown-item context-action"
+               id="hide-button"
+               data-action="hide">Скрыть</a>
+            <a class="dropdown-item context-action"
+               id="hide-all-button"
+               data-action="hide-all">Скрыть все</a>
+            <a class="dropdown-item context-action"
+               id="show-all-button"
+               data-action="show-all">Показать все</a>
+        </div>
+        <div class="stats-container">
+            {% if is_admin %}
+            <button id="refresh-stats-button" class="stats-refresh-button" title="Обновить статистику">
+                <img src="{% static 'images/arrows-rotate.svg' %}" alt="Обновить"
+                     height="16"
+                     width="16">
+            </button>
+            <h2 class="debtors-office-list__header debtors-office__header">Баланс</h2>
+            <div id="balance-container"></div>
+            <h2 class="debtors-office-list__header debtors-office__header debtors-office__header--top">Рентабельность капитала</h2>
+            <div class="charts-container">
+                <div class="chart-stats">
+                    <canvas id="statsChart"></canvas>
+                </div>
+                <div class="chart-profit">
+                    <canvas id="profitChart"></canvas>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+{% endblock content %}
+{% block extra_scripts %}
+    {{ block.super }}
+    <script src="{% static 'main/js/main.js' %}" type="module"></script>
+    <script src="{% static 'main/js/autonumeric.js' %}" defer></script>
+    <script src="{% static 'main/js/chart.js' %}" type="module" defer></script>
+    <script src="{% static 'main/js/chartjs-plugin-datalabels.js' %}" type="module" defer></script>
+    {{ data_ids|json_script:"data-ids" }}
+{% endblock extra_scripts %}

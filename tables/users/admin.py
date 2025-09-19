@@ -3,11 +3,13 @@ from django.contrib import admin
 from .models import (
     User,
 	UserType,
-	WebAuthnCredential
+	WebAuthnCredential,
+    HiddenRows
 )
 
 admin.site.register(UserType)
 admin.site.register(WebAuthnCredential)
+admin.site.register(HiddenRows)
 
 
 class UserAdmin(admin.ModelAdmin):

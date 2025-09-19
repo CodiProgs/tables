@@ -55,6 +55,7 @@ urlpatterns = [
 	path("clients/delete/<int:pk>/", views.client_delete, name="client_delete"),
 	path("suppliers/", views.suppliers, name="suppliers"),
 	path("suppliers/debtors/", views.debtors, name="debtors"),
+	path("suppliers/balance/", views.balance, name="balance"),
 	path(
 		"suppliers/debtors/<str:type>/<pk>/",
 		views.debtor_detail,
@@ -84,4 +85,7 @@ urlpatterns = [
     path('exchange/', views.exchange, name='exchange'),
     path('money_logs/', views.money_logs, name='money_logs'),
     path('suppliers/close_investor_debt/<pk>/', views.close_investor_debt, name='close_investor_debt'),
+    path("hidden_rows/get/", views.get_hidden_rows, name="get_hidden_rows"),
+    path("hidden_rows/set/", views.set_hidden_rows, name="set_hidden_rows"),
+    path("hidden_rows/clear/", views.clear_hidden_rows, name="clear_hidden_rows"),
 ]

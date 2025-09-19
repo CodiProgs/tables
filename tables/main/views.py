@@ -20,7 +20,7 @@ from calendar import monthrange
 from django.core.cache import cache
 from django.contrib.admin.views.decorators import staff_member_required
 from django.utils import timezone
-from users.models import User, UserType
+from users.models import User, UserType, HiddenRows
 import math
 
 
@@ -2737,6 +2737,84 @@ def debtors(request):
     }
     return render(request, "main/debtors.html", context)
 
+@login_required
+def balance(request):
+    user = request.user
+    is_admin = hasattr(user, 'user_type') and user.user_type.name == 'Администратор'
+
+    is_supplier = hasattr(request.user, 'user_type') and request.user.user_type.name == 'Поставщик' or request.user.user_type.name == 'Филиал'
+
+    branches = list(Branch.objects.all().values('id', 'name'))
+
+    if is_supplier:
+        branch = None
+        if hasattr(user, 'branch') and user.branch:
+            branch = user.branch
+        else:
+            supplier = Supplier.objects.filter(user=user).first()
+            if supplier:
+                branch = supplier.branch
+        if branch:
+            branches = [b for b in branches if b['id'] == branch.id]
+
+    transactions = Transaction.objects.select_related('supplier__branch').filter(paid_amount__gt=0).all()
+
+    branch_debts = defaultdict(float)
+    for t in transactions:
+        branch = t.supplier.branch if t.supplier and t.supplier.branch else None
+        if branch and branch.name != "Филиал 1" and branch.name != "Наши Ип":
+            branch_debts[branch.name] += float(getattr(t, 'supplier_debt', 0))
+
+    branch_debts_list = [
+        {"branch": branch['name'], "debt": branch_debts.get(branch['name'], 0)}
+        for branch in branches
+    ]
+
+    total_branch_debts = sum(
+        branch['debt'] for branch in branch_debts_list if branch['branch'] != "Филиал 1" and branch['branch'] != "Наши Ип"
+    )
+
+    total_bonuses = sum(float(t.bonus_debt) for t in transactions)
+    total_remaining = sum(float(t.client_debt_paid) for t in transactions)
+    total_profit = sum(float(t.profit) for t in transactions if float(t.paid_amount) - float(t.amount) == 0)
+
+    transactionsInvestors = [
+        t for t in Transaction.objects.filter(paid_amount__gt=0)
+        if getattr(t, 'bonus_debt', 0) == 0
+        and getattr(t, 'client_debt', 0) == 0
+        # and getattr(t, 'supplier_debt', 0) == 0
+        and getattr(t, 'profit', 0) > 0
+    ]
+
+    cashflows = CashFlow.objects.filter(
+        purpose__operation_type=PaymentPurpose.INCOME
+    ).exclude(purpose__name="Оплата")
+
+    total_profit = sum(float(t.profit - t.returned_to_investor) for t in transactionsInvestors) + sum(float(cf.amount - (cf.returned_to_investor or 0)) for cf in cashflows)
+
+    summary = [
+        {"name": "Бонусы", "amount": total_bonuses},
+        {"name": "Выдачи клиентам", "amount": total_remaining},
+    ]
+
+    if is_admin:
+        summary.append({"name": "Инвесторам", "amount": total_profit})
+
+    if is_supplier:
+        summary = []
+
+    total_summary_debts = sum(item['amount'] for item in summary)
+    
+    context = {
+        "is_admin": is_admin,
+        "is_supplier": is_supplier,
+        "branch_debts": branch_debts_list,
+        "summary": summary,
+        "total_branch_debts": total_branch_debts,
+        "total_summary_debts": total_summary_debts,
+    }
+    return render(request, "main/balance.html", context)
+
 @forbid_supplier
 @login_required
 @require_http_methods(["POST"])
@@ -3963,9 +4041,6 @@ def user_create(request):
             email = request.POST.get("email")
             username = request.POST.get("username")
             password = request.POST.get("password")
-            last_name = request.POST.get("last_name")
-            first_name = request.POST.get("first_name")
-            patronymic = request.POST.get("patronymic")
             user_type_id = request.POST.get("user_type")
             is_active = request.POST.get("is_active") == "on"
             branch_id = request.POST.get("branch")
@@ -4001,9 +4076,6 @@ def user_create(request):
             user = User.objects.create(
                 email=email,
                 username=username,
-                first_name=first_name,
-                last_name=last_name,
-                patronymic=patronymic,
                 user_type=user_type,
                 is_active=is_active,
                 branch=branch
@@ -4040,9 +4112,6 @@ def user_edit(request, pk=None):
             email = request.POST.get("email")
             username = request.POST.get("username")
             password = request.POST.get("password")
-            last_name = request.POST.get("last_name")
-            first_name = request.POST.get("first_name")
-            patronymic = request.POST.get("patronymic")
             user_type_id = request.POST.get("user_type")
             is_active = request.POST.get("is_active") == "on"
             branch_id = request.POST.get("branch")
@@ -4079,9 +4148,6 @@ def user_edit(request, pk=None):
             user.username = username
             if password:
                 user.set_password(password)
-            user.first_name = first_name
-            user.last_name = last_name
-            user.patronymic = patronymic
             user.user_type = user_type
             user.is_active = is_active
             user.branch = branch
@@ -4440,3 +4506,46 @@ def close_investor_debt(request, pk):
             })
     except Exception as e:
         return JsonResponse({"status": "error", "message": str(e)}, status=400)
+
+@login_required
+@require_http_methods(["GET"])
+def get_hidden_rows(request):
+    table = request.GET.get("table")
+    if not table:
+        return JsonResponse({"status": "error", "message": "Не указано имя таблицы"}, status=400)
+    hidden, _ = HiddenRows.objects.get_or_create(user=request.user, table=table)
+    return JsonResponse({"hidden_ids": hidden.hidden_ids})
+
+@login_required
+@require_http_methods(["POST"])
+def set_hidden_rows(request):
+    try:
+        data = json.loads(request.body)
+        table = data.get("table")
+        hidden_ids = data.get("hidden_ids")
+    except Exception:
+        table = request.POST.get("table")
+        hidden_ids = request.POST.get("hidden_ids")
+
+    if not table or hidden_ids is None:
+        return JsonResponse({"status": "error", "message": "Не указаны параметры"}, status=400)
+    try:
+        if isinstance(hidden_ids, str):
+            hidden_ids_list = json.loads(hidden_ids)
+        else:
+            hidden_ids_list = hidden_ids
+    except Exception:
+        hidden_ids_list = []
+    hidden, _ = HiddenRows.objects.get_or_create(user=request.user, table=table)
+    hidden.hidden_ids = hidden_ids_list
+    hidden.save()
+    return JsonResponse({"status": "success", "hidden_ids": hidden.hidden_ids})
+
+@login_required
+@require_http_methods(["POST"])
+def clear_hidden_rows(request):
+    table = request.POST.get("table")
+    if not table:
+        return JsonResponse({"status": "error", "message": "Не указано имя таблицы"}, status=400)
+    HiddenRows.objects.filter(user=request.user, table=table).delete()
+    return JsonResponse({"status": "success"})

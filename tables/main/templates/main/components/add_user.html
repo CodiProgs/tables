@@ -31,33 +31,6 @@
                    placeholder="Введите пароль">
         </div>
 		<div class="modal-form__group">
-            <input class="modal-form__input"
-                   type="text"
-                   id="last_name"
-                   name="last_name"
-                   spellcheck="false"
-                   autocomplete="off"
-                   placeholder="Введите фамилию">
-        </div>
-		<div class="modal-form__group">
-			<input class="modal-form__input"
-				   type="text"
-				   id="first_name"
-				   name="first_name"
-				   spellcheck="false"
-                   autocomplete="off"
-				   placeholder="Введите имя">
-		</div>
-		<div class="modal-form__group">
-			<input class="modal-form__input"
-				   type="text"
-				   id="patronymic"
-				   name="patronymic"
-				   spellcheck="false"
-                   autocomplete="off"
-				   placeholder="Введите отчество">
-		</div>
-		<div class="modal-form__group">
             {% include "components/select.html" with id="user_type" placeholder="Выберите тип пользователя" %}
         </div>
         <div class="modal-form__group" hidden id="branch-group">

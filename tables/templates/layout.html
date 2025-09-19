@@ -59,6 +59,17 @@
                                 <span>Долги</span>
                             </a>
                         </li>
+                        <li class="nav-item {% if request.resolver_match.url_name == 'balance' %}active{% endif %}">
+                            <a href="{% url 'main:balance' %}">
+                                <img src="{% static 'images/nav/scale-balanced.svg' %}"
+                                    alt="Баланс"
+                                    class="icon"
+                                    data-hint="Баланс"
+                                    height="12"
+                                    width="12">
+                                <span>Баланс</span>
+                            </a>
+                        </li>
                         <li class="nav-item {% if request.resolver_match.url_name == 'cash_flow' %}active{% endif %}">
                             <a href="{% url 'main:cash_flow' %}">
                                 <img src="{% static 'images/nav/chart-line.svg' %}"

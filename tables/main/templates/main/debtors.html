@@ -53,11 +53,10 @@
                     </li>
                 {% endfor %}
             </ul>
+            {% if summary|length > 1 %}
             <div class="debtors-header" id="summary-header">
-                {% if summary|length > 1 %}
                 <h2 class="debtors-office-list__header">Кредиторка</h2>
                 <span class="debtors-total {% if total_summary_debts != 0 %}text-red{% else %}text-green{% endif %}">{{ total_summary_debts|floatformat:2 }}</span>
-                {% endif %}
             </div>
             <ul class="debtors-office-list">
                 {% for row in summary %}
@@ -78,27 +77,10 @@
                 {% endfor %}
                 
             </ul>
-        </div>
-        <div class="stats-container">
-            {% if is_admin %}
-            <button id="refresh-stats-button" class="stats-refresh-button" title="Обновить статистику">
-                <img src="{% static 'images/arrows-rotate.svg' %}" alt="Обновить"
-                     height="16"
-                     width="16">
-            </button>
-            <h2 class="debtors-office-list__header debtors-office__header">Баланс</h2>
-            <div id="balance-container"></div>
-            <h2 class="debtors-office-list__header debtors-office__header debtors-office__header--top">Рентабельность капитала</h2>
-            <div class="charts-container">
-            <div class="chart-stats">
-            <canvas id="statsChart" width="800" height="264"></canvas>
-            </div>
-            <div class="chart-profit">
-            <canvas id="profitChart" width="40" height="264"></canvas>
-            </div>
-            </div>
             {% endif %}
+
         </div>
+        
     </div>
 {% endblock content %}
 {% block extra_scripts %}

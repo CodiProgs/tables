@@ -75,7 +75,7 @@ const postData = async (url, data) => {
 	}
 }
 
-function saveHiddenRowsState(tableId) {
+async function saveHiddenRowsState(tableId) {
 	const rows = document.querySelectorAll(`#${tableId} tbody tr[data-id]`)
 	const hiddenIds = []
 	rows.forEach(row => {
@@ -83,32 +83,51 @@ function saveHiddenRowsState(tableId) {
 			hiddenIds.push(row.getAttribute('data-id'))
 		}
 	})
-	localStorage.setItem(`${tableId}-hidden-rows`, JSON.stringify(hiddenIds))
-	localStorage.setItem(`${tableId}-show-all`, 'false')
+	try {
+		await fetch('/hidden_rows/set/', {
+			method: 'POST',
+			headers: {
+				'X-CSRFToken': getCSRFToken(),
+				'Content-Type': 'application/json',
+			},
+			body: JSON.stringify({ table: tableId, hidden_ids: hiddenIds }),
+		})
+	} catch (e) {
+		console.error('Ошибка сохранения скрытых строк:', e)
+	}
 }
 
-function saveShowAllState(tableId) {
-	localStorage.setItem(`${tableId}-hidden-rows`, JSON.stringify([]))
-	localStorage.setItem(`${tableId}-show-all`, 'true')
+async function saveShowAllState(tableId) {
+	try {
+		await fetch('/hidden_rows/set/', {
+			method: 'POST',
+			headers: {
+				'X-CSRFToken': getCSRFToken(),
+				'Content-Type': 'application/json',
+			},
+			body: JSON.stringify({ table: tableId, hidden_ids: [] }),
+		})
+	} catch (e) {
+		console.error('Ошибка сохранения состояния "Показать все":', e)
+	}
 }
 
-function restoreHiddenRowsState(tableId) {
-	const showAll = localStorage.getItem(`${tableId}-show-all`)
-	const hiddenIds = JSON.parse(
-		localStorage.getItem(`${tableId}-hidden-rows`) || '[]'
-	)
-	const rows = document.querySelectorAll(`#${tableId} tbody tr[data-id]`)
-	if (showAll === 'true') {
-		rows.forEach(row => row.classList.remove('hidden-row'))
-	} else {
+async function restoreHiddenRowsState(tableId) {
+	try {
+		const response = await fetch(`/hidden_rows/get/?table=${tableId}`)
+		if (!response.ok) return
+		const { hidden_ids = [] } = await response.json()
+		const rows = document.querySelectorAll(`#${tableId} tbody tr[data-id]`)
 		rows.forEach(row => {
 			const id = row.getAttribute('data-id')
-			if (hiddenIds.includes(id)) {
+			if (hidden_ids.includes(id)) {
 				row.classList.add('hidden-row')
 			} else {
 				row.classList.remove('hidden-row')
 			}
 		})
+	} catch (e) {
+		console.error('Ошибка загрузки скрытых строк:', e)
 	}
 }
 
@@ -4171,9 +4190,9 @@ const handleDebtors = async () => {
 		})
 	}
 
-	const officeList = document.querySelector('.debtors-office-list')
-	if (officeList) {
-		const rows = officeList.querySelectorAll('.debtors-office-list__row')
+	const officeList = document.querySelectorAll('.debtors-office-list')
+	if (officeList.length === 1) {
+		const rows = officeList[0].querySelectorAll('.debtors-office-list__row')
 		if (rows.length === 1) {
 			rows[0].click()
 		}
@@ -4867,6 +4886,9 @@ document.addEventListener('DOMContentLoaded', function () {
 				handleTransactions(mainConfig)
 				break
 			case `debtors`:
+				handleDebtors()
+				break
+			case `balance`:
 				handleDebtors()
 				break
 			case `profit_distribution`:
