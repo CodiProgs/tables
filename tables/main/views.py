@@ -920,6 +920,8 @@ def client_create(request):
             percentage = clean_percentage(request.POST.get("percentage"))
             comment = request.POST.get("comment", "")
             bonus_percentage = clean_percentage(request.POST.get("bonus_percentage", "0"))
+            if not bonus_percentage:
+                bonus_percentage = 0
 
             if not name or not percentage:
                 return JsonResponse(
@@ -1874,6 +1876,7 @@ def cash_flow_report(request):
         "fields": fields,
         "data": rows,
         "year": current_year,
+        "data_ids": [row.purpose_id for row in rows],
     }
 
     return render(request, "main/cash_flow_report.html", context)

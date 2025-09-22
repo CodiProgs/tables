@@ -551,6 +551,7 @@ const addMenuHandler = () => {
 	const settleDebtButton = document.getElementById('settle-debt-button')
 	const settleDebtAllButton = document.getElementById('settle-debt-all-button')
 	const repaymentsEditButton = document.getElementById('repayment-edit-button')
+	const detailButton = document.getElementById('detail-button')
 
 	function showMenu(x, y) {
 		menu.style.display = 'block'
@@ -660,6 +661,10 @@ const addMenuHandler = () => {
 					}
 				}
 
+				if (table.id === 'cash_flow_report-table') {
+					if (detailButton) detailButton.style.display = 'block'
+				}
+
 				showMenu(e.pageX, e.pageY)
 				return
 			}
@@ -675,6 +680,7 @@ const addMenuHandler = () => {
 				if (settleDebtButton) settleDebtButton.style.display = 'none'
 				if (settleDebtAllButton) settleDebtAllButton.style.display = 'none'
 				if (repaymentsEditButton) repaymentsEditButton.style.display = 'none'
+				if (detailButton) detailButton.style.display = 'none'
 
 				showMenu(e.pageX, e.pageY)
 			}
@@ -3154,10 +3160,7 @@ const handleCashFlow = async config => {
 		console.error('Error parsing cashflow IDs data for actions column:', e)
 	}
 
-	colorizeAmounts(`${CASH_FLOW}-table`)
-	initTableHandlers(config)
-
-	TableManager.createColumnsForTable(
+	await TableManager.createColumnsForTable(
 		'cash_flow-table',
 		[
 			{ name: 'created_at' },
@@ -3169,6 +3172,52 @@ const handleCashFlow = async config => {
 		],
 		['profit']
 	)
+
+	const urlParams = new URLSearchParams(window.location.search)
+	const idPurpose = urlParams.get('id_purpose')
+	const createdAt = urlParams.get('created_at')
+
+	if (idPurpose || createdAt) {
+		if (createdAt) {
+			const createdAtInput = document.querySelector('input[name="created_at"]')
+			console.log('Setting created_at to:', createdAtInput)
+			if (createdAtInput) {
+				createdAtInput.value = createdAt
+				createdAtInput.dispatchEvent(new Event('input', { bubbles: true }))
+			}
+		}
+
+		const selectInput = document.getElementById('id_purpose')
+		const select = selectInput ? selectInput.closest('.select') : null
+		const selectControl = select
+			? select.querySelector('.select__control')
+			: null
+
+		if (
+			select &&
+			selectControl &&
+			idPurpose &&
+			idPurpose !== 0 &&
+			idPurpose !== '0'
+		) {
+			selectControl.click()
+
+			const trySelectOption = () => {
+				const option = select.querySelector(
+					`.select__option[data-value="${idPurpose}"]`
+				)
+				if (option) {
+					option.click()
+				} else {
+					setTimeout(trySelectOption, 100)
+				}
+			}
+			trySelectOption()
+		}
+	}
+
+	colorizeAmounts(`${CASH_FLOW}-table`)
+	initTableHandlers(config)
 
 	new TablePaginator({
 		baseUrl: BASE_URL,
@@ -3273,6 +3322,21 @@ const handleCashFlow = async config => {
 }
 
 const handleReport = () => {
+	try {
+		const dataIdsData = document.getElementById('data-ids')?.textContent
+		if (dataIdsData) {
+			const dataIds = JSON.parse(dataIdsData)
+			setIds(dataIds, `cash_flow_report-table`)
+		} else {
+			console.warn("Element with ID 'data-ids' not found or empty.")
+		}
+	} catch (e) {
+		console.error(
+			'Error parsing money transfers IDs data for actions column:',
+			e
+		)
+	}
+
 	const table = document.getElementById('cash_flow_report-table')
 	if (table) {
 		const cells = table.querySelectorAll('td:not(:first-child)')
@@ -3288,6 +3352,72 @@ const handleReport = () => {
 		const rows = table.querySelectorAll('tbody tr')
 		if (rows.length > 0) {
 			rows[rows.length - 1].classList.add('total-row')
+		}
+
+		const detailButton = document.getElementById('detail-button')
+		if (detailButton) {
+			detailButton.addEventListener('click', function () {
+				const selectedRow = document.querySelector(
+					'#cash_flow_report-table tr.table__row--selected'
+				)
+				const selectedCell = document.querySelector(
+					'#cash_flow_report-table td.table__cell--selected'
+				)
+				let query = ''
+				if (selectedRow) {
+					const idPurpose = selectedRow.getAttribute('data-id')
+					const table = document.getElementById('cash_flow_report-table')
+					const rows = table.querySelectorAll('tbody tr')
+					const cells = selectedRow.querySelectorAll('td')
+					const isTotalRow = selectedRow.classList.contains('total-row')
+					let isLastCell = false
+					let createdAt = null
+
+					if (selectedCell && !isTotalRow) {
+						const cellIndex = Array.from(
+							selectedCell.parentNode.children
+						).indexOf(selectedCell)
+						isLastCell = cellIndex === cells.length - 1
+						if (cellIndex > 0 && !isLastCell) {
+							const ths = table.querySelectorAll('thead th')
+							const monthName = ths[cellIndex]?.textContent?.trim()
+							const months = [
+								'январь',
+								'февраль',
+								'март',
+								'апрель',
+								'май',
+								'июнь',
+								'июль',
+								'август',
+								'сентябрь',
+								'октябрь',
+								'ноябрь',
+								'декабрь',
+							]
+							const monthIndex = months.findIndex(
+								m => m.toLowerCase() === monthName.toLowerCase()
+							)
+							const year =
+								ths[cellIndex]?.dataset?.year || new Date().getFullYear()
+							if (monthIndex !== -1) {
+								createdAt = `${String(monthIndex + 1).padStart(2, '0')}.${year}`
+							}
+						}
+					}
+
+					if (selectedCell && isLastCell) {
+						query = ''
+					} else if (!isTotalRow && createdAt) {
+						query = `?id_purpose=${idPurpose}&created_at=${createdAt}`
+					} else {
+						query = `?id_purpose=${idPurpose}`
+					}
+					window.location.href = `/cash_flow/${query}`
+				} else {
+					showError('Выберите строку для просмотра деталей.')
+				}
+			})
 		}
 	}
 }

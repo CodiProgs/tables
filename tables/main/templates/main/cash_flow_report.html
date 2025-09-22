@@ -6,14 +6,15 @@
     </div>
     <div id="context-menu" class="dropdown-menu">
         <a class="dropdown-item context-action"
-            id="show-button"
-            data-action="show">Добавить</a>
+            id="detail-button"
+            data-action="detail">Подробнее</a>
     </div>
 {% endblock content %}
 {% block extra_scripts %}
     {{ block.super }}
     <script src="{% static 'main/js/main.js' %}" type="module"></script>
     <script src="{% static 'main/js/autonumeric.js' %}"></script>
+    {{ data_ids|json_script:"data-ids" }}
 {% endblock extra_scripts %}
 
 

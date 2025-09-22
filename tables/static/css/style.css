@@ -528,12 +528,18 @@ textarea::placeholder {
 
 @media (max-width: 1024px) {
 	.nav-list {
-		grid-template-columns: repeat(3, minmax(auto, 1fr)) !important;
+		grid-template-columns: repeat(4, minmax(auto, 1fr)) !important;
 		grid-template-rows: auto;
 	}
 
 	.nav-item:last-child {
 		border-right: 1px solid #e1e6eb;
+	}
+}
+
+@media (max-width: 700px) {
+	.nav-list {
+		grid-template-columns: repeat(3, minmax(auto, 1fr)) !important;
 	}
 }
 
