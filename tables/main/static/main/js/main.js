@@ -4042,6 +4042,7 @@ const handleDebtors = async () => {
 						}
 						details.dataset.loaded = '1'
 						TableManager.init()
+						TableManager.attachGlobalCellClickHandler()
 
 						const table = details.querySelector('table')
 
