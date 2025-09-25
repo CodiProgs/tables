@@ -126,6 +126,7 @@ async function restoreHiddenRowsState(tableId) {
 				row.classList.remove('hidden-row')
 			}
 		})
+		updateHiddenRowsCounter()
 	} catch (e) {
 		console.error('Ошибка загрузки скрытых строк:', e)
 	}
