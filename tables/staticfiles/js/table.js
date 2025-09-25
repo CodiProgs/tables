@@ -2249,7 +2249,9 @@ document.addEventListener('DOMContentLoaded', function () {
 			table.querySelectorAll('.table__row:not(.hidden-row)')
 		)
 		const rowIndex = rows.indexOf(row)
-		const cells = Array.from(row.querySelectorAll('.table__cell:not(.hidden)'))
+		const cells = Array.from(
+			row.querySelectorAll('.table__cell:not(.hidden)')
+		).filter(cell => getComputedStyle(cell).display !== 'none')
 		const cellIndex = cells.indexOf(selectedCell)
 
 		let newRowIndex = rowIndex
@@ -2278,7 +2280,7 @@ document.addEventListener('DOMContentLoaded', function () {
 		const targetRow = rows[newRowIndex]
 		const targetCells = Array.from(
 			targetRow.querySelectorAll('.table__cell:not(.hidden)')
-		)
+		).filter(cell => getComputedStyle(cell).display !== 'none')
 		const targetCell = targetCells[newCellIndex] || targetCells[0]
 
 		if (targetCell) {
