@@ -2247,7 +2247,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
 		const rows = Array.from(
 			table.querySelectorAll('.table__row:not(.hidden-row)')
-		)
+		).filter(row => getComputedStyle(row).display !== 'none')
 		const rowIndex = rows.indexOf(row)
 		const cells = Array.from(
 			row.querySelectorAll('.table__cell:not(.hidden)')
