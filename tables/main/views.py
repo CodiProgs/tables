@@ -399,12 +399,10 @@ def transaction_edit(request, pk=None):
                     status=400,
                 )
 
-            new_client_part = new_amount * new_client_percentage / Decimal('100')
-            new_bonus_part = new_amount * new_bonus_percentage / Decimal('100')
-            new_remaining_amount = Decimal(math.floor(float(new_amount - new_client_part - new_bonus_part)))
+            new_remaining_amount = Decimal(math.floor(float(new_amount * (Decimal('100') - new_client_percentage) / Decimal('100'))))
             if trans.returned_to_client > new_remaining_amount:
                 return JsonResponse(
-                    {"status": "error", "message": "Возвращено клиенту больше, чем новая сумма по проценту клиента и бонусу. Измените процент или уменьшите возврат."},
+                    {"status": "error", "message": "Возвращено клиенту больше, чем новая сумма по проценту клиента. Измените процент или уменьшите возврат."},
                     status=400,
                 )
 
@@ -3014,7 +3012,7 @@ def settle_supplier_debt(request, pk: int):
 
                 if amount_value > trans.client_debt_paid:
                     return JsonResponse({"status": "error", "message": "Сумма не может превышать долг по выдачам"}, status=400)
-                
+
                 cash_account = Account.objects.filter(name="Наличные").first()
                 if not cash_account:
                     return JsonResponse({"status": "error", "message": 'Счет "Наличные" не найден'}, status=400)
@@ -3475,7 +3473,7 @@ def debtor_detail(request, type, pk):
 
         data['amount'] = float(cashflow.amount - (cashflow.returned_to_investor or 0))
         return JsonResponse({"data": data})
-    
+
     type_map = {
         "equipment": "Оборудование",
         "credit": "Кредит",
@@ -4554,4 +4552,3 @@ def clear_hidden_rows(request):
         return JsonResponse({"status": "error", "message": "Не указано имя таблицы"}, status=400)
     HiddenRows.objects.filter(user=request.user, table=table).delete()
     return JsonResponse({"status": "success"})
-
