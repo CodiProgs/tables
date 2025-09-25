@@ -2766,6 +2766,15 @@ const handleTransactions = async config => {
 			{ name: 'supplier', url: '/suppliers/list/' },
 			{ name: 'account', url: '/accounts/list/' },
 			{ name: 'amount' },
+			{ name: 'client_percentage' },
+			{ name: 'supplier_percentage' },
+			{ name: 'bonus_percentage' },
+			{ name: 'remaining_amount' },
+			{ name: 'profit' },
+			{ name: 'bonus' },
+			{ name: 'paid_amount' },
+			{ name: 'debt' },
+			{ name: 'documents' },
 		],
 		['profit']
 	)

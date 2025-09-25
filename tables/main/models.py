@@ -198,7 +198,10 @@ class Transaction(models.Model):
     @property
     def remaining_amount(self):
         """Сумма после вычета процента клиента"""
-        result = math.floor(self.amount * (100 - self.client_percentage) / 100)
+        base = self.amount
+        client_part = base * self.client_percentage / 100
+        bonus_part = base * self.bonus_percentage / 100
+        result = math.floor(base - client_part - bonus_part)
         return Decimal(result)
 
     @property
@@ -254,7 +257,10 @@ class Transaction(models.Model):
         """
         Долг клиента, рассчитанный от оплаченной суммы
         """
-        result = math.floor(self.paid_amount * (100 - self.client_percentage) / 100)
+        paid = self.paid_amount or Decimal(0)
+        client_part = paid * self.client_percentage / 100
+        bonus_part = paid * self.bonus_percentage / 100
+        result = math.floor(paid - client_part - bonus_part)
         return Decimal(result) - self.returned_to_client
     
     @property
