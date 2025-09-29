@@ -1134,3 +1134,8 @@ textarea::placeholder {
 	flex: 0 0 auto;
 	height: max-content;
 }
+
+.add-invest-operation__selects {
+	display: flex;
+	flex-direction: column;
+}

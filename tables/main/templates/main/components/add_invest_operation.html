@@ -1,0 +1,29 @@
+{% load components %}
+{% add_style 'css/modal-form.css' %}
+<form class="modal-form" id="invest_operation-form" method="post">
+    <div class="modal-form__content">
+        {% csrf_token %}
+        <input type="hidden" name="type" id="type" value="" hidden>
+		<div class="add-invest-operation__selects">
+			<div class="modal-form__group">
+            {% include "components/select.html" with id="supplier" placeholder="Выберите поставщика (необязательно)" %}
+        </div>
+			<div class="modal-form__group">
+				{% include "components/select.html" with id="account" placeholder="Выберите счет" %}
+			</div>
+		</div>
+        <div class="modal-form__group">
+            <input class="modal-form__input"
+                   type="text"
+                   id="amount"
+                   name="amount"
+                   spellcheck="false"
+                   autocomplete="off"
+                   placeholder="Введите сумму">
+        </div>
+        <div class="modal-form__buttons">
+            <button class="button modal-form__button" type="submit">Сохранить</button>
+            <button class="button modal-form__button button--cancel" type="button">Отменить</button>
+        </div>
+    </div>
+</form>

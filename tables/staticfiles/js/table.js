@@ -1084,12 +1084,9 @@ export const TableManager = {
 			event.preventDefault()
 		}
 
-		const table = cell.closest('.table')
-		if (table) {
-			table.querySelectorAll('.table__row--selected').forEach(row => {
-				row.classList.remove('table__row--selected')
-			})
-		}
+		document.querySelectorAll('.table__row--selected').forEach(row => {
+			row.classList.remove('table__row--selected')
+		})
 
 		const sumDiv = document.querySelector('.table-sum-indicator')
 

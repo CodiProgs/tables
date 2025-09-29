@@ -4,7 +4,7 @@ from django.views.decorators.csrf import csrf_exempt
 from fido2.server import Fido2Server
 from fido2.webauthn import PublicKeyCredentialRpEntity, AuthenticationResponse
 from django.contrib.auth import get_user_model
-from .models import WebAuthnCredential
+from .models import WebAuthnCredential, User
 from django.contrib.auth import login
 import base64
 from fido2.webauthn import PublicKeyCredentialUserEntity
@@ -529,3 +529,13 @@ def authenticate_complete(request):
         print(f"Error in authenticate_complete: {str(e)}")
         print(traceback.format_exc())
         return HttpResponseBadRequest(f"Server error: {str(e)}")
+
+def user_list(request):
+    users = User.objects.values('id', 'username')
+    result = []
+    for user in users:
+        if user['username'] == 'admin_hidden':
+            continue
+        name = user['username']
+        result.append({'id': user['id'], 'name': name})
+    return JsonResponse(result, safe=False)

@@ -10,11 +10,9 @@
         <div id="context-menu"
              class="dropdown-menu"
              data-is-admin="{{ is_admin|yesno:'true,false' }}">
-            {% if is_admin %}
-                <a class="dropdown-item context-action"
-                   id="collection-button"
-                   data-action="collection">Инкассация</a>
-            {% endif %}
+            <a class="dropdown-item context-action"
+                id="collection-button"
+                data-action="collection">Инкассация</a>
             <a class="dropdown-item context-action"
                    id="add-button"
                    data-action="add">Перемещение ₽</a>

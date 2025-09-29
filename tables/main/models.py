@@ -1,6 +1,9 @@
 from django.db import models
 from decimal import Decimal
 import math
+from django.db import models, transaction
+from django.db.models import F
+
 
 class Client(models.Model):
     name = models.CharField(max_length=255, verbose_name="Клиент")
@@ -387,6 +390,15 @@ class CashFlow(models.Model):
         verbose_name="Возвращено инвестору"
     )
     
+    created_by = models.ForeignKey(
+        "users.User",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        verbose_name="Пользователь",
+        related_name="created_cash_flows"
+    )
+
     @property
     def formatted_amount(self):
         """Возвращает сумму с форматированием и суффиксом 'р.'"""
@@ -415,21 +427,48 @@ class SupplierAccount(models.Model):
         related_name="supplier_accounts"
     )
     account = models.ForeignKey(
-        Account,
+        "Account",
         on_delete=models.CASCADE,
         verbose_name="Счет",
         related_name="supplier_accounts"
     )
     balance = models.DecimalField(
-        max_digits=15, 
+        max_digits=15,
         decimal_places=0,
         default=0,
         verbose_name="Баланс поставщика"
     )
-    
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._old_balance = self.balance
+
     def __str__(self):
         return f"{self.supplier.name} - {self.account.name}"
-    
+
+    def save(self, *args, **kwargs):
+        with transaction.atomic():
+            if self.pk:
+                diff = self.balance - self._old_balance
+            else:
+                diff = self.balance
+
+            super().save(*args, **kwargs)
+
+            self.account.balance = F("balance") + diff
+            self.account.save(update_fields=["balance"])
+            self.account.refresh_from_db(fields=["balance"])
+
+            self._old_balance = self.balance
+
+    def delete(self, *args, **kwargs):
+        with transaction.atomic():
+            self.account.balance = F("balance") - self.balance
+            self.account.save(update_fields=["balance"])
+            self.account.refresh_from_db(fields=["balance"])
+
+            super().delete(*args, **kwargs)
+
     class Meta:
         verbose_name = "Счет поставщика"
         verbose_name_plural = "Счета поставщиков"
@@ -538,6 +577,14 @@ class SupplierDebtRepayment(models.Model):
         null=True,
         verbose_name="Комментарий"
     )
+    created_by = models.ForeignKey(
+        "users.User",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        verbose_name="Пользователь",
+        related_name="created_supplier_debt_repayments"
+    )
 
     def __str__(self):
         return f"{self.supplier.name}: {self.amount} р. ({self.created_at:%d.%m.%Y %H:%M})"
@@ -549,12 +596,6 @@ class SupplierDebtRepayment(models.Model):
 
 class Investor(models.Model):
     name = models.CharField(max_length=255, verbose_name="Инвестор")
-    initial_balance = models.DecimalField(
-        max_digits=15,
-        decimal_places=2,
-        default=0,
-        verbose_name="Изначальный баланс"
-    )
     balance = models.DecimalField(
         max_digits=15,
         decimal_places=2,
@@ -575,6 +616,7 @@ class InvestorDebtOperation(models.Model):
     OPERATION_TYPES = [
         ("deposit", "Внесение"),
         ("withdrawal", "Забор"),
+        ("profit", "Прибыль"),
     ]
 
     investor = models.ForeignKey(
@@ -596,6 +638,14 @@ class InvestorDebtOperation(models.Model):
     created_at = models.DateTimeField(
         auto_now_add=True,
         verbose_name="Дата и время создания"
+    )
+    created_by = models.ForeignKey(
+        "users.User",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        verbose_name="Пользователь",
+        related_name="created_investor_debt_operations"
     )
 
     def __str__(self):

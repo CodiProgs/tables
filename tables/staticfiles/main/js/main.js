@@ -554,6 +554,9 @@ const addMenuHandler = () => {
 	const repaymentsEditButton = document.getElementById('repayment-edit-button')
 	const detailButton = document.getElementById('detail-button')
 
+	const withdrawalButton = document.getElementById('withdrawal-button')
+	const contributionButton = document.getElementById('contribution-button')
+
 	function showMenu(x, y) {
 		menu.style.display = 'block'
 		const menuHeight = menu.offsetHeight || 180
@@ -590,34 +593,35 @@ const addMenuHandler = () => {
 					) {
 						settleDebtButton.style.display = 'none'
 					} else if (table.id === 'investors-table') {
-						const selectedCell = document.querySelector(
-							'td.table__cell--selected'
-						)
-						if (selectedCell) {
-							const cellIndex = Array.from(
-								selectedCell.parentNode.children
-							).indexOf(selectedCell)
-							const th = table.querySelectorAll('thead th')[cellIndex]
-							const colName = th ? th.dataset.name : null
+						// const selectedCell = document.querySelector(
+						// 	'td.table__cell--selected'
+						// )
+						// if (selectedCell) {
+						// 	const cellIndex = Array.from(
+						// 		selectedCell.parentNode.children
+						// 	).indexOf(selectedCell)
+						// 	const th = table.querySelectorAll('thead th')[cellIndex]
+						// 	const colName = th ? th.dataset.name : null
 
-							if (colName === 'initial_balance') {
-								settleDebtButton.style.display = 'block'
-								settleDebtButton.textContent = 'Изменить сумму'
-								settleDebtButton.dataset.type = 'initial'
-							}
-							// else if (colName === 'balance') {
-							// 	settleDebtButton.style.display = 'block'
-							// 	settleDebtButton.textContent = 'Изменить сумму'
-							// 	settleDebtButton.dataset.type = 'balance'
-							// }
-							else {
-								settleDebtButton.style.display = 'none'
-								settleDebtButton.dataset.type = ''
-							}
-						} else {
-							settleDebtButton.style.display = 'none'
-							settleDebtButton.dataset.type = ''
-						}
+						// 	if (colName === 'balance') {
+						// 		settleDebtButton.style.display = 'block'
+						// 		settleDebtButton.textContent = 'Распределить'
+						// 		settleDebtButton.dataset.type = 'initial'
+						// 	}
+						// 	// else if (colName === 'balance') {
+						// 	// 	settleDebtButton.style.display = 'block'
+						// 	// 	settleDebtButton.textContent = 'Изменить сумму'
+						// 	// 	settleDebtButton.dataset.type = 'balance'
+						// 	// }
+						// 	else {
+						// 		settleDebtButton.style.display = 'none'
+						// 		settleDebtButton.dataset.type = ''
+						// 	}
+						// }
+						// else {
+						settleDebtButton.style.display = 'none'
+						settleDebtButton.dataset.type = ''
+						// }
 					} else {
 						settleDebtButton.style.display = 'block'
 						settleDebtButton.textContent = 'Погасить долг'
@@ -666,6 +670,27 @@ const addMenuHandler = () => {
 					if (detailButton) detailButton.style.display = 'block'
 				}
 
+				if (table.id === 'investors-table') {
+					const selectedCell = document.querySelector(
+						'td.table__cell--selected'
+					)
+					if (selectedCell) {
+						const cellIndex = Array.from(
+							selectedCell.parentNode.children
+						).indexOf(selectedCell)
+						const th = table.querySelectorAll('thead th')[cellIndex]
+						const colName = th ? th.dataset.name : null
+
+						if (colName === 'balance') {
+							withdrawalButton.style.display = 'block'
+							contributionButton.style.display = 'block'
+						}
+					}
+				} else {
+					if (withdrawalButton) withdrawalButton.style.display = 'none'
+					if (contributionButton) contributionButton.style.display = 'none'
+				}
+
 				showMenu(e.pageX, e.pageY)
 				return
 			}
@@ -682,6 +707,8 @@ const addMenuHandler = () => {
 				if (settleDebtAllButton) settleDebtAllButton.style.display = 'none'
 				if (repaymentsEditButton) repaymentsEditButton.style.display = 'none'
 				if (detailButton) detailButton.style.display = 'none'
+				if (withdrawalButton) withdrawalButton.style.display = 'none'
+				if (contributionButton) contributionButton.style.display = 'none'
 
 				showMenu(e.pageX, e.pageY)
 			}
@@ -3179,6 +3206,7 @@ const handleCashFlow = async config => {
 			{ name: 'formatted_amount' },
 			{ name: 'purpose', url: '/payment_purposes/list/?all=True' },
 			{ name: 'comment' },
+			{ name: 'created_by', url: '/users/list/' },
 		],
 		['profit']
 	)
@@ -4496,6 +4524,11 @@ const handleDebtors = async () => {
 							case 'initial':
 								tableId = 'investors-table'
 
+								TableManager.addTableRow(
+									{ html: result.html_investor_debt_operation },
+									`investor-operations-table`
+								)
+
 								break
 							case 'Инвесторам':
 								tableId = 'summary-profit'
@@ -4605,6 +4638,9 @@ const handleDebtors = async () => {
 							result.type === 'initial'
 						) {
 							TableManager.calculateTableSummary('investors-table', ['balance'])
+						}
+
+						if (result.type === 'initial') {
 						}
 
 						refreshData(tableId)
@@ -4778,10 +4814,9 @@ const handleDebtors = async () => {
 				if (operation_type) {
 					const container = operation_type.closest('.modal-form__group')
 
-					container.setAttribute('hidden', 'true')
+					// container.setAttribute('hidden', 'true')
 				}
 			}
-
 			if (type === 'transactions.investors') {
 				const investorSelectInput = document.getElementById('investor_select')
 				if (investorSelectInput) {
@@ -4980,6 +5015,164 @@ const handleDebtors = async () => {
 			if (row) row.classList.remove('row-focused')
 		})
 	})
+
+	const withdrawalButton = document.getElementById('withdrawal-button')
+	const contributionButton = document.getElementById('contribution-button')
+	const investOperationFormHandler = createFormHandler(
+		`${BASE_URL}investors/debt-operation/`,
+		`investors-table`,
+		`invest_operation-form`,
+		``,
+		[
+			{
+				id: 'supplier',
+				url: `${BASE_URL}suppliers/list/`,
+			},
+		],
+		{
+			url: '/components/main/add_invest_operation/',
+			title: 'Операция с инвестором',
+		},
+		result => {
+			if (result.html_investor && result.investor_id) {
+				TableManager.updateTableRow(
+					{ html: result.html_investor, id: result.investor_id },
+					'investors-table'
+				)
+				const investorRow = TableManager.getRowById(
+					result.investor_id,
+					'investors-table'
+				)
+				TableManager.formatCurrencyValuesForRow('investors-table', investorRow)
+				TableManager.calculateTableSummary('investors-table', ['balance'])
+			}
+			if (result.html_operation) {
+				const tableOps = document.getElementById('investor-operations-table')
+				if (tableOps) {
+					const wrapper = document.createElement('tbody')
+					wrapper.innerHTML = result.html_operation
+					const newRow = wrapper.querySelector('tr')
+					if (newRow) {
+						tableOps.querySelector('tbody').appendChild(newRow)
+						TableManager.formatCurrencyValuesForRow(
+							'investor-operations-table',
+							newRow
+						)
+					}
+				}
+			}
+		}
+	)
+
+	if (withdrawalButton) {
+		withdrawalButton.addEventListener('click', async e => {
+			e.preventDefault()
+
+			const selectedId = TableManager.getSelectedRowId('investors-table')
+			if (!selectedId) {
+				showError('Инвестор не выбран')
+				return
+			}
+
+			await investOperationFormHandler.init(selectedId)
+
+			setupSupplierAccountSelects()
+
+			const accountSelect = document
+				.getElementById('account')
+				?.closest('.select')
+
+			if (!accountSelect) return
+			const dropdown = accountSelect.querySelector('.select__dropdown')
+			if (!dropdown) return
+
+			const exists = Array.from(dropdown.children).some(
+				opt => opt.textContent.trim() === 'Наличные'
+			)
+			if (!exists) {
+				const cashOption = document.createElement('div')
+				cashOption.className = 'select__option'
+				cashOption.tabIndex = 0
+				cashOption.dataset.value = '0'
+				cashOption.textContent = 'Наличные'
+				dropdown.appendChild(cashOption)
+
+				SelectHandler.attachOptionHandlers(accountSelect)
+				SelectHandler.setupSelectBehavior(accountSelect)
+
+				const input = accountSelect.querySelector('.select__input')
+				const text = accountSelect.querySelector('.select__text')
+				input.value = cashOption.dataset.value
+				text.textContent = cashOption.textContent
+				text.classList.remove('select__placeholder')
+				accountSelect.classList.add('has-value')
+				input.dispatchEvent(new Event('change', { bubbles: true }))
+			}
+
+			const typeInput = document.getElementById('type')
+			if (typeInput) {
+				typeInput.value = 'withdrawal'
+				typeInput.dispatchEvent(new Event('change', { bubbles: true }))
+			}
+
+			const selectedRow = document.querySelector('.table__row--selected')
+			console.log('selectedRow', selectedRow)
+			const idInput = document.getElementById('id')
+			if (selectedRow && idInput) {
+				const rowId = selectedRow.getAttribute('data-id')
+				if (rowId) {
+					idInput.value = rowId
+					idInput.dispatchEvent(new Event('change', { bubbles: true }))
+				}
+			}
+
+			const investSelectsDiv = document.querySelector(
+				'.add-invest-operation__selects'
+			)
+			if (investSelectsDiv) {
+				investSelectsDiv.style.flexDirection = 'column-reverse'
+			}
+		})
+	}
+
+	if (contributionButton) {
+		contributionButton.addEventListener('click', async e => {
+			e.preventDefault()
+
+			const selectedId = TableManager.getSelectedRowId('investors-table')
+			if (!selectedId) {
+				showError('Инвестор не выбран')
+				return
+			}
+
+			await investOperationFormHandler.init(selectedId)
+
+			setupSupplierAccountSelects()
+
+			const typeInput = document.getElementById('type')
+			if (typeInput) {
+				typeInput.value = 'contribution'
+				typeInput.dispatchEvent(new Event('change', { bubbles: true }))
+			}
+
+			const supplierInput = document.getElementById('supplier')
+			if (supplierInput) {
+				supplierInput.setAttribute('placeholder', 'Выберите поставщика')
+				supplierInput.value = ''
+				const select = supplierInput.closest('.select')
+				if (select) {
+					const textSpan = select.querySelector('.select__text')
+					if (
+						textSpan &&
+						textSpan.textContent.trim() ===
+							'Выберите поставщика (необязательно)'
+					) {
+						textSpan.textContent = 'Выберите поставщика'
+					}
+				}
+			}
+		})
+	}
 }
 
 document.addEventListener('DOMContentLoaded', function () {
