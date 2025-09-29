@@ -2737,7 +2737,7 @@ def debtors(request):
 
     cashflows = CashFlow.objects.filter(
         purpose__operation_type=PaymentPurpose.INCOME
-    ).exclude(purpose__name="Оплата")
+    ).exclude(purpose__name__in=["Оплата", "Внесение инвестора"])
 
     total_profit = sum(float(t.profit - t.returned_to_investor) for t in transactionsInvestors) + sum(float(cf.amount - (cf.returned_to_investor or 0)) for cf in cashflows)
 
@@ -2816,7 +2816,7 @@ def balance(request):
 
     cashflows = CashFlow.objects.filter(
         purpose__operation_type=PaymentPurpose.INCOME
-    ).exclude(purpose__name="Оплата")
+    ).exclude(purpose__name__in=["Оплата", "Внесение инвестора"])
 
     total_profit = sum(float(t.profit - t.returned_to_investor) for t in transactionsInvestors) + sum(float(cf.amount - (cf.returned_to_investor or 0)) for cf in cashflows)
 
@@ -3013,7 +3013,7 @@ def settle_supplier_debt(request, pk: int):
 
                 cashflows = CashFlow.objects.filter(
                     purpose__operation_type=PaymentPurpose.INCOME
-                ).exclude(purpose__name="Оплата")
+                ).exclude(purpose__name__in=["Оплата", "Внесение инвестора"])
 
                 total_profit = sum(float(getattr(t, 'profit', 0) - getattr(t, 'returned_to_investor', 0)) for t in transactionsInvestors) + sum(float(cf.amount - (cf.returned_to_investor or 0)) for cf in cashflows)
 
@@ -3091,7 +3091,7 @@ def settle_supplier_debt(request, pk: int):
 
                 cashflows = CashFlow.objects.filter(
                     purpose__operation_type=PaymentPurpose.INCOME
-                ).exclude(purpose__name="Оплата")
+                ).exclude(purpose__name__in=["Оплата", "Внесение инвестора"])
 
                 total_profit = sum(float(getattr(t, 'profit', 0) - getattr(t, 'returned_to_investor', 0)) for t in transactionsInvestors) + sum(float(cf.amount - (cf.returned_to_investor or 0)) for cf in cashflows)
 
@@ -3340,7 +3340,7 @@ def settle_supplier_debt(request, pk: int):
 
                 cashflows = CashFlow.objects.filter(
                     purpose__operation_type=PaymentPurpose.INCOME
-                ).exclude(purpose__name="Оплата")
+                ).exclude(purpose__name__in=["Оплата", "Внесение инвестора"])
 
                 total_profit = sum(float(getattr(t, 'profit', 0) - getattr(t, 'returned_to_investor', 0)) for t in transactionsInvestors) + sum(float(cf.amount - (cf.returned_to_investor or 0)) for cf in cashflows)
 
@@ -3479,7 +3479,7 @@ def settle_supplier_debt(request, pk: int):
 
                 cashflows = CashFlow.objects.filter(
                     purpose__operation_type=PaymentPurpose.INCOME
-                ).exclude(purpose__name="Оплата")
+                ).exclude(purpose__name__in=["Оплата", "Внесение инвестора"])
 
                 total_debt = sum(float(Decimal(str(t.profit or 0)) - Decimal(str(t.returned_to_investor or 0))) for t in transactionsInvestors) + sum(float(Decimal(str(cf.amount or 0)) - Decimal(str(cf.returned_to_investor or 0))) for cf in cashflows)
                 total_profit = total_debt
@@ -3584,7 +3584,7 @@ def debtor_detail(request, type, pk):
 
             cashflows = CashFlow.objects.filter(
                 purpose__operation_type=PaymentPurpose.INCOME
-            ).exclude(purpose__name="Оплата")
+            ).exclude(purpose__name__in=["Оплата", "Внесение инвестора"])
             total_cashflow_income = sum(float(Decimal(str(cf.amount or 0)) - Decimal(str(cf.returned_to_investor or 0))) for cf in cashflows if cf.amount > 0)
             data = {}
             data["amount"] = total_investor_debt + total_cashflow_income
@@ -3784,7 +3784,7 @@ def debtor_details(request):
 
             cashflows = CashFlow.objects.filter(
                 purpose__operation_type=PaymentPurpose.INCOME,
-            ).exclude(purpose__name="Оплата")
+            ).exclude(purpose__name__in=["Оплата", "Внесение инвестора"])
 
             cashflows = [cf for cf in cashflows if (cf.amount - (cf.returned_to_investor or 0)) > 0]
 
@@ -3947,7 +3947,7 @@ def company_balance_stats(request):
 
     cashflows = CashFlow.objects.filter(
         purpose__operation_type=PaymentPurpose.INCOME
-    ).exclude(purpose__name="Оплата")
+    ).exclude(purpose__name__in=["Оплата", "Внесение инвестора"])
 
     total_profit = sum(float(getattr(t, 'profit', 0) - getattr(t, 'returned_to_investor', 0)) for t in transactionsInvestors) + sum(float(Decimal(str(cf.amount or 0)) - Decimal(str(cf.returned_to_investor or 0))) for cf in cashflows)
 
@@ -4390,7 +4390,7 @@ def money_logs(request):
     cash_flows = CashFlow.objects.select_related('account', 'supplier', 'purpose', 'transaction').all()
     # money_transfers = MoneyTransfer.objects.select_related('source_account', 'destination_account', 'source_supplier', 'destination_supplier').all()
     debt_repayments = SupplierDebtRepayment.objects.select_related('supplier').all()
-    investor_ops = InvestorDebtOperation.objects.select_related('investor').all()
+    investor_ops = InvestorDebtOperation.objects.select_related('investor').filter(operation_type="profit")
 
     class LogRow:
         def __init__(self, dt, type, info, amount, comment="", created_by=None):
