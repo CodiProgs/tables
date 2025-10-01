@@ -427,11 +427,7 @@ def transaction_edit(request, pk=None):
             account_changed = old_account.id != account_supplier.id if old_account else True
             supplier_changed = old_supplier.id != supplier.id if old_supplier else True
 
-            # Если сменился счет или поставщик и по транзакции были оплаты,
-            # перемещаем баланс через SupplierAccount (чтобы модель синхронизировала Account.balance)
             if (account_changed or supplier_changed) and old_paid_amount > 0:
-                # Вычитаем с баланса старого SupplierAccount (создаем, если нужно),
-                # это приведет к корректному уменьшению Account.balance через логику SupplierAccount.save()
                 if old_supplier and old_account:
                     old_supplier_account, _created = SupplierAccount.objects.get_or_create(
                         supplier=old_supplier,
@@ -441,7 +437,6 @@ def transaction_edit(request, pk=None):
                     old_supplier_account.balance = Decimal(old_supplier_account.balance) - Decimal(old_paid_amount)
                     old_supplier_account.save()
 
-                # Добавляем на баланс нового SupplierAccount (создаем, если нужно)
                 new_supplier_account, _ = SupplierAccount.objects.get_or_create(
                     supplier=supplier,
                     account=account_supplier,
@@ -450,7 +445,6 @@ def transaction_edit(request, pk=None):
                 new_supplier_account.balance = Decimal(new_supplier_account.balance) + Decimal(old_paid_amount)
                 new_supplier_account.save()
 
-            # Обновляем существующие CashFlow, чтобы они указывали на новый счет/поставщика
             if account_changed or supplier_changed:
                 cashflows = CashFlow.objects.filter(transaction=trans)
                 for cf in cashflows:
@@ -559,7 +553,6 @@ def transaction_payment(request, pk=None):
 
             payment_difference = new_paid_amount - previous_paid_amount
 
-            # Уменьшение оплаты: нужно удалить/обновить CashFlow-элементы и скорректировать SupplierAccount
             if payment_difference < 0 and trans.supplier:
                 if not trans.account:
                     return JsonResponse(
@@ -568,7 +561,6 @@ def transaction_payment(request, pk=None):
                     )
                 account = trans.account
 
-                # получаем или создаём SupplierAccount — даже если его не было раньше, создаём, чтобы изменение корректно синхронизировалось с Account
                 supplier_account, _ = SupplierAccount.objects.get_or_create(
                     supplier=trans.supplier,
                     account=account,
@@ -582,20 +574,17 @@ def transaction_payment(request, pk=None):
                         break
                     cf_amount = cf.amount
                     if to_remove >= cf_amount:
-                        # удаляем полностью этот cashflow — списываем с SupplierAccount
                         supplier_account.balance = Decimal(supplier_account.balance) - Decimal(cf_amount)
                         supplier_account.save()
                         cf.delete()
                         to_remove -= cf_amount
                     else:
-                        # частичное уменьшение
                         supplier_account.balance = Decimal(supplier_account.balance) - Decimal(to_remove)
                         supplier_account.save()
                         cf.amount = cf.amount - to_remove
                         cf.save()
                         to_remove = 0
 
-            # Увеличение оплаты: создаём/обновляем SupplierAccount и создаём CashFlow
             if payment_difference > 0 and trans.supplier:
                 if not trans.account:
                     return JsonResponse(
@@ -627,7 +616,6 @@ def transaction_payment(request, pk=None):
                     created_by=request.user
                 )
 
-            # Если обнуляем оплату — удаляем все cashflows с пометкой "Оплата" и списываем сумму с SupplierAccount
             if new_paid_amount == 0 and previous_paid_amount > 0 and trans.supplier and trans.account:
                 account = trans.account
                 supplier_account, _ = SupplierAccount.objects.get_or_create(
@@ -818,8 +806,6 @@ def accounts(request):
 def prepare_accounts_data(accounts):
     data = {}
     for acc in accounts:
-        # balance теперь корректно синхронизируется моделью SupplierAccount,
-        # здесь просто форматируем для вывода
         acc_balance = float(acc.balance or 0)
         acc_data = BankAccountData(
             name=acc.name,
@@ -844,7 +830,6 @@ def suppliers(request):
 
     fields = get_supplier_fields()
     
-    # Переименуем поле для отображения в таблице
     for field in fields:
         if field.get("name") == "accounts":
             field["name"] = "accounts_display"
@@ -984,7 +969,6 @@ def client_edit(request, pk=None):
             client.comment = comment
             client.bonus_percentage = float(bonus_percentage) if bonus_percentage is not None else 0
 
-            # при необходимости можно восстанавливать старые комментарии/логирование изменений
             client.save()
             context = {
                 "item": client,
@@ -1145,21 +1129,19 @@ def transaction_list(request):
 @login_required
 def supplier_accounts(request):
     suppliers = Supplier.objects.filter(visible_in_summary=True).order_by('name')
-    bank_accounts = Account.objects.exclude(name__iexact="Наличные").order_by('name')  # исключаем "Наличные"
+    bank_accounts = Account.objects.exclude(name__iexact="Наличные").order_by('name')
 
     class SupplierAccountRow:
         def __init__(self, supplier_name, supplier_id):
             self.supplier = supplier_name
             self.supplier_id = supplier_id
 
-    # Загружаем все SupplierAccount в память чтобы быстро собирать таблицу
     supplier_accounts_qs = SupplierAccount.objects.select_related('supplier', 'account').all()
     balances = {}
     for sa in supplier_accounts_qs:
         balances[(sa.supplier_id, sa.account_id)] = sa.balance or 0
 
     rows = []
-    # используем Decimal/float аккуратно при суммировании
     account_totals = {account.id: 0 for account in bank_accounts}
 
     for supplier in suppliers:
@@ -1167,7 +1149,6 @@ def supplier_accounts(request):
         total_balance = 0
         for account in bank_accounts:
             balance = balances.get((supplier.id, account.id), 0)
-            # приводим к float для корректной работы format_currency
             balance_float = float(balance or 0)
             setattr(row, f'account_{account.id}', format_currency(balance_float))
             account_totals[account.id] = float(account_totals[account.id]) + balance_float
@@ -1252,7 +1233,6 @@ def supplier_create(request):
                 visible_in_summary=visible_in_summary,
             )
 
-            # Привязываем счета (SupplierAccount будут созданы по мере необходимости при оплатах)
             supplier.accounts.set(Account.objects.filter(id__in=[int(x) for x in account_ids.split(',') if x.strip()]))
 
             if username and password:
@@ -1411,7 +1391,6 @@ def supplier_delete(request, pk=None):
 
             supplier = get_object_or_404(Supplier, id=pk)
 
-            # Проверяем все SupplierAccount для данного поставщика — запрещаем удалять если есть остатки
             supplier_accounts = SupplierAccount.objects.filter(supplier=supplier)
             for sa in supplier_accounts:
                 if float(sa.balance or 0) != 0.0:
@@ -1498,7 +1477,6 @@ def cash_flow_create(request):
                 created_by=user,
             )
 
-            # Если указан поставщик — меняем баланс через SupplierAccount (модель синхронизирует Account)
             if supplier:
                 supplier_account, _ = SupplierAccount.objects.get_or_create(
                     supplier=supplier,
@@ -1508,7 +1486,6 @@ def cash_flow_create(request):
                 supplier_account.balance = Decimal(supplier_account.balance or 0) + Decimal(amount_value)
                 supplier_account.save()
             else:
-                # Операции без поставщика — обновляем баланс счета напрямую
                 account.balance = F('balance') + amount_value
                 account.save(update_fields=['balance'])
                 account.refresh_from_db(fields=['balance'])
@@ -1596,7 +1573,6 @@ def cash_flow_edit(request, pk=None):
 
             updated_amount = -abs(new_amount_value) if new_purpose.operation_type == PaymentPurpose.EXPENSE else abs(new_amount_value)
 
-            # Снимаем старую сумму — через SupplierAccount если был поставщик, иначе напрямую с счета
             old_account = get_object_or_404(Account, id=old_account_id)
             if old_supplier_id:
                 old_supplier = get_object_or_404(Supplier, id=old_supplier_id)
@@ -1608,7 +1584,6 @@ def cash_flow_edit(request, pk=None):
                     old_supplier_account.balance = Decimal(old_supplier_account.balance or 0) - Decimal(old_amount)
                     old_supplier_account.save()
                 else:
-                    # Если supplier_account не найден, попытаемся снизить баланс счета напрямую (на случай исторических данных)
                     old_account.balance = F('balance') - old_amount
                     old_account.save(update_fields=['balance'])
                     old_account.refresh_from_db(fields=['balance'])
@@ -1617,7 +1592,6 @@ def cash_flow_edit(request, pk=None):
                 old_account.save(update_fields=['balance'])
                 old_account.refresh_from_db(fields=['balance'])
 
-            # Добавляем новую сумму — через SupplierAccount если указан поставщик, иначе напрямую по счету
             if new_supplier:
                 new_supplier_account, _ = SupplierAccount.objects.get_or_create(
                     supplier=new_supplier,
@@ -1631,11 +1605,8 @@ def cash_flow_edit(request, pk=None):
                 new_account.save(update_fields=['balance'])
                 new_account.refresh_from_db(fields=['balance'])
 
-            # Если это оплата по транзакции — корректируем paid_amount
             if cashflow.purpose.name == "Оплата" and cashflow.transaction:
                 transaction_obj = cashflow.transaction
-                # Используем арифметику похожую на старую логику (учитываем знаки old_amount и updated_amount)
-                # Если требуется иная логика (например всегда работать с abs), можно поменять здесь
                 transaction_obj.paid_amount = int(transaction_obj.paid_amount or 0) - int(old_amount) + int(updated_amount)
                 transaction_obj.save()
 
@@ -1687,7 +1658,6 @@ def cash_flow_delete(request, pk=None):
 
             is_payment = purpose and purpose.name == "Оплата"
 
-            # Корректируем балансы: через SupplierAccount если есть поставщик, иначе напрямую счет
             if supplier:
                 try:
                     supplier_account = SupplierAccount.objects.get(
@@ -1697,7 +1667,6 @@ def cash_flow_delete(request, pk=None):
                     supplier_account.balance = Decimal(supplier_account.balance or 0) - amount
                     supplier_account.save()
                 except SupplierAccount.DoesNotExist:
-                    # Если нет SupplierAccount — попробуем скорректировать баланс счета напрямую
                     account.balance = F('balance') - amount
                     account.save(update_fields=['balance'])
                     account.refresh_from_db(fields=['balance'])
@@ -1958,11 +1927,9 @@ def money_transfer_collection(request):
                 amount=amount_value
             )
 
-            # Списываем с SupplierAccount (это автоматически скорректирует баланс source_account через модель)
             source_supplier_account.balance = Decimal(source_supplier_account.balance or 0) - Decimal(amount_value)
             source_supplier_account.save()
 
-            # Увеличиваем наличный счет (Account) — для "Наличные" пока оставляем прямое изменение
             cash_account.balance = F('balance') + amount_value
             cash_account.save(update_fields=['balance'])
             cash_account.refresh_from_db(fields=['balance'])
@@ -1982,7 +1949,6 @@ def money_transfer_collection(request):
                 created_by=request.user
             )
 
-            # Собираем данные для обновления таблицы поставщиков/счетов
             bank_accounts = Account.objects.exclude(name__iexact="Наличные").order_by('name')
             suppliers = Supplier.objects.filter(visible_in_summary=True).order_by('name')
 
@@ -2209,11 +2175,9 @@ def money_transfer_create(request):
                 is_counted=is_counted if is_exchange else None
             )
 
-            # Списываем с SupplierAccount отправителя (модель синхронизирует Account.balance)
             source_supplier_account.balance = Decimal(source_supplier_account.balance or 0) - Decimal(amount_value)
             source_supplier_account.save()
 
-            # Начисляем на SupplierAccount получателя (создаём если нужно)
             destination_supplier_account, _ = SupplierAccount.objects.get_or_create(
                 supplier=destination_supplier,
                 account=destination_account,
@@ -2245,7 +2209,6 @@ def money_transfer_create(request):
                 created_by=request.user
             )
 
-            # Подготовка таблицы поставщиков/счетов
             suppliers = Supplier.objects.filter(visible_in_summary=True).order_by('name')
             bank_accounts = Account.objects.exclude(name__iexact="Наличные").order_by('name')
 
@@ -2435,7 +2398,6 @@ def money_transfer_edit(request, pk: int):
                     status=400,
                 )
 
-            # ОТМЕНА старых проводок: вернуть деньги отправителю и убрать с получателя (через SupplierAccount)
             if old_source_supplier:
                 old_source_supplier_account, _ = SupplierAccount.objects.get_or_create(
                     supplier=old_source_supplier,
@@ -2445,7 +2407,6 @@ def money_transfer_edit(request, pk: int):
                 old_source_supplier_account.balance = Decimal(old_source_supplier_account.balance or 0) + Decimal(old_amount)
                 old_source_supplier_account.save()
             else:
-                # на случай исторических записей — скорректировать счет напрямую
                 old_source_account.balance = F('balance') + old_amount
                 old_source_account.save(update_fields=['balance'])
                 old_source_account.refresh_from_db(fields=['balance'])
@@ -2463,7 +2424,6 @@ def money_transfer_edit(request, pk: int):
                 old_destination_account.save(update_fields=['balance'])
                 old_destination_account.refresh_from_db(fields=['balance'])
 
-            # ПРОВЕДЕНИЕ новых проводок: снимаем с нового отправителя и начисляем получателю
             new_source_supplier_account.balance = Decimal(new_source_supplier_account.balance or 0) - Decimal(amount_value)
             new_source_supplier_account.save()
 
@@ -2511,7 +2471,6 @@ def money_transfer_edit(request, pk: int):
                     operation_type=PaymentPurpose.EXPENSE
                 )
 
-            # Удаляем старые cashflow-записи (по старым параметрам) и создаём новые
             CashFlow.objects.filter(
                 account=old_source_account,
                 supplier=old_source_supplier,
@@ -2637,7 +2596,6 @@ def money_transfer_delete(request, pk=None):
                         status=400,
                     )
 
-            # Возвращаем средства отправителю
             if source_supplier:
                 source_supplier_account, _ = SupplierAccount.objects.get_or_create(
                     supplier=source_supplier,
@@ -2651,7 +2609,6 @@ def money_transfer_delete(request, pk=None):
                 source_account.save(update_fields=['balance'])
                 source_account.refresh_from_db(fields=['balance'])
 
-            # Снимаем средства у получателя
             if destination_supplier and destination_supplier_account:
                 destination_supplier_account.balance = Decimal(destination_supplier_account.balance or 0) - Decimal(amount)
                 destination_supplier_account.save()
@@ -2721,7 +2678,6 @@ def debtors(request):
     total_branch_debts = sum(
         branch['debt'] for branch in branch_debts_list if branch['branch'] != "Филиал 1" and branch['branch'] != "Наши ИП"
     )
-    print(total_branch_debts)
 
     total_bonuses = sum(float(t.bonus_debt) for t in transactions)
     total_remaining = sum(float(t.client_debt_paid) for t in transactions)
@@ -2731,7 +2687,6 @@ def debtors(request):
         t for t in Transaction.objects.filter(paid_amount__gt=0)
         if getattr(t, 'bonus_debt', 0) == 0
         and getattr(t, 'client_debt', 0) == 0
-        # and getattr(t, 'supplier_debt', 0) == 0
         and getattr(t, 'profit', 0) > 0
     ]
 
@@ -2810,7 +2765,6 @@ def balance(request):
         t for t in Transaction.objects.filter(paid_amount__gt=0)
         if getattr(t, 'bonus_debt', 0) == 0
         and getattr(t, 'client_debt', 0) == 0
-        # and getattr(t, 'supplier_debt', 0) == 0
         and getattr(t, 'profit', 0) > 0
     ]
 
@@ -2862,13 +2816,10 @@ def settle_supplier_debt(request, pk: int):
             except Exception:
                 return JsonResponse({"status": "error", "message": "Некорректная сумма"}, status=400)
 
-            # Для большинства типов нам нужен объект Transaction
             if type_ not in ("balance", "initial", "short_term_liabilities", "credit", "equipment", "profit"):
                 trans = get_object_or_404(Transaction, id=pk)
 
-            # --- Погашение долга филиала (распределение суммы по транзакциям филиала) ---
             if type_ == "branch":
-                # trans определён выше (используется только для получения branch)
                 branch = trans.supplier.branch if trans and trans.supplier else None
 
                 supplier_ids = Supplier.objects.filter(branch=branch).values_list('id', flat=True)
@@ -2887,21 +2838,18 @@ def settle_supplier_debt(request, pk: int):
                 changed_html_rows = []
                 changed_ids = []
 
-                # Распределяем выплату по транзакциям филиала (по возрастанию даты)
                 for t in branch_transactions:
                     debt = Decimal(str(getattr(t, 'supplier_debt', 0) or 0))
                     if debt <= 0 or remaining <= 0:
                         continue
                     repay_amount = min(debt, remaining)
 
-                    # Увеличиваем возвращено поставщиком у транзакции
                     t.returned_by_supplier = (Decimal(str(t.returned_by_supplier or 0)) + repay_amount)
                     t.returned_date = timezone.now()
                     t.save()
 
                     remaining -= repay_amount
 
-                    # Формируем строку для обновления UI
                     row = type("DebtorRow", (), {})()
                     row.created_at = timezone.localtime(t.created_at).strftime("%d.%m.%Y") if t.created_at else ""
                     row.supplier = str(t.supplier) if t.supplier else ""
@@ -2924,20 +2872,17 @@ def settle_supplier_debt(request, pk: int):
 
                 branch_total_debt = sum(float(getattr(t, 'supplier_debt', 0) or 0) for t in branch_transactions)
 
-                # Пополнение "Наличных" (если есть)
                 cash_account = Account.objects.filter(name__iexact="Наличные").first()
                 if cash_account:
-                    # Это операция по кассе — обновляем напрямую
                     cash_account.balance = F('balance') + amount_value
                     cash_account.save(update_fields=['balance'])
                     cash_account.refresh_from_db(fields=['balance'])
 
                 user = request.user
 
-                # Для истории создаём запись погашения — используем supplier последней обработанной транзакции (как раньше)
                 supplier_for_record = None
                 if branch_transactions:
-                    supplier_for_record = branch_transactions[0].supplier  # можно взять первый (раньше брали последний t)
+                    supplier_for_record = branch_transactions[0].supplier 
                 debtRepayment = SupplierDebtRepayment.objects.create(
                     supplier=supplier_for_record,
                     amount=amount_value,
@@ -2972,7 +2917,6 @@ def settle_supplier_debt(request, pk: int):
                     "total_branch_debts": all_branches_total_debt,
                 })
 
-            # --- Возврат по бонусам ---
             elif type_ == "bonus":
                 if amount_value == 0:
                     return JsonResponse({"status": "error", "message": "Сумма должна быть больше нуля"}, status=400)
@@ -3038,7 +2982,6 @@ def settle_supplier_debt(request, pk: int):
                     "total_profit": total_profit,
                 })
 
-            # --- Выдачи клиентам (возврат наличными клиенту) ---
             elif type_ == "remaining":
                 if amount_value == 0:
                     return JsonResponse({"status": "error", "message": "Сумма должна быть больше нуля"}, status=400)
@@ -3053,7 +2996,6 @@ def settle_supplier_debt(request, pk: int):
                 if Decimal(str(cash_account.balance or 0)) < amount_value:
                     return JsonResponse({"status": "error", "message": "Недостаточно средств на счете 'Наличные'"}, status=400)
 
-                # Снимаем из кассы
                 cash_account.balance = F('balance') - amount_value
                 cash_account.save(update_fields=['balance'])
                 cash_account.refresh_from_db(fields=['balance'])
@@ -3116,7 +3058,6 @@ def settle_supplier_debt(request, pk: int):
                     "total_profit": total_profit,
                 })
 
-            # --- Операции по балансу инвестора (внесение/снятие) ---
             elif type_ == "balance":
                 operation_type = request.POST.get("operation_type")
                 if operation_type not in ["withdrawal", "deposit"]:
@@ -3203,95 +3144,6 @@ def settle_supplier_debt(request, pk: int):
                     "html_investor_debt_operation": html_investor_debt_operation,
                 })
 
-            # --- Начальный баланс инвестора (initial) --- (не работает)
-            # elif type_ == "initial":
-            #     investor = get_object_or_404(Investor, id=pk)
-
-            #     operation_type = request.POST.get("operation_type")
-
-            #     if operation_type not in ["withdrawal", "deposit"]:
-            #         return JsonResponse({"status": "error", "message": "Некорректный тип операции"}, status=400)
-
-            #     cash_account = Account.objects.filter(name__iexact="Наличные").first()
-
-            #     if operation_type == "deposit":
-            #         investor.initial_balance = Decimal(str(investor.initial_balance or 0)) + amount_value
-            #         if cash_account:
-            #             cash_account.balance = F('balance') + amount_value
-            #             cash_account.save(update_fields=['balance'])
-            #             cash_account.refresh_from_db(fields=['balance'])
-            #     elif operation_type == "withdrawal":
-            #         if Decimal(str(investor.initial_balance or 0)) < amount_value:
-            #             return JsonResponse({"status": "error", "message": "Недостаточно средств для снятия"}, status=400)
-            #         investor.initial_balance = Decimal(str(investor.initial_balance or 0)) - amount_value
-            #         if cash_account:
-            #             cash_account.balance = F('balance') - amount_value
-            #             cash_account.save(update_fields=['balance'])
-            #             cash_account.refresh_from_db(fields=['balance'])
-
-            #     investor.save()
-
-            #     investorDebtOperation = InvestorDebtOperation.objects.create(
-            #         investor=investor,
-            #         amount=amount_value,
-            #         operation_type=operation_type,
-            #         created_by=request.user
-            #     )
-
-            #     row = type("InvestorRow", (), {
-            #         "name": investor.name,
-            #         "balance": investor.balance,
-            #     })()
-            #     fields = [
-            #         {"name": "name", "verbose_name": "Инвестор"},
-            #         {"name": "balance", "verbose_name": "Фактические инвест", "is_amount": True},
-            #     ]
-            #     html = render_to_string("components/table_row.html", {"item": row, "fields": fields})
-
-            #     row = type("Row", (), {
-            #         "created_at": timezone.localtime(investorDebtOperation.created_at).strftime("%d.%m.%Y %H:%M") if investorDebtOperation.created_at else "",
-            #         "investor": str(investorDebtOperation.investor) if investorDebtOperation.investor else "",
-            #         "operation_type": "Внесение" if investorDebtOperation.operation_type == "deposit" else "Забор",
-            #         "amount": investorDebtOperation.amount,
-            #     })()
-
-            #     fields = [
-            #         {"name": "created_at", "verbose_name": "Дата", "is_date": True},
-            #         {"name": "investor", "verbose_name": "Инвестор"},
-            #         {"name": "operation_type", "verbose_name": "Тип операции"},
-            #         {"name": "amount", "verbose_name": "Сумма", "is_amount": True},
-            #     ]
-            #     html_investor_debt_operation = render_to_string("components/table_row.html", {"item": row, "fields": fields})
-
-            #     transactions_all = Transaction.objects.filter(paid_amount__gt=0)
-            #     total_bonuses = sum(float(getattr(t, 'bonus_debt', 0) or 0) for t in transactions_all)
-            #     total_remaining = sum(float(getattr(t, 'client_debt_paid', 0) or 0) for t in transactions_all)
-            #     transactionsInvestors = [
-            #         t for t in Transaction.objects.filter(paid_amount__gt=0)
-            #         if getattr(t, 'bonus_debt', 0) == 0
-            #         and getattr(t, 'client_debt', 0) == 0
-            #         and getattr(t, 'profit', 0) > 0
-            #     ]
-
-            #     total_profit = sum(float(getattr(t, 'profit', 0)) for t in transactionsInvestors)
-
-            #     summary = [
-            #         {"name": "Бонусы", "amount": total_bonuses},
-            #         {"name": "Выдачи клиентам", "amount": total_remaining},
-            #         {"name": "Инвесторам", "amount": total_profit},
-            #     ]
-
-            #     total_summary_debts = sum(item['amount'] for item in summary)
-
-            #     return JsonResponse({
-            #         "html": html,
-            #         "id": investor.id,
-            #         "type": "initial",
-            #         "total_summary_debts": total_summary_debts,
-            #         "html_investor_debt_operation": html_investor_debt_operation,
-            #     })
-
-            # --- Балансные данные: оборудование/кредит/краткосрочные обязательства ---
             elif type_ in ["short_term_liabilities", "credit", "equipment"]:
                 type_map = {
                     "equipment": "Оборудование",
@@ -3374,7 +3226,6 @@ def settle_supplier_debt(request, pk: int):
                 }
                 return JsonResponse(data, safe=False)
 
-            # --- Погашение долга инвестору (profit) ---
             elif type_ == "profit":
                 if amount_value == 0:
                     return JsonResponse({"status": "error", "message": "Сумма должна быть больше нуля"}, status=400)
@@ -3386,10 +3237,8 @@ def settle_supplier_debt(request, pk: int):
                     cf_id = pk.replace("cf-", "")
                     cashflow = get_object_or_404(CashFlow, id=cf_id)
                 else:
-                    # корректное получение транзакции с клиентом:
                     trans = Transaction.objects.select_related('client').filter(id=pk).first()
                     if not trans:
-                        # если не нашли — вернём ошибку
                         return JsonResponse({"status": "error", "message": "Транзакция не найдена"}, status=400)
 
                 if trans:
@@ -3535,7 +3384,6 @@ def settle_supplier_debt(request, pk: int):
 @forbid_supplier
 @login_required
 def debtor_detail(request, type, pk):
-    # Если пришёл id денежного потока в виде "cf-<id>"
     if isinstance(pk, str) and pk.startswith("cf-"):
         cf_id = pk.replace("cf-", "")
         cashflow = get_object_or_404(CashFlow, id=cf_id)
@@ -3777,7 +3625,6 @@ def debtor_details(request):
                 t for t in Transaction.objects.filter(paid_amount__gt=0)
                 if getattr(t, 'bonus_debt', 0) == 0
                 and getattr(t, 'client_debt', 0) == 0
-                # and getattr(t, 'supplier_debt', 0) == 0 TODO:
                 and getattr(t, 'profit', 0) > 0
                 and (getattr(t, 'profit', 0) - getattr(t, 'returned_to_investor', 0)) > 0
             ]
@@ -3797,7 +3644,6 @@ def debtor_details(request):
                     self.id = id
                     self.returned_to_investor = returned_to_investor 
 
-            # добавляем денежные потоки как "транзакции" для выплаты инвесторам
             for cf in cashflows:
                 transactions.append(TransactionRow(
                     created_at=cf.created_at,
@@ -3901,191 +3747,12 @@ def cash_flow_payment_stats(request, supplier_id):
     })
 
 
-
-
-
-
-# @forbid_supplier
-# @login_required
-# @require_GET
-# def company_balance_stats(request):
-#     # Оборудование остаётся из BalanceData
-#     equipment = BalanceData.objects.filter(name="Оборудование").aggregate(total=Sum("amount"))["total"] or Decimal(0)
-
-#     # Кредиты — список и HTML-таблица
-#     credits_qs = Credit.objects.all().order_by('name')
-#     credit_rows = [
-#         type("Row", (), {
-#             "name": getattr(c, "name", str(c)),
-#             "amount": getattr(c, "amount", Decimal(0))
-#         })()
-#         for c in credits_qs
-#     ]
-#     credit_total = sum((getattr(c, "amount", Decimal(0)) or Decimal(0)) for c in credits_qs) if credits_qs else Decimal(0)
-#     credit_fields = [
-#         {"name": "name", "verbose_name": "Наименование"},
-#         {"name": "amount", "verbose_name": "Сумма", "is_amount": True},
-#     ]
-#     credit_html = render_to_string("components/table.html", {"id": "credits-table", "fields": credit_fields, "data": credit_rows})
-
-#     # Краткосрочные обязательства — список и HTML-таблица
-#     short_qs = ShortTermLiability.objects.all().order_by('name')
-#     short_rows = [
-#         type("Row", (), {
-#             "name": getattr(s, "name", str(s)),
-#             "amount": getattr(s, "amount", Decimal(0))
-#         })()
-#         for s in short_qs
-#     ]
-#     short_total = sum((getattr(s, "amount", Decimal(0)) or Decimal(0)) for s in short_qs) if short_qs else Decimal(0)
-#     short_fields = [
-#         {"name": "name", "verbose_name": "Наименование"},
-#         {"name": "amount", "verbose_name": "Сумма", "is_amount": True},
-#     ]
-#     short_html = render_to_string("components/table.html", {"id": "short-term-table", "fields": short_fields, "data": short_rows})
-
-#     # ТМЦ — InventoryItem как таблица
-#     inventory_qs = InventoryItem.objects.all().order_by('name')
-#     inventory_rows = [
-#         type("Row", (), {
-#             "name": getattr(it, "name", str(it)),
-#             "amount": getattr(it, "total", getattr(it, "amount", Decimal(0)))
-#         })()
-#         for it in inventory_qs
-#     ]
-#     inventory_total = sum((getattr(it, "total", getattr(it, "amount", Decimal(0))) or Decimal(0)) for it in inventory_qs) if inventory_qs else Decimal(0)
-#     inventory_fields = [
-#         {"name": "name", "verbose_name": "Наименование"},
-#         {"name": "amount", "verbose_name": "Сумма", "is_amount": True},
-#     ]
-#     inventory_html = render_to_string("components/table.html", {"id": "inventory-table", "fields": inventory_fields, "data": inventory_rows})
-
-#     # Дебиторы по филиалам
-#     debtors = []
-#     total_debtors = Decimal(0)
-#     for branch in Supplier.objects.exclude(branch=None).values_list("branch__id", "branch__name").distinct():
-#         branch_id, branch_name = branch
-#         if branch_name != "Филиал 1" and branch_name != "Наши ИП":
-#             branch_debt = sum(
-#                 (t.supplier_debt or Decimal(0))
-#                 for t in Transaction.objects.filter(supplier__branch_id=branch_id, paid_amount__gt=0)
-#             )
-#             debtors.append({"branch": branch_name, "amount": branch_debt})
-#             total_debtors += branch_debt
-
-#     # Безналичные — SupplierAccount + касса
-#     safe_amount = SupplierAccount.objects.filter(
-#         supplier__visible_in_summary=True
-#     ).aggregate(total=Sum("balance"))["total"] or Decimal(0)
-
-#     cash_account = Account.objects.filter(name__iexact="Наличные").first()
-#     cash_balance = Decimal(cash_account.balance) if cash_account and cash_account.balance is not None else Decimal(0)
-
-#     safe_amount = Decimal(safe_amount) + cash_balance
-
-#     # Суммы для "Кредиторская задолженность" (как в summary / debtors)
-#     bonuses = sum((t.bonus_debt or Decimal(0)) for t in Transaction.objects.filter(paid_amount__gt=0))
-#     total_remaining = sum((t.client_debt_paid or Decimal(0)) for t in Transaction.objects.filter(paid_amount__gt=0))
-#     # Рассчитаем прибыль для инвесторов (Decimal)
-#     transactionsInvestors = [
-#         t for t in Transaction.objects.filter(paid_amount__gt=0)
-#         if getattr(t, 'bonus_debt', 0) == 0
-#         and getattr(t, 'client_debt', 0) == 0
-#         and getattr(t, 'profit', 0) > 0
-#     ]
-#     cashflows = CashFlow.objects.filter(
-#         purpose__operation_type=PaymentPurpose.INCOME
-#     ).exclude(purpose__name__in=["Оплата", "Внесение инвестора"])
-
-#     total_profit_decimal = sum(
-#         (Decimal(str(getattr(t, 'profit', 0) or 0)) - Decimal(str(getattr(t, 'returned_to_investor', 0) or 0)))
-#         for t in transactionsInvestors
-#     ) + sum(
-#         (Decimal(str(cf.amount or 0)) - Decimal(str(cf.returned_to_investor or 0)))
-#         for cf in cashflows
-#     )
-
-#     # Сумма трёх элементов внутри "Кредиторская задолженность"
-#     total_summary_debts = (bonuses or Decimal(0)) + (total_remaining or Decimal(0)) + (total_profit_decimal or Decimal(0))
-
-#     # Сумма client_debts (если ранее использовалась как отдельная статья)
-#     client_debts = sum((t.client_debt or Decimal(0)) for t in Transaction.objects.filter(paid_amount__gt=0).all())
-
-#     assets_total = equipment + inventory_total + total_debtors + safe_amount
-
-#     # Считаем предварительные пассивы (без капитала)
-#     provisional_liabilities = credit_total + client_debts + short_total + total_summary_debts
-
-#     # капитал — разница активов и предварительных пассивов
-#     current_capital = assets_total - provisional_liabilities
-
-#     # включаем капитал в итог пассивов
-#     liabilities_total = provisional_liabilities + current_capital
-
-#     current_year = datetime.now().year
-#     capitals = []
-
-#     MONTHS_RU = [
-#         "январь", "февраль", "март", "апрель", "май", "июнь",
-#         "июль", "август", "сентябрь", "октябрь", "ноябрь", "декабрь"
-#     ]
-#     months = [MONTHS_RU[month-1] for month in range(1, 13)]
-
-#     for month in range(1, 13):
-#         capital = float(get_monthly_capital(current_year, month))
-#         capitals.append(capital)
-
-#     if capitals:
-#         total_capital = round(sum(capitals) / len(capitals), 1)
-#     else:
-#         total_capital = 0
-
-#     data = {
-#         "non_current_assets": {
-#             "total": equipment,
-#             "items": [{"name": "Оборудование", "amount": equipment}]
-#         },
-#         "current_assets": {
-#             "inventory": {"total": inventory_total, "html": inventory_html},
-#             "debtors": {"total": total_debtors, "items": debtors},
-#             "cash": {"total": safe_amount,
-#                      "items": [{"name": "Счета, Карты и Сейф", "amount": safe_amount}]},
-#         },
-#         "assets": assets_total,
-#         "liabilities": {
-#             "total": liabilities_total,
-#             "items": [
-#                 {"name": "Кредит", "amount": credit_total, "html": credit_html},
-#                 {
-#                     "name": "Кредиторская задолженность",
-#                     "amount": total_summary_debts,
-#                     "items": [
-#                         {"name": "Бонусы", "amount": bonuses},
-#                         {"name": "Выдачи клиентам", "amount": total_remaining},
-#                         {"name": "Инвесторам", "amount": total_profit_decimal},
-#                     ],
-#                 },
-#                 {"name": "Краткосрочные обязательства", "amount": short_total, "html": short_html},
-#             ],
-#         },
-#         "capital": current_capital,
-#         "capitals_by_month": {
-#             "months": months,
-#             "capitals": capitals,
-#             "total": total_capital
-#         },
-#     }
-#     return JsonResponse(data, safe=False)
-
-
 @forbid_supplier
 @login_required
 @require_GET
 def company_balance_stats(request):
-    # Оборудование остаётся из BalanceData
     equipment = BalanceData.objects.filter(name="Оборудование").aggregate(total=Sum("amount"))["total"] or Decimal(0)
 
-    # Кредиты — список и HTML-таблица
     credits_qs = Credit.objects.all().order_by('name')
     credit_rows = [
         type("Row", (), {
@@ -4101,7 +3768,6 @@ def company_balance_stats(request):
     ]
     credit_html = render_to_string("components/table.html", {"id": "credits-table", "fields": credit_fields, "data": credit_rows})
 
-    # Краткосрочные обязательства — список и HTML-таблица
     short_qs = ShortTermLiability.objects.all().order_by('name')
     short_rows = [
         type("Row", (), {
@@ -4117,23 +3783,41 @@ def company_balance_stats(request):
     ]
     short_html = render_to_string("components/table.html", {"id": "short-term-table", "fields": short_fields, "data": short_rows})
 
-    # ТМЦ — InventoryItem как таблица
     inventory_qs = InventoryItem.objects.all().order_by('name')
-    inventory_rows = [
-        type("Row", (), {
-            "name": getattr(it, "name", str(it)),
-            "amount": getattr(it, "total", getattr(it, "amount", Decimal(0)))
-        })()
-        for it in inventory_qs
-    ]
+    inventory_rows = []
+    for it in inventory_qs:
+        qty = getattr(it, "quantity", Decimal(0)) or Decimal(0)
+        if isinstance(qty, Decimal):
+            try:
+                if qty == qty.to_integral():
+                    quantity_val = int(qty)
+                else:
+                    quantity_val = qty.normalize()
+            except Exception:
+                quantity_val = qty
+        else:
+            if isinstance(qty, float) and qty.is_integer():
+                quantity_val = int(qty)
+            else:
+                quantity_val = qty
+
+        inventory_rows.append(
+            type("Row", (), {
+                "name": getattr(it, "name", str(it)),
+                "quantity": quantity_val,
+                "price": getattr(it, "price", Decimal(0)),
+                "amount": getattr(it, "total", getattr(it, "amount", Decimal(0)))
+            })()
+        )
     inventory_total = sum((getattr(it, "total", getattr(it, "amount", Decimal(0))) or Decimal(0)) for it in inventory_qs) if inventory_qs else Decimal(0)
     inventory_fields = [
         {"name": "name", "verbose_name": "Наименование"},
+        {"name": "quantity", "verbose_name": "Количество"},
+        {"name": "price", "verbose_name": "Цена за ед.", "is_amount": True},
         {"name": "amount", "verbose_name": "Сумма", "is_amount": True},
     ]
     inventory_html = render_to_string("components/table.html", {"id": "inventory-table", "fields": inventory_fields, "data": inventory_rows})
 
-    # Дебиторы по филиалам
     debtors = []
     total_debtors = Decimal(0)
     for branch in Supplier.objects.exclude(branch=None).values_list("branch__id", "branch__name").distinct():
@@ -4146,7 +3830,6 @@ def company_balance_stats(request):
             debtors.append({"branch": branch_name, "amount": branch_debt})
             total_debtors += branch_debt
 
-    # Безналичные — SupplierAccount + касса
     safe_amount = SupplierAccount.objects.filter(
         supplier__visible_in_summary=True
     ).aggregate(total=Sum("balance"))["total"] or Decimal(0)
@@ -4156,10 +3839,9 @@ def company_balance_stats(request):
 
     safe_amount = Decimal(safe_amount) + cash_balance
 
-    # Суммы для "Кредиторская задолженность" (как в summary / debtors)
     bonuses = sum((t.bonus_debt or Decimal(0)) for t in Transaction.objects.filter(paid_amount__gt=0))
     total_remaining = sum((t.client_debt_paid or Decimal(0)) for t in Transaction.objects.filter(paid_amount__gt=0))
-    # Рассчитаем прибыль для инвесторов (Decimal)
+    
     transactionsInvestors = [
         t for t in Transaction.objects.filter(paid_amount__gt=0)
         if getattr(t, 'bonus_debt', 0) == 0
@@ -4178,13 +3860,10 @@ def company_balance_stats(request):
         for cf in cashflows
     )
 
-    # Сумма трёх элементов внутри "Кредиторская задолженность"
     total_summary_debts = (bonuses or Decimal(0)) + (total_remaining or Decimal(0)) + (total_profit_decimal or Decimal(0))
 
-    # Сумма client_debts (если ранее использовалась как отдельная статья)
     client_debts = sum((t.client_debt or Decimal(0)) for t in Transaction.objects.filter(paid_amount__gt=0).all())
 
-    # Вложения инвесторов — список и HTML-таблица
     investors_qs = Investor.objects.all().order_by('name')
     investors_rows = [
         type("Row", (), {
@@ -4200,18 +3879,14 @@ def company_balance_stats(request):
     ]
     investors_html = render_to_string("components/table.html", {"id": "investors-table", "fields": investor_fields, "data": investors_rows})
 
-    # Нераспределенная прибыль — пока статично 0
     undistributed_profit = Decimal(0)
 
     assets_total = equipment + inventory_total + total_debtors + safe_amount
 
-    # Считаем предварительные пассивы (без капитала)
     provisional_liabilities = credit_total + client_debts + short_total + total_summary_debts + investors_total + undistributed_profit
 
-    # капитал — разница активов и предварительных пассивов
     current_capital = assets_total - provisional_liabilities
 
-    # включаем капитал в итог пассивов
     liabilities_total = provisional_liabilities + current_capital
 
     current_year = datetime.now().year
@@ -4258,14 +3933,12 @@ def company_balance_stats(request):
                     ],
                 },
                 {"name": "Краткосрочные обязательства", "amount": short_total, "html": short_html},
-                # Вложения инвесторов — раскрывающийся список с таблицей
                 {
                     "name": "Вложения инвесторов",
                     "amount": investors_total,
                     "items": [{"name": inv.name, "amount": inv.balance or Decimal(0)} for inv in investors_qs],
                     "html": investors_html
                 },
-                # Нераспределенная прибыль — обычный элемент
                 {"name": "Нераспределенная прибыль", "amount": undistributed_profit},
             ],
         },
@@ -4299,28 +3972,6 @@ def company_balance_stats_by_month(request):
     return JsonResponse({"months": months, "capitals": capitals})
 
 
-# def get_monthly_capital(year, month):
-#     last_day = monthrange(year, month)[1]
-#     dt_start = timezone.make_aware(datetime(year, month, 1, 0, 0, 0))
-#     dt_end = timezone.make_aware(datetime(year, month, last_day, 23, 59, 59))
-
-#     investors_total = sum([
-#         Decimal(inv["balance"] or 0) for inv in Investor.objects.filter(
-#             created_at__lte=dt_end
-#         ).values("balance")
-#     ], Decimal(0))
-
-#     transactions = Transaction.objects.filter(created_at__range=(dt_start, dt_end))
-#     profit_total = sum((t.profit or Decimal(0)) for t in transactions)
-
-#     if profit_total > 0 and investors_total > 0:
-#         capital_percent = float(profit_total) / float(investors_total) * 100
-#     else:
-#         capital_percent = 0
-
-#     return round(capital_percent, 1)
-
-
 def get_monthly_capital(year, month):
     """
     Новый алгоритм:
@@ -4330,12 +3981,10 @@ def get_monthly_capital(year, month):
     - Прибыль за месяц = сумма profit по транзакциям в заданном месяце.
     - Возвращает процент = profit / average_capital * 100 (округлён до 1 знака). При нулевом среднем капитале возвращает 0.
     """
-    # границы периода
     last_day = monthrange(year, month)[1]
     dt_start = timezone.make_aware(datetime(year, month, 1, 0, 0, 0))
     dt_end = timezone.make_aware(datetime(year, month, last_day, 23, 59, 59))
 
-    # прошлый месяц
     if month == 1:
         prev_year = year - 1
         prev_month = 12
@@ -4343,55 +3992,39 @@ def get_monthly_capital(year, month):
         prev_year = year
         prev_month = month - 1
 
-    # helper для суммирования балансов инвесторов до конца дня
     def _investors_total_up_to(dt):
         total = Investor.objects.filter(created_at__lte=dt).aggregate(total=Sum('balance'))['total'] or Decimal(0)
         return Decimal(total)
 
-    # получаем капитал прошлого месяца (из MonthlyCapital или считаем)
     prev_obj = MonthlyCapital.objects.filter(year=prev_year, month=prev_month).first()
     if prev_obj and prev_obj.capital is not None:
         prev_cap = Decimal(prev_obj.capital)
     else:
-        # считаем капитал по состоянию на конец предыдущего месяца
         prev_last_day = monthrange(prev_year, prev_month)[1]
         prev_dt_end = timezone.make_aware(datetime(prev_year, prev_month, prev_last_day, 23, 59, 59))
         prev_cap = _investors_total_up_to(prev_dt_end)
 
-    # получаем капитал текущего месяца (из MonthlyCapital или считаем)
     curr_obj = MonthlyCapital.objects.filter(year=year, month=month).first()
     if curr_obj and curr_obj.capital is not None:
         curr_cap = Decimal(curr_obj.capital)
     else:
         curr_cap = _investors_total_up_to(dt_end)
 
-    # печать для отладки — посмотреть исходные значения капиталов
-    print(f"[get_monthly_capital] year={year} month={month} prev={prev_year}-{prev_month} prev_obj={bool(prev_obj)} curr_obj={bool(curr_obj)}")
-    print(f"[get_monthly_capital] prev_cap={prev_cap} curr_cap={curr_cap}")
-
-    # средний капитал за месяц
     try:
         avg_cap = (Decimal(prev_cap) + Decimal(curr_cap)) / Decimal(2)
     except Exception:
         avg_cap = Decimal(0)
 
-    print(f"[get_monthly_capital] avg_cap={avg_cap}")
-
-    # прибыль за месяц (сумма profit у транзакций в периоде)
     transactions = Transaction.objects.filter(created_at__range=(dt_start, dt_end)).select_related()
     profit_total = sum(
         (Decimal(str(getattr(t, 'profit', 0) or 0)) for t in transactions),
         Decimal(0)
     )
 
-    print(f"[get_monthly_capital] transactions_count={transactions.count()} profit_total={profit_total}")
-
     if avg_cap > 0 and profit_total != 0:
         capital_percent = float(profit_total) / float(avg_cap) * 100.0
     else:
         capital_percent = 0.0
-
-    print(f"[get_monthly_capital] capital_percent={capital_percent} (before rounding)")
 
     return round(capital_percent, 1)
 
@@ -4741,9 +4374,7 @@ def complete_all_unfinished_transfers(request):
 @forbid_supplier
 @login_required
 def money_logs(request):
-    # transactions = Transaction.objects.select_related('client', 'supplier', 'account').exclude(paid_amount=0)
     cash_flows = CashFlow.objects.select_related('account', 'supplier', 'purpose', 'transaction').all()
-    # money_transfers = MoneyTransfer.objects.select_related('source_account', 'destination_account', 'source_supplier', 'destination_supplier').all()
     debt_repayments = SupplierDebtRepayment.objects.select_related('supplier').all()
     investor_ops = InvestorDebtOperation.objects.select_related('investor').filter(operation_type="profit")
 
@@ -4759,15 +4390,6 @@ def money_logs(request):
 
     rows = []
 
-    # for t in transactions:
-    #     rows.append(LogRow(
-    #         dt=t.created_at,
-    #         type="Транзакция",
-    #         info=f"Клиент: {t.client}, Поставщик: {t.supplier}, Счет: {t.account}",
-    #         amount=t.paid_amount,
-    #         comment=""
-    #     ))
-
     for cf in cash_flows:
         rows.append(LogRow(
             dt=cf.created_at,
@@ -4777,15 +4399,6 @@ def money_logs(request):
             comment=cf.comment or "",
             created_by=str(cf.created_by) if cf.created_by else ""
         ))
-
-    # for mt in money_transfers:
-    #     rows.append(LogRow(
-    #         dt=mt.created_at,
-    #         type="Перевод",
-    #         info=f"От: {mt.source_supplier} ({mt.source_account}) → Кому: {mt.destination_supplier} ({mt.destination_account})",
-    #         amount=mt.amount,
-    #         comment=""
-    #     ))
 
     for dr in debt_repayments:
         rows.append(LogRow(

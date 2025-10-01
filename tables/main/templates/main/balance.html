@@ -3,16 +3,16 @@
 {% block content %}
     <div class="page-table-container" id="debtors-container">
         <div id="context-menu" class="dropdown-menu">
-            {% if not is_supplier %}
             <a class="dropdown-item context-action"
-                id="settle-debt-button"
-                data-action="settle-debt">Погасить долг</a>
+               id="add-button"
+               data-action="add">Добавить</a>
             <a class="dropdown-item context-action"
-                id="settle-debt-all-button"
-                data-action="settle-debt-all">Погасить долг по всем</a>
+               id="edit-button"
+               data-action="edit">Редактировать</a>
+            {% if request.user.is_authenticated and request.user.user_type.name == "Администратор" %}
             <a class="dropdown-item context-action"
-                id="repayment-edit-button"
-                data-action="repayment-edit">Изменить</a>
+               id="delete-button"
+               data-action="delete">Удалить</a>
             {% endif %}
             <div class="dropdown-divider">
             </div>
