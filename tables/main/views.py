@@ -3972,6 +3972,7 @@ def company_balance_stats_by_month(request):
     return JsonResponse({"months": months, "capitals": capitals})
 
 
+# ...existing code...
 def get_monthly_capital(year, month):
     """
     Новый алгоритм:
@@ -3981,52 +3982,72 @@ def get_monthly_capital(year, month):
     - Прибыль за месяц = сумма profit по транзакциям в заданном месяце.
     - Возвращает процент = profit / average_capital * 100 (округлён до 1 знака). При нулевом среднем капитале возвращает 0.
     """
-    last_day = monthrange(year, month)[1]
-    dt_start = timezone.make_aware(datetime(year, month, 1, 0, 0, 0))
-    dt_end = timezone.make_aware(datetime(year, month, last_day, 23, 59, 59))
-
-    if month == 1:
-        prev_year = year - 1
-        prev_month = 12
-    else:
-        prev_year = year
-        prev_month = month - 1
-
-    def _investors_total_up_to(dt):
-        total = Investor.objects.filter(created_at__lte=dt).aggregate(total=Sum('balance'))['total'] or Decimal(0)
-        return Decimal(total)
-
-    prev_obj = MonthlyCapital.objects.filter(year=prev_year, month=prev_month).first()
-    if prev_obj and prev_obj.capital is not None:
-        prev_cap = Decimal(prev_obj.capital)
-    else:
-        prev_last_day = monthrange(prev_year, prev_month)[1]
-        prev_dt_end = timezone.make_aware(datetime(prev_year, prev_month, prev_last_day, 23, 59, 59))
-        prev_cap = _investors_total_up_to(prev_dt_end)
-
-    curr_obj = MonthlyCapital.objects.filter(year=year, month=month).first()
-    if curr_obj and curr_obj.capital is not None:
-        curr_cap = Decimal(curr_obj.capital)
-    else:
-        curr_cap = _investors_total_up_to(dt_end)
-
     try:
-        avg_cap = (Decimal(prev_cap) + Decimal(curr_cap)) / Decimal(2)
-    except Exception:
-        avg_cap = Decimal(0)
+        last_day = monthrange(year, month)[1]
+        dt_start = timezone.make_aware(datetime(year, month, 1, 0, 0, 0))
+        dt_end = timezone.make_aware(datetime(year, month, last_day, 23, 59, 59))
 
-    transactions = Transaction.objects.filter(created_at__range=(dt_start, dt_end)).select_related()
-    profit_total = sum(
-        (Decimal(str(getattr(t, 'profit', 0) or 0)) for t in transactions),
-        Decimal(0)
-    )
+        print(f"[get_monthly_capital] input year={year} month={month} dt_start={dt_start} dt_end={dt_end}")
 
-    if avg_cap > 0 and profit_total != 0:
-        capital_percent = float(profit_total) / float(avg_cap) * 100.0
-    else:
-        capital_percent = 0.0
+        if month == 1:
+            prev_year = year - 1
+            prev_month = 12
+        else:
+            prev_year = year
+            prev_month = month - 1
 
-    return round(capital_percent, 1)
+        def _investors_total_up_to(dt):
+            total = Investor.objects.filter(created_at__lte=dt).aggregate(total=Sum('balance'))['total'] or Decimal(0)
+            return Decimal(total)
+
+        prev_obj = MonthlyCapital.objects.filter(year=prev_year, month=prev_month).first()
+        if prev_obj and prev_obj.capital is not None:
+            prev_cap = Decimal(prev_obj.capital)
+            print(f"[get_monthly_capital] found MonthlyCapital prev {prev_year}-{prev_month} capital={prev_cap}")
+        else:
+            prev_last_day = monthrange(prev_year, prev_month)[1]
+            prev_dt_end = timezone.make_aware(datetime(prev_year, prev_month, prev_last_day, 23, 59, 59))
+            prev_cap = _investors_total_up_to(prev_dt_end)
+            print(f"[get_monthly_capital] computed prev_cap from investors up to {prev_dt_end}: {prev_cap}")
+
+        curr_obj = MonthlyCapital.objects.filter(year=year, month=month).first()
+        if curr_obj and curr_obj.capital is not None:
+            curr_cap = Decimal(curr_obj.capital)
+            print(f"[get_monthly_capital] found MonthlyCapital current {year}-{month} capital={curr_cap}")
+        else:
+            curr_cap = _investors_total_up_to(dt_end)
+            print(f"[get_monthly_capital] computed curr_cap from investors up to {dt_end}: {curr_cap}")
+
+        try:
+            avg_cap = (Decimal(prev_cap) + Decimal(curr_cap)) / Decimal(2)
+        except Exception as ex:
+            avg_cap = Decimal(0)
+            print(f"[get_monthly_capital] error computing avg_cap: {ex}")
+        print(f"[get_monthly_capital] prev_cap={prev_cap} curr_cap={curr_cap} avg_cap={avg_cap}")
+
+        transactions = Transaction.objects.filter(created_at__range=(dt_start, dt_end)).select_related()
+        tx_count = transactions.count()
+        profit_total = sum(
+            (Decimal(str(getattr(t, 'profit', 0) or 0)) for t in transactions),
+            Decimal(0)
+        )
+        print(f"[get_monthly_capital] transactions_count={tx_count} profit_total={profit_total}")
+
+        if avg_cap > 0 and profit_total != 0:
+            capital_percent = float(profit_total) / float(avg_cap) * 100.0
+        else:
+            capital_percent = 0.0
+
+        capital_percent_rounded = round(capital_percent, 1)
+        print(f"[get_monthly_capital] capital_percent={capital_percent} rounded={capital_percent_rounded}")
+
+        return capital_percent_rounded
+    except Exception as e:
+        import traceback
+        print(f"[get_monthly_capital] EXCEPTION year={year} month={month}: {e}")
+        print(traceback.format_exc())
+        return 0
+
 
 def calculate_and_save_monthly_capital(year, month):
     last_day = monthrange(year, month)[1]
