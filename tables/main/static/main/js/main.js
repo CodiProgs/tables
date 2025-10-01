@@ -549,6 +549,8 @@ const addMenuHandler = () => {
 	const deleteButton = document.getElementById('delete-button')
 	const paymentButton = document.getElementById('payment-button')
 	const hideButton = document.getElementById('hide-button')
+	const hideAllButton = document.getElementById('hide-all-button')
+	const showAllButton = document.getElementById('show-all-button')
 	const settleDebtButton = document.getElementById('settle-debt-button')
 	const settleDebtAllButton = document.getElementById('settle-debt-all-button')
 	const repaymentsEditButton = document.getElementById('repayment-edit-button')
@@ -573,6 +575,29 @@ const addMenuHandler = () => {
 
 	if (menu) {
 		document.addEventListener('contextmenu', function (e) {
+			const multiSelected =
+				document.querySelectorAll('.table__cell--selected').length > 1
+			if (multiSelected) {
+				e.preventDefault()
+				if (addButton) addButton.style.display = 'none'
+				if (editButton) editButton.style.display = 'none'
+				if (deleteButton) deleteButton.style.display = 'none'
+				if (paymentButton) paymentButton.style.display = 'none'
+				if (hideButton) hideButton.style.display = 'none'
+				if (settleDebtButton) settleDebtButton.style.display = 'none'
+				if (settleDebtAllButton) settleDebtAllButton.style.display = 'none'
+				if (repaymentsEditButton) repaymentsEditButton.style.display = 'none'
+				if (detailButton) detailButton.style.display = 'none'
+				if (withdrawalButton) withdrawalButton.style.display = 'none'
+				if (contributionButton) contributionButton.style.display = 'none'
+				if (showAllButton) showAllButton.style.display = 'none'
+
+				if (hideAllButton) hideAllButton.style.display = 'block'
+
+				showMenu(e.pageX, e.pageY)
+				return
+			}
+
 			const row = e.target.closest(
 				'tbody tr:not(.table__row--summary):not(.table__row--empty)'
 			)
@@ -586,6 +611,7 @@ const addMenuHandler = () => {
 				if (deleteButton) deleteButton.style.display = 'block'
 				if (paymentButton) paymentButton.style.display = 'block'
 				if (hideButton) hideButton.style.display = 'block'
+				if (showAllButton) showAllButton.style.display = 'block'
 				if (settleDebtButton) {
 					if (
 						(table.id && table.id.startsWith('branch-repayments-')) ||
@@ -682,6 +708,7 @@ const addMenuHandler = () => {
 				if (detailButton) detailButton.style.display = 'none'
 				if (withdrawalButton) withdrawalButton.style.display = 'none'
 				if (contributionButton) contributionButton.style.display = 'none'
+				if (showAllButton) showAllButton.style.display = 'block'
 
 				showMenu(e.pageX, e.pageY)
 			}
@@ -5277,6 +5304,49 @@ document.addEventListener('DOMContentLoaded', function () {
 	TableManager.init()
 	addMenuHandler()
 
+	const globalHideAllBtn = document.getElementById('hide-all-button')
+	if (globalHideAllBtn) {
+		globalHideAllBtn.addEventListener('click', function (e) {
+			const selectedCells = Array.from(
+				document.querySelectorAll('.table__cell--selected')
+			)
+			if (selectedCells.length <= 1) {
+				return
+			}
+
+			e.preventDefault()
+			e.stopPropagation()
+
+			const tables = new Set(
+				selectedCells.map(cell => {
+					const tbl = cell.closest('table')
+					return tbl ? tbl.id : null
+				})
+			)
+			if (tables.size !== 1) {
+				return
+			}
+			const tableId = Array.from(tables)[0]
+			if (!tableId) return
+
+			selectedCells.forEach(cell => {
+				const row = cell.closest('tr[data-id]')
+				if (!row) return
+				row.classList.toggle('hidden-row')
+			})
+
+			try {
+				updateHiddenRowsCounter()
+				saveHiddenRowsState(tableId)
+			} catch (err) {
+				console.error('Ошибка при сохранении скрытых строк:', err)
+			}
+
+			const menu = document.getElementById('context-menu')
+			if (menu) menu.style.display = 'none'
+		})
+	}
+
 	const pathname = window.location.pathname
 	const regex = /^(?:\/[\w-]+)?\/([\w-]+)\/?$/
 	const match = pathname.match(regex)
@@ -5336,3 +5406,5 @@ document.addEventListener('DOMContentLoaded', function () {
 		updateHiddenRowsCounter()
 	}
 })
+
+// сделать чтобы на странице баланса Кнопка добавить не показывалась если это не клик по таблице и также для скрыть и показать все

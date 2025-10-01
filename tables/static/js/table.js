@@ -1077,18 +1077,28 @@ export const TableManager = {
 		// )
 	},
 
-	onTableCellClick(event) {
+	onTableCellClick(event, isContextMenu = false) {
 		const cell = event.target.closest('.table__cell')
 		if (!cell) return
+
 		if (event.ctrlKey) {
 			event.preventDefault()
 		}
 
-		document.querySelectorAll('.table__row--selected').forEach(row => {
-			row.classList.remove('table__row--selected')
-		})
-
 		const sumDiv = document.querySelector('.table-sum-indicator')
+		const selectedCells = Array.from(
+			document.querySelectorAll('.table__cell--selected')
+		)
+		const multiSelected = selectedCells.length > 1
+
+		if (isContextMenu && multiSelected) {
+			if (cell.classList.contains('table__cell--selected')) {
+				selectedCells.forEach(sc =>
+					sc.parentElement.classList.add('table__row--selected')
+				)
+			}
+			return
+		}
 
 		if (event.ctrlKey) {
 			if (cell.classList.contains('table__cell--selected')) {
@@ -1103,8 +1113,10 @@ export const TableManager = {
 			let allRub = true
 			let allPercent = true
 
-			const selectedCells = document.querySelectorAll('.table__cell--selected')
-			selectedCells.forEach(selectedCell => {
+			const currentSelected = document.querySelectorAll(
+				'.table__cell--selected'
+			)
+			currentSelected.forEach(selectedCell => {
 				const text = selectedCell.textContent.trim()
 				const val = text.replace(/[^\d.,-]/g, '').replace(',', '.')
 				const num = parseFloat(val)
@@ -1118,18 +1130,25 @@ export const TableManager = {
 			if (allRub) suffix = ' р.'
 			else if (allPercent) suffix = '%'
 
-			sumDiv.textContent = 'Сумма: ' + TableManager.formatNumber(sum) + suffix
-			sumDiv.style.display = 'block'
-		} else {
-			document.querySelectorAll('.table__cell--selected').forEach(el => {
-				el.classList.remove('table__cell--selected')
-			})
+			if (sumDiv) {
+				sumDiv.textContent = 'Сумма: ' + TableManager.formatNumber(sum) + suffix
+				sumDiv.style.display = 'block'
+			}
 
-			cell.classList.add('table__cell--selected')
-			cell.parentElement.classList.add('table__row--selected')
-
-			if (sumDiv) sumDiv.style.display = 'none'
+			return
 		}
+
+		document.querySelectorAll('.table__cell--selected').forEach(el => {
+			el.classList.remove('table__cell--selected')
+		})
+		document.querySelectorAll('.table__row--selected').forEach(row => {
+			row.classList.remove('table__row--selected')
+		})
+
+		cell.classList.add('table__cell--selected')
+		cell.parentElement.classList.add('table__row--selected')
+
+		if (sumDiv) sumDiv.style.display = 'none'
 	},
 
 	setInitialCellSelection() {
