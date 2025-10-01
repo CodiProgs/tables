@@ -3965,6 +3965,25 @@ const handleDebtors = async () => {
 												)
 											}
 										}
+
+										if (tableId === data.repayments_table_id) {
+											const rows = Array.from(
+												table.querySelectorAll(
+													'tbody tr:not(.table__row--summary)'
+												)
+											)
+
+											if (rows.length > 10) {
+												rows.slice(0, rows.length - 10).forEach(row => {
+													row.classList.add('hidden-row')
+												})
+												rows.slice(-10).forEach(row => {
+													row.classList.remove('hidden-row')
+												})
+											} else {
+												rows.forEach(row => row.classList.remove('hidden-row'))
+											}
+										}
 									}
 								}
 							)

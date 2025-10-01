@@ -15,7 +15,10 @@ from .models import (
 	Investor,
 	InvestorDebtOperation,
 	BalanceData,
-	MonthlyCapital
+	MonthlyCapital,
+	Credit,
+	InventoryItem,
+	ShortTermLiability
 )
 
 
@@ -34,3 +37,6 @@ admin.site.register(Investor)
 admin.site.register(InvestorDebtOperation)
 admin.site.register(BalanceData)
 admin.site.register(MonthlyCapital)
+admin.site.register(Credit)
+admin.site.register(InventoryItem)
+admin.site.register(ShortTermLiability)

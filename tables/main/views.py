@@ -2,7 +2,7 @@ from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
 from tables.utils import get_model_fields
 from django.db import transaction, models
-from .models import Transaction, Client, Supplier, Account, CashFlow, SupplierAccount, PaymentPurpose, MoneyTransfer, Branch, SupplierDebtRepayment, Investor, InvestorDebtOperation, BalanceData, MonthlyCapital
+from .models import Transaction, Client, Supplier, Account, CashFlow, SupplierAccount, PaymentPurpose, MoneyTransfer, Branch, SupplierDebtRepayment, Investor, InvestorDebtOperation, BalanceData, MonthlyCapital, ShortTermLiability, Credit, InventoryItem
 from django.http import JsonResponse
 from django.forms.models import model_to_dict
 from django.template.loader import render_to_string
@@ -4047,10 +4047,16 @@ def get_monthly_capital(year, month):
 
 
 def calculate_and_save_monthly_capital(year, month):
-    capital = get_monthly_capital(year, month)
+    last_day = monthrange(year, month)[1]
+    dt_end = timezone.make_aware(datetime(year, month, last_day, 23, 59, 59))
+
+    total_capital = Investor.objects.filter(created_at__lte=dt_end).aggregate(
+        total=Sum('balance')
+    )['total'] or 0
+
     MonthlyCapital.objects.update_or_create(
         year=year, month=month,
-        defaults={'capital': capital, 'calculated_at': datetime.now()}
+        defaults={'capital': total_capital, 'calculated_at': datetime.now()}
     )
 
 

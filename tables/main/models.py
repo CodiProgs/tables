@@ -689,3 +689,45 @@ class MonthlyCapital(models.Model):
 
     class Meta:
         unique_together = ('year', 'month')
+
+class InventoryItem(models.Model):
+    name = models.CharField(max_length=255, verbose_name="Название")
+    quantity = models.DecimalField(max_digits=12, decimal_places=2, verbose_name="Кол-во")
+    price = models.DecimalField(max_digits=15, decimal_places=2, verbose_name="Цена")
+    total = models.DecimalField(max_digits=20, decimal_places=2, verbose_name="Сумма")
+
+    def save(self, *args, **kwargs):
+        self.total = self.quantity * self.price
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.name} ({self.quantity} x {self.price} = {self.total})"
+
+    class Meta:
+        verbose_name = "ТМЦ"
+        verbose_name_plural = "ТМЦ"
+        ordering = ['name']
+
+class Credit(models.Model):
+    name = models.CharField(max_length=255, verbose_name="Название")
+    amount = models.DecimalField(max_digits=20, decimal_places=2, verbose_name="Сумма")
+
+    def __str__(self):
+        return f"{self.name} ({self.amount} р.)"
+
+    class Meta:
+        verbose_name = "Кредит"
+        verbose_name_plural = "Кредиты"
+        ordering = ['name']
+
+class ShortTermLiability(models.Model):
+    name = models.CharField(max_length=255, verbose_name="Название")
+    amount = models.DecimalField(max_digits=20, decimal_places=2, verbose_name="Сумма")
+
+    def __str__(self):
+        return f"{self.name} ({self.amount} р.)"
+
+    class Meta:
+        verbose_name = "Краткосрочное обязательство"
+        verbose_name_plural = "Краткосрочные обязательства"
+        ordering = ['name']
