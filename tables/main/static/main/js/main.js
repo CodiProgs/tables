@@ -3770,95 +3770,276 @@ const handleExchange = () => {
 	}
 }
 
+// ...existing code...
 function renderBalance(data) {
+	const assetsTotal =
+		data?.assets !== undefined
+			? formatAmount(data.assets)
+			: formatAmount(data?.assets_total || 0)
+	const liabilitiesTotal =
+		data?.liabilities?.total !== undefined
+			? formatAmount(data.liabilities.total)
+			: formatAmount(0)
+
+	const mapItems = items =>
+		Array.isArray(items)
+			? items.map(i => ({
+					name: i.branch ?? i.name ?? i.title ?? '-',
+					amount: i.amount ?? i.total ?? 0,
+					formatted: i.formatted_total ?? null,
+					table_html: i.table_html ?? i.html ?? null,
+			  }))
+			: []
+
+	// Активы
+	// не рендерим non-current элементы (например "Оборудование") в списке Активы
+	const inventory = mapItems(data?.current_assets?.inventory?.items)
+	const debtors = mapItems(data?.current_assets?.debtors?.items)
+	const cash = mapItems(data?.current_assets?.cash?.items)
+
+	const inventoryOptions = {}
+	if (data?.current_assets?.inventory?.html)
+		inventoryOptions.table_html = data.current_assets.inventory.html
+	else if (data?.current_assets?.inventory?.table_html)
+		inventoryOptions.table_html = data.current_assets.inventory.table_html
+	else if (data?.current_assets?.inventory?.formatted_total)
+		inventoryOptions.formatted = data.current_assets.inventory.formatted_total
+
+	const debtorsOptions = {}
+	if (data?.current_assets?.debtors?.html)
+		debtorsOptions.table_html = data.current_assets.debtors.html
+	else if (data?.current_assets?.debtors?.table_html)
+		debtorsOptions.table_html = data.current_assets.debtors.table_html
+	else if (data?.current_assets?.debtors?.formatted_total)
+		debtorsOptions.formatted = data.current_assets.debtors.formatted_total
+
+	const cashOptions = {}
+	if (data?.current_assets?.cash?.html)
+		cashOptions.table_html = data.current_assets.cash.html
+	else if (data?.current_assets?.cash?.table_html)
+		cashOptions.table_html = data.current_assets.cash.table_html
+	else if (data?.current_assets?.cash?.formatted_total)
+		cashOptions.formatted = data.current_assets.cash.formatted_total
+
+	// Пассивы — соберём html по списку items
+	let liabilitiesHtml = ''
+	if (Array.isArray(data?.liabilities?.items)) {
+		liabilitiesHtml = data.liabilities.items
+			.map(item => {
+				const opt = {}
+				// форматированное значение, если есть
+				if (item.formatted_total) opt.formatted = item.formatted_total
+
+				// соберём простые вложенные элементы, если они есть
+				const nestedItems = Array.isArray(item.items)
+					? item.items.map(i => ({
+							name: i.branch ?? i.name ?? i.title ?? '-',
+							amount: i.amount ?? i.total ?? 0,
+							formatted: i.formatted_total ?? null,
+					  }))
+					: null
+
+				// Специально: "Нераспределенная прибыль" — обычный элемент без раскрывающегося списка
+				if (item.name === 'Нераспределенная прибыль') {
+					return renderSimple(item.name, item.amount ?? 0, opt)
+				}
+
+				// Отдаём приоритет вложенным простым элементам (например для "Вложения инвесторов")
+				if (nestedItems && nestedItems.length > 0) {
+					return renderGroup(
+						item.name,
+						item.amount ?? 0,
+						nestedItems,
+						'name',
+						opt
+					)
+				}
+
+				// Если сервер вернул готовый HTML, используем его
+				if (item.html || item.table_html) {
+					opt.table_html = item.html || item.table_html
+					return renderGroup(item.name, item.amount ?? 0, null, 'name', opt)
+				}
+
+				// По умолчанию — стандартный рендер группы
+				return renderGroup(item.name, item.amount ?? 0, null, 'name', opt)
+			})
+			.join('')
+	} else {
+		liabilitiesHtml = renderGroup(
+			'Пассивы',
+			data?.liabilities?.total ?? 0,
+			null,
+			'name',
+			{
+				formatted: data?.liabilities?.formatted_total,
+			}
+		)
+	}
+
 	return `
         <div>
-            <div class="debtors-office-list__header">Внеоборотные активы</div>
-			<ul class="debtors-office-list">
-				${renderGroup(
-					'Основные средства',
-					data.non_current_assets.total,
-					data.non_current_assets.items
-				)}
-			</ul>
-
-            <div class="debtors-office-list__header">Оборотные активы</div>
-            <ul class="debtors-office-list">
-			${renderGroup(
-				'Товарные остатки',
-				data.current_assets.inventory.total,
-				data.current_assets.inventory.items
-			)}
-            ${renderGroup(
-							'Дебиторская задолженность',
-							data.current_assets.debtors.total,
-							data.current_assets.debtors.items,
-							'branch'
-						)}
-            ${renderGroup(
-							'Денежные средства',
-							data.current_assets.cash.total,
-							data.current_assets.cash.items
-						)}</ul>
-
-						<div class="debtors-header" id="summary-header">
+            <div class="debtors-header">
                 <h2 class="debtors-office-list__header">Активы</h2>
-                <span class="debtors-total">${formatAmount(data.assets)}</span>
+                <span class="debtors-total">${assetsTotal}</span>
             </div>
 
             <ul class="debtors-office-list">
-			${renderGroup('Обязательства', null, data.liabilities.items)}
-			</ul>
+                ${renderGroup(
+									'ТМЦ',
+									data?.current_assets?.inventory?.total ?? 0,
+									inventory,
+									'name',
+									inventoryOptions
+								)}
+                ${renderGroup(
+									'Дебиторская задолженность',
+									data?.current_assets?.debtors?.total ?? 0,
+									debtors,
+									'name',
+									debtorsOptions
+								)}
+                ${renderGroup(
+									'Денежные средства',
+									data?.current_assets?.cash?.total ?? 0,
+									cash,
+									'name',
+									cashOptions
+								)}
+            </ul>
 
-						<div class="debtors-header" id="summary-header">
+            <div class="debtors-header">
                 <h2 class="debtors-office-list__header">Пассивы</h2>
-                <span class="debtors-total">${formatAmount(
-									data.liabilities.total
-								)}</span>
+                <span class="debtors-total">${liabilitiesTotal}</span>
             </div>
-						<div class="debtors-header" id="summary-header">
-                <h2 class="debtors-office-list__header">Капитал</h2>
-                <span class="debtors-total">${formatAmount(data.capital)}</span>
-            </div>
+
+            <ul class="debtors-office-list">
+                ${liabilitiesHtml}
+                ${renderGroup(
+									'Капитал',
+									data?.capital ?? data?.liabilities?.capital?.value ?? 0,
+									null,
+									'name',
+									{
+										formatted:
+											data?.liabilities?.capital?.formatted ??
+											data?.capital?.formatted,
+									}
+								)}
+            </ul>
         </div>
     `
 }
+// ...existing code...
 
-function renderGroup(title, total, items, nameKey = 'name') {
-	let detailsHtml
-	if (!items || items.length === 0) {
-		detailsHtml = `<div class="debtors-office-list__row-item debtors-office-list__empty">Нет данных</div>`
-	} else {
+// ...existing code...
+function renderSimple(title, total, options = {}) {
+	// простой неизменяемый элемент без кнопки раскрытия
+	const totalHtml =
+		options.formatted !== undefined
+			? `<span class="debtors-office-list__amount">${options.formatted}</span>`
+			: total !== null && total !== undefined
+			? `<span class="debtors-office-list__amount">${formatAmount(
+					total
+			  )}</span>`
+			: ''
+
+	return `
+        <li class="debtors-office-list__item">
+            <div class="debtors-office-list__row">
+                <span class="debtors-office-list__title">${title}</span>
+                ${totalHtml}
+            </div>
+        </li>
+    `
+}
+
+function renderGroup(title, total, items, nameKey = 'name', options = {}) {
+	// options: { table_html, html, formatted }
+	let detailsHtml = ''
+
+	// если есть простые вложенные элементы — показываем их в приоритете
+	if (items && items.length > 0) {
 		detailsHtml = items
 			.map(
 				i =>
 					`<div class="debtors-office-list__row-item">
-                        <h4>${i[nameKey]}</h4> <span>${formatAmount(
-						i.amount
-					)}</span>
+                        <h4>${
+													i[nameKey] ?? i.name ?? '-'
+												}</h4> <span>${formatAmount(i.amount)}</span>
                     </div>`
 			)
 			.join('')
+	} else {
+		// сервер может вернуть html или table_html
+		const tableHtml = options.html || options.table_html
+		if (tableHtml) {
+			detailsHtml =
+				tableHtml ||
+				'<div class="debtors-office-list__row-item debtors-office-list__empty">Нет данных</div>'
+		} else {
+			detailsHtml = `<div class="debtors-office-list__row-item debtors-office-list__empty">Нет данных</div>`
+		}
 	}
+
+	const totalHtml =
+		options.formatted !== undefined
+			? `<span class="debtors-office-list__amount">${options.formatted}</span>`
+			: total !== null && total !== undefined
+			? `<span class="debtors-office-list__amount">${formatAmount(
+					total
+			  )}</span>`
+			: ''
+
+	// Если details уже содержит готовый HTML (tableHtml) или вложенные элементы — помечаем как загруженные,
+	// чтобы обработчик клика не делал дополнительный fetch при первом открытии.
+	const loadedAttr =
+		options.html || options.table_html || (items && items.length > 0)
+			? ' data-loaded="1"'
+			: ''
+
 	return `
         <li class="debtors-office-list__item">
             <div class="debtors-office-list__row">
                 <button class="debtors-office-list__toggle">+</button>
                 <span class="debtors-office-list__title">${title}</span>
-                ${
-									total !== null && total !== undefined
-										? `<span class="debtors-office-list__amount">${formatAmount(
-												total
-										  )}</span>`
-										: ''
-								}
+                ${totalHtml}
             </div>
-            <div class="debtors-office-list__details">
+            <div class="debtors-office-list__details"${loadedAttr}>
                 ${detailsHtml}
             </div>
         </li>
     `
 }
+// ...existing code...
+// ...existing code...
+// ...existing code...
+
+function initBalanceInsertedTables() {
+	const balanceTableIds = [
+		'inventory-table',
+		'debtors-table',
+		'accounts-table',
+		'credits-table',
+		'short-term-table',
+		'investors-table',
+	]
+	balanceTableIds.forEach(id => {
+		const table = document.getElementById(id)
+		if (table) {
+			// TableManager.initTable безопасно инициализирует таблицу
+			if (typeof TableManager.initTable === 'function') {
+				TableManager.initTable(id)
+			}
+			if (typeof TableManager.formatCurrencyValues === 'function') {
+				try {
+					TableManager.formatCurrencyValues(id)
+				} catch (e) {}
+			}
+		}
+	})
+}
+// ...existing code...
 
 function formatAmount(value) {
 	if (value === null || value === undefined || value === '') {
@@ -4140,6 +4321,15 @@ const handleDebtors = async () => {
 			const data = await response.json()
 
 			balanceContainer.innerHTML = renderBalance(data)
+			initBalanceInsertedTables()
+			// обязательно инициализируем менеджер таблиц после вставки HTML
+			if (
+				typeof TableManager !== 'undefined' &&
+				TableManager &&
+				typeof TableManager.init === 'function'
+			) {
+				TableManager.init()
+			}
 
 			balanceContainer
 				.querySelectorAll('.debtors-office-list__row')
@@ -4149,6 +4339,8 @@ const handleDebtors = async () => {
 							.closest('.debtors-office-list__item')
 							.querySelector('.debtors-office-list__details')
 						const btn = row.querySelector('.debtors-office-list__toggle')
+						if (!details) return
+						if (!btn) return
 						btn.classList.toggle('open')
 						details.classList.toggle('open')
 					})
@@ -4339,6 +4531,7 @@ const handleDebtors = async () => {
 				const data = await response.json()
 
 				balanceContainer.innerHTML = renderBalance(data)
+				initBalanceInsertedTables()
 
 				balanceContainer
 					.querySelectorAll('.debtors-office-list__row')

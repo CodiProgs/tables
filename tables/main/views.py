@@ -3901,14 +3901,239 @@ def cash_flow_payment_stats(request, supplier_id):
     })
 
 
+
+
+
+
+# @forbid_supplier
+# @login_required
+# @require_GET
+# def company_balance_stats(request):
+#     # Оборудование остаётся из BalanceData
+#     equipment = BalanceData.objects.filter(name="Оборудование").aggregate(total=Sum("amount"))["total"] or Decimal(0)
+
+#     # Кредиты — список и HTML-таблица
+#     credits_qs = Credit.objects.all().order_by('name')
+#     credit_rows = [
+#         type("Row", (), {
+#             "name": getattr(c, "name", str(c)),
+#             "amount": getattr(c, "amount", Decimal(0))
+#         })()
+#         for c in credits_qs
+#     ]
+#     credit_total = sum((getattr(c, "amount", Decimal(0)) or Decimal(0)) for c in credits_qs) if credits_qs else Decimal(0)
+#     credit_fields = [
+#         {"name": "name", "verbose_name": "Наименование"},
+#         {"name": "amount", "verbose_name": "Сумма", "is_amount": True},
+#     ]
+#     credit_html = render_to_string("components/table.html", {"id": "credits-table", "fields": credit_fields, "data": credit_rows})
+
+#     # Краткосрочные обязательства — список и HTML-таблица
+#     short_qs = ShortTermLiability.objects.all().order_by('name')
+#     short_rows = [
+#         type("Row", (), {
+#             "name": getattr(s, "name", str(s)),
+#             "amount": getattr(s, "amount", Decimal(0))
+#         })()
+#         for s in short_qs
+#     ]
+#     short_total = sum((getattr(s, "amount", Decimal(0)) or Decimal(0)) for s in short_qs) if short_qs else Decimal(0)
+#     short_fields = [
+#         {"name": "name", "verbose_name": "Наименование"},
+#         {"name": "amount", "verbose_name": "Сумма", "is_amount": True},
+#     ]
+#     short_html = render_to_string("components/table.html", {"id": "short-term-table", "fields": short_fields, "data": short_rows})
+
+#     # ТМЦ — InventoryItem как таблица
+#     inventory_qs = InventoryItem.objects.all().order_by('name')
+#     inventory_rows = [
+#         type("Row", (), {
+#             "name": getattr(it, "name", str(it)),
+#             "amount": getattr(it, "total", getattr(it, "amount", Decimal(0)))
+#         })()
+#         for it in inventory_qs
+#     ]
+#     inventory_total = sum((getattr(it, "total", getattr(it, "amount", Decimal(0))) or Decimal(0)) for it in inventory_qs) if inventory_qs else Decimal(0)
+#     inventory_fields = [
+#         {"name": "name", "verbose_name": "Наименование"},
+#         {"name": "amount", "verbose_name": "Сумма", "is_amount": True},
+#     ]
+#     inventory_html = render_to_string("components/table.html", {"id": "inventory-table", "fields": inventory_fields, "data": inventory_rows})
+
+#     # Дебиторы по филиалам
+#     debtors = []
+#     total_debtors = Decimal(0)
+#     for branch in Supplier.objects.exclude(branch=None).values_list("branch__id", "branch__name").distinct():
+#         branch_id, branch_name = branch
+#         if branch_name != "Филиал 1" and branch_name != "Наши ИП":
+#             branch_debt = sum(
+#                 (t.supplier_debt or Decimal(0))
+#                 for t in Transaction.objects.filter(supplier__branch_id=branch_id, paid_amount__gt=0)
+#             )
+#             debtors.append({"branch": branch_name, "amount": branch_debt})
+#             total_debtors += branch_debt
+
+#     # Безналичные — SupplierAccount + касса
+#     safe_amount = SupplierAccount.objects.filter(
+#         supplier__visible_in_summary=True
+#     ).aggregate(total=Sum("balance"))["total"] or Decimal(0)
+
+#     cash_account = Account.objects.filter(name__iexact="Наличные").first()
+#     cash_balance = Decimal(cash_account.balance) if cash_account and cash_account.balance is not None else Decimal(0)
+
+#     safe_amount = Decimal(safe_amount) + cash_balance
+
+#     # Суммы для "Кредиторская задолженность" (как в summary / debtors)
+#     bonuses = sum((t.bonus_debt or Decimal(0)) for t in Transaction.objects.filter(paid_amount__gt=0))
+#     total_remaining = sum((t.client_debt_paid or Decimal(0)) for t in Transaction.objects.filter(paid_amount__gt=0))
+#     # Рассчитаем прибыль для инвесторов (Decimal)
+#     transactionsInvestors = [
+#         t for t in Transaction.objects.filter(paid_amount__gt=0)
+#         if getattr(t, 'bonus_debt', 0) == 0
+#         and getattr(t, 'client_debt', 0) == 0
+#         and getattr(t, 'profit', 0) > 0
+#     ]
+#     cashflows = CashFlow.objects.filter(
+#         purpose__operation_type=PaymentPurpose.INCOME
+#     ).exclude(purpose__name__in=["Оплата", "Внесение инвестора"])
+
+#     total_profit_decimal = sum(
+#         (Decimal(str(getattr(t, 'profit', 0) or 0)) - Decimal(str(getattr(t, 'returned_to_investor', 0) or 0)))
+#         for t in transactionsInvestors
+#     ) + sum(
+#         (Decimal(str(cf.amount or 0)) - Decimal(str(cf.returned_to_investor or 0)))
+#         for cf in cashflows
+#     )
+
+#     # Сумма трёх элементов внутри "Кредиторская задолженность"
+#     total_summary_debts = (bonuses or Decimal(0)) + (total_remaining or Decimal(0)) + (total_profit_decimal or Decimal(0))
+
+#     # Сумма client_debts (если ранее использовалась как отдельная статья)
+#     client_debts = sum((t.client_debt or Decimal(0)) for t in Transaction.objects.filter(paid_amount__gt=0).all())
+
+#     assets_total = equipment + inventory_total + total_debtors + safe_amount
+
+#     # Считаем предварительные пассивы (без капитала)
+#     provisional_liabilities = credit_total + client_debts + short_total + total_summary_debts
+
+#     # капитал — разница активов и предварительных пассивов
+#     current_capital = assets_total - provisional_liabilities
+
+#     # включаем капитал в итог пассивов
+#     liabilities_total = provisional_liabilities + current_capital
+
+#     current_year = datetime.now().year
+#     capitals = []
+
+#     MONTHS_RU = [
+#         "январь", "февраль", "март", "апрель", "май", "июнь",
+#         "июль", "август", "сентябрь", "октябрь", "ноябрь", "декабрь"
+#     ]
+#     months = [MONTHS_RU[month-1] for month in range(1, 13)]
+
+#     for month in range(1, 13):
+#         capital = float(get_monthly_capital(current_year, month))
+#         capitals.append(capital)
+
+#     if capitals:
+#         total_capital = round(sum(capitals) / len(capitals), 1)
+#     else:
+#         total_capital = 0
+
+#     data = {
+#         "non_current_assets": {
+#             "total": equipment,
+#             "items": [{"name": "Оборудование", "amount": equipment}]
+#         },
+#         "current_assets": {
+#             "inventory": {"total": inventory_total, "html": inventory_html},
+#             "debtors": {"total": total_debtors, "items": debtors},
+#             "cash": {"total": safe_amount,
+#                      "items": [{"name": "Счета, Карты и Сейф", "amount": safe_amount}]},
+#         },
+#         "assets": assets_total,
+#         "liabilities": {
+#             "total": liabilities_total,
+#             "items": [
+#                 {"name": "Кредит", "amount": credit_total, "html": credit_html},
+#                 {
+#                     "name": "Кредиторская задолженность",
+#                     "amount": total_summary_debts,
+#                     "items": [
+#                         {"name": "Бонусы", "amount": bonuses},
+#                         {"name": "Выдачи клиентам", "amount": total_remaining},
+#                         {"name": "Инвесторам", "amount": total_profit_decimal},
+#                     ],
+#                 },
+#                 {"name": "Краткосрочные обязательства", "amount": short_total, "html": short_html},
+#             ],
+#         },
+#         "capital": current_capital,
+#         "capitals_by_month": {
+#             "months": months,
+#             "capitals": capitals,
+#             "total": total_capital
+#         },
+#     }
+#     return JsonResponse(data, safe=False)
+
+
 @forbid_supplier
 @login_required
 @require_GET
 def company_balance_stats(request):
+    # Оборудование остаётся из BalanceData
     equipment = BalanceData.objects.filter(name="Оборудование").aggregate(total=Sum("amount"))["total"] or Decimal(0)
-    credit = BalanceData.objects.filter(name="Кредит").aggregate(total=Sum("amount"))["total"] or Decimal(0)
-    short_term = BalanceData.objects.filter(name="Краткосрочные обязательства").aggregate(total=Sum("amount"))["total"] or Decimal(0)
 
+    # Кредиты — список и HTML-таблица
+    credits_qs = Credit.objects.all().order_by('name')
+    credit_rows = [
+        type("Row", (), {
+            "name": getattr(c, "name", str(c)),
+            "amount": getattr(c, "amount", Decimal(0))
+        })()
+        for c in credits_qs
+    ]
+    credit_total = sum((getattr(c, "amount", Decimal(0)) or Decimal(0)) for c in credits_qs) if credits_qs else Decimal(0)
+    credit_fields = [
+        {"name": "name", "verbose_name": "Наименование"},
+        {"name": "amount", "verbose_name": "Сумма", "is_amount": True},
+    ]
+    credit_html = render_to_string("components/table.html", {"id": "credits-table", "fields": credit_fields, "data": credit_rows})
+
+    # Краткосрочные обязательства — список и HTML-таблица
+    short_qs = ShortTermLiability.objects.all().order_by('name')
+    short_rows = [
+        type("Row", (), {
+            "name": getattr(s, "name", str(s)),
+            "amount": getattr(s, "amount", Decimal(0))
+        })()
+        for s in short_qs
+    ]
+    short_total = sum((getattr(s, "amount", Decimal(0)) or Decimal(0)) for s in short_qs) if short_qs else Decimal(0)
+    short_fields = [
+        {"name": "name", "verbose_name": "Наименование"},
+        {"name": "amount", "verbose_name": "Сумма", "is_amount": True},
+    ]
+    short_html = render_to_string("components/table.html", {"id": "short-term-table", "fields": short_fields, "data": short_rows})
+
+    # ТМЦ — InventoryItem как таблица
+    inventory_qs = InventoryItem.objects.all().order_by('name')
+    inventory_rows = [
+        type("Row", (), {
+            "name": getattr(it, "name", str(it)),
+            "amount": getattr(it, "total", getattr(it, "amount", Decimal(0)))
+        })()
+        for it in inventory_qs
+    ]
+    inventory_total = sum((getattr(it, "total", getattr(it, "amount", Decimal(0))) or Decimal(0)) for it in inventory_qs) if inventory_qs else Decimal(0)
+    inventory_fields = [
+        {"name": "name", "verbose_name": "Наименование"},
+        {"name": "amount", "verbose_name": "Сумма", "is_amount": True},
+    ]
+    inventory_html = render_to_string("components/table.html", {"id": "inventory-table", "fields": inventory_fields, "data": inventory_rows})
+
+    # Дебиторы по филиалам
     debtors = []
     total_debtors = Decimal(0)
     for branch in Supplier.objects.exclude(branch=None).values_list("branch__id", "branch__name").distinct():
@@ -3921,7 +4146,7 @@ def company_balance_stats(request):
             debtors.append({"branch": branch_name, "amount": branch_debt})
             total_debtors += branch_debt
 
-    # Сумма по всем SupplierAccount (безналичные на счетах поставщиков), учитываем NULL как 0
+    # Безналичные — SupplierAccount + касса
     safe_amount = SupplierAccount.objects.filter(
         supplier__visible_in_summary=True
     ).aggregate(total=Sum("balance"))["total"] or Decimal(0)
@@ -3931,33 +4156,67 @@ def company_balance_stats(request):
 
     safe_amount = Decimal(safe_amount) + cash_balance
 
+    # Суммы для "Кредиторская задолженность" (как в summary / debtors)
     bonuses = sum((t.bonus_debt or Decimal(0)) for t in Transaction.objects.filter(paid_amount__gt=0))
-
-    client_debts = sum((t.client_debt or Decimal(0)) for t in Transaction.objects.filter(paid_amount__gt=0).all())
-
-    assets_total = equipment + Decimal(0) + total_debtors + safe_amount
-
+    total_remaining = sum((t.client_debt_paid or Decimal(0)) for t in Transaction.objects.filter(paid_amount__gt=0))
+    # Рассчитаем прибыль для инвесторов (Decimal)
     transactionsInvestors = [
         t for t in Transaction.objects.filter(paid_amount__gt=0)
         if getattr(t, 'bonus_debt', 0) == 0
         and getattr(t, 'client_debt', 0) == 0
-        # and getattr(t, 'supplier_debt', 0) == 0
         and getattr(t, 'profit', 0) > 0
     ]
-
     cashflows = CashFlow.objects.filter(
         purpose__operation_type=PaymentPurpose.INCOME
     ).exclude(purpose__name__in=["Оплата", "Внесение инвестора"])
 
-    total_profit = sum(float(getattr(t, 'profit', 0) - getattr(t, 'returned_to_investor', 0)) for t in transactionsInvestors) + sum(float(Decimal(str(cf.amount or 0)) - Decimal(str(cf.returned_to_investor or 0))) for cf in cashflows)
+    total_profit_decimal = sum(
+        (Decimal(str(getattr(t, 'profit', 0) or 0)) - Decimal(str(getattr(t, 'returned_to_investor', 0) or 0)))
+        for t in transactionsInvestors
+    ) + sum(
+        (Decimal(str(cf.amount or 0)) - Decimal(str(cf.returned_to_investor or 0)))
+        for cf in cashflows
+    )
 
-    liabilities_total = credit + client_debts + short_term + bonuses + Decimal(total_profit)
-    
-    current_capital = assets_total - liabilities_total
+    # Сумма трёх элементов внутри "Кредиторская задолженность"
+    total_summary_debts = (bonuses or Decimal(0)) + (total_remaining or Decimal(0)) + (total_profit_decimal or Decimal(0))
+
+    # Сумма client_debts (если ранее использовалась как отдельная статья)
+    client_debts = sum((t.client_debt or Decimal(0)) for t in Transaction.objects.filter(paid_amount__gt=0).all())
+
+    # Вложения инвесторов — список и HTML-таблица
+    investors_qs = Investor.objects.all().order_by('name')
+    investors_rows = [
+        type("Row", (), {
+            "name": inv.name,
+            "amount": inv.balance or Decimal(0)
+        })()
+        for inv in investors_qs
+    ]
+    investors_total = sum((inv.balance or Decimal(0)) for inv in investors_qs) if investors_qs else Decimal(0)
+    investor_fields = [
+        {"name": "name", "verbose_name": "Инвестор"},
+        {"name": "amount", "verbose_name": "Баланс", "is_amount": True},
+    ]
+    investors_html = render_to_string("components/table.html", {"id": "investors-table", "fields": investor_fields, "data": investors_rows})
+
+    # Нераспределенная прибыль — пока статично 0
+    undistributed_profit = Decimal(0)
+
+    assets_total = equipment + inventory_total + total_debtors + safe_amount
+
+    # Считаем предварительные пассивы (без капитала)
+    provisional_liabilities = credit_total + client_debts + short_total + total_summary_debts + investors_total + undistributed_profit
+
+    # капитал — разница активов и предварительных пассивов
+    current_capital = assets_total - provisional_liabilities
+
+    # включаем капитал в итог пассивов
+    liabilities_total = provisional_liabilities + current_capital
 
     current_year = datetime.now().year
     capitals = []
-    
+
     MONTHS_RU = [
         "январь", "февраль", "март", "апрель", "май", "июнь",
         "июль", "август", "сентябрь", "октябрь", "ноябрь", "декабрь"
@@ -3979,7 +4238,7 @@ def company_balance_stats(request):
             "items": [{"name": "Оборудование", "amount": equipment}]
         },
         "current_assets": {
-            "inventory": {"total": 0, "items": []},
+            "inventory": {"total": inventory_total, "html": inventory_html},
             "debtors": {"total": total_debtors, "items": debtors},
             "cash": {"total": safe_amount,
                      "items": [{"name": "Счета, Карты и Сейф", "amount": safe_amount}]},
@@ -3988,11 +4247,26 @@ def company_balance_stats(request):
         "liabilities": {
             "total": liabilities_total,
             "items": [
-                {"name": "Кредит", "amount": credit},
-                {"name": "Кредиторская задолженность", "amount": client_debts},
-                {"name": "Краткосрочные обязательства", "amount": short_term},
-                {"name": "Бонусы", "amount": bonuses},
-                {"name": "Выплата инвесторам", "amount": total_profit}
+                {"name": "Кредит", "amount": credit_total, "html": credit_html},
+                {
+                    "name": "Кредиторская задолженность",
+                    "amount": total_summary_debts,
+                    "items": [
+                        {"name": "Бонусы", "amount": bonuses},
+                        {"name": "Выдачи клиентам", "amount": total_remaining},
+                        {"name": "Инвесторам", "amount": total_profit_decimal},
+                    ],
+                },
+                {"name": "Краткосрочные обязательства", "amount": short_total, "html": short_html},
+                # Вложения инвесторов — раскрывающийся список с таблицей
+                {
+                    "name": "Вложения инвесторов",
+                    "amount": investors_total,
+                    "items": [{"name": inv.name, "amount": inv.balance or Decimal(0)} for inv in investors_qs],
+                    "html": investors_html
+                },
+                # Нераспределенная прибыль — обычный элемент
+                {"name": "Нераспределенная прибыль", "amount": undistributed_profit},
             ],
         },
         "capital": current_capital,
@@ -4003,6 +4277,7 @@ def company_balance_stats(request):
         },
     }
     return JsonResponse(data, safe=False)
+
 
 
 @forbid_supplier
@@ -4024,27 +4299,101 @@ def company_balance_stats_by_month(request):
     return JsonResponse({"months": months, "capitals": capitals})
 
 
+# def get_monthly_capital(year, month):
+#     last_day = monthrange(year, month)[1]
+#     dt_start = timezone.make_aware(datetime(year, month, 1, 0, 0, 0))
+#     dt_end = timezone.make_aware(datetime(year, month, last_day, 23, 59, 59))
+
+#     investors_total = sum([
+#         Decimal(inv["balance"] or 0) for inv in Investor.objects.filter(
+#             created_at__lte=dt_end
+#         ).values("balance")
+#     ], Decimal(0))
+
+#     transactions = Transaction.objects.filter(created_at__range=(dt_start, dt_end))
+#     profit_total = sum((t.profit or Decimal(0)) for t in transactions)
+
+#     if profit_total > 0 and investors_total > 0:
+#         capital_percent = float(profit_total) / float(investors_total) * 100
+#     else:
+#         capital_percent = 0
+
+#     return round(capital_percent, 1)
+
+
 def get_monthly_capital(year, month):
+    """
+    Новый алгоритм:
+    - Берёт капитал предыдущего месяца (MonthlyCapital.year=prev_year, month=prev_month). Если нет — считает по данным инвесторов на конец предыдущего месяца.
+    - Берёт капитал текущего месяца: если MonthlyCapital для этого месяца есть — использует его, иначе считает по данным инвесторов на конец этого месяца.
+    - Средний капитал = (prev_capital + curr_capital) / 2.
+    - Прибыль за месяц = сумма profit по транзакциям в заданном месяце.
+    - Возвращает процент = profit / average_capital * 100 (округлён до 1 знака). При нулевом среднем капитале возвращает 0.
+    """
+    # границы периода
     last_day = monthrange(year, month)[1]
     dt_start = timezone.make_aware(datetime(year, month, 1, 0, 0, 0))
     dt_end = timezone.make_aware(datetime(year, month, last_day, 23, 59, 59))
 
-    investors_total = sum([
-        Decimal(inv["balance"] or 0) for inv in Investor.objects.filter(
-            created_at__lte=dt_end
-        ).values("balance")
-    ], Decimal(0))
-
-    transactions = Transaction.objects.filter(created_at__range=(dt_start, dt_end))
-    profit_total = sum((t.profit or Decimal(0)) for t in transactions)
-
-    if profit_total > 0 and investors_total > 0:
-        capital_percent = float(profit_total) / float(investors_total) * 100
+    # прошлый месяц
+    if month == 1:
+        prev_year = year - 1
+        prev_month = 12
     else:
-        capital_percent = 0
+        prev_year = year
+        prev_month = month - 1
+
+    # helper для суммирования балансов инвесторов до конца дня
+    def _investors_total_up_to(dt):
+        total = Investor.objects.filter(created_at__lte=dt).aggregate(total=Sum('balance'))['total'] or Decimal(0)
+        return Decimal(total)
+
+    # получаем капитал прошлого месяца (из MonthlyCapital или считаем)
+    prev_obj = MonthlyCapital.objects.filter(year=prev_year, month=prev_month).first()
+    if prev_obj and prev_obj.capital is not None:
+        prev_cap = Decimal(prev_obj.capital)
+    else:
+        # считаем капитал по состоянию на конец предыдущего месяца
+        prev_last_day = monthrange(prev_year, prev_month)[1]
+        prev_dt_end = timezone.make_aware(datetime(prev_year, prev_month, prev_last_day, 23, 59, 59))
+        prev_cap = _investors_total_up_to(prev_dt_end)
+
+    # получаем капитал текущего месяца (из MonthlyCapital или считаем)
+    curr_obj = MonthlyCapital.objects.filter(year=year, month=month).first()
+    if curr_obj and curr_obj.capital is not None:
+        curr_cap = Decimal(curr_obj.capital)
+    else:
+        curr_cap = _investors_total_up_to(dt_end)
+
+    # печать для отладки — посмотреть исходные значения капиталов
+    print(f"[get_monthly_capital] year={year} month={month} prev={prev_year}-{prev_month} prev_obj={bool(prev_obj)} curr_obj={bool(curr_obj)}")
+    print(f"[get_monthly_capital] prev_cap={prev_cap} curr_cap={curr_cap}")
+
+    # средний капитал за месяц
+    try:
+        avg_cap = (Decimal(prev_cap) + Decimal(curr_cap)) / Decimal(2)
+    except Exception:
+        avg_cap = Decimal(0)
+
+    print(f"[get_monthly_capital] avg_cap={avg_cap}")
+
+    # прибыль за месяц (сумма profit у транзакций в периоде)
+    transactions = Transaction.objects.filter(created_at__range=(dt_start, dt_end)).select_related()
+    profit_total = sum(
+        (Decimal(str(getattr(t, 'profit', 0) or 0)) for t in transactions),
+        Decimal(0)
+    )
+
+    print(f"[get_monthly_capital] transactions_count={transactions.count()} profit_total={profit_total}")
+
+    if avg_cap > 0 and profit_total != 0:
+        capital_percent = float(profit_total) / float(avg_cap) * 100.0
+    else:
+        capital_percent = 0.0
+
+    print(f"[get_monthly_capital] capital_percent={capital_percent} (before rounding)")
 
     return round(capital_percent, 1)
-
 
 def calculate_and_save_monthly_capital(year, month):
     last_day = monthrange(year, month)[1]
