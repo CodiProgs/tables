@@ -593,35 +593,8 @@ const addMenuHandler = () => {
 					) {
 						settleDebtButton.style.display = 'none'
 					} else if (table.id === 'investors-table') {
-						// const selectedCell = document.querySelector(
-						// 	'td.table__cell--selected'
-						// )
-						// if (selectedCell) {
-						// 	const cellIndex = Array.from(
-						// 		selectedCell.parentNode.children
-						// 	).indexOf(selectedCell)
-						// 	const th = table.querySelectorAll('thead th')[cellIndex]
-						// 	const colName = th ? th.dataset.name : null
-
-						// 	if (colName === 'balance') {
-						// 		settleDebtButton.style.display = 'block'
-						// 		settleDebtButton.textContent = 'Распределить'
-						// 		settleDebtButton.dataset.type = 'initial'
-						// 	}
-						// 	// else if (colName === 'balance') {
-						// 	// 	settleDebtButton.style.display = 'block'
-						// 	// 	settleDebtButton.textContent = 'Изменить сумму'
-						// 	// 	settleDebtButton.dataset.type = 'balance'
-						// 	// }
-						// 	else {
-						// 		settleDebtButton.style.display = 'none'
-						// 		settleDebtButton.dataset.type = ''
-						// 	}
-						// }
-						// else {
 						settleDebtButton.style.display = 'none'
 						settleDebtButton.dataset.type = ''
-						// }
 					} else {
 						settleDebtButton.style.display = 'block'
 						settleDebtButton.textContent = 'Погасить долг'
@@ -840,9 +813,7 @@ const createExchangeFormHandler = action => {
 		`${BASE_URL}money_transfers/`,
 		[
 			{ id: 'source_supplier', url: `${BASE_URL}${SUPPLIERS}/list/` },
-			// { id: 'source_account', url: `${BASE_URL}accounts/list/` },
 			{ id: 'destination_supplier', url: `${BASE_URL}${SUPPLIERS}/list/` },
-			// { id: 'destination_account', url: `${BASE_URL}accounts/list/` },
 		],
 		{
 			url: '/components/main/add_money_transfers/',
@@ -880,24 +851,6 @@ const createExchangeFormHandler = action => {
 						lastRow.setAttribute('data-id', result.id)
 					}
 				}
-
-				// counted_from_us =
-				// 	result.transfer_type === 'from_us'
-				// 		? Array.isArray(result?.counted_from_us) &&
-				// 		  result.counted_from_us.length > 0
-				// 			? result.counted_from_us
-				// 			: [0]
-				// 		: []
-
-				// TableManager.calculateTableSummary(
-				// 	result.transfer_type === 'from_us'
-				// 		? 'from_us_exchange-table'
-				// 		: 'to_us_exchange-table',
-				// 	['amount'],
-				// 	{
-				// 		ids: result.transfer_type === 'from_us' ? counted_from_us : [],
-				// 	}
-				// )
 			} else if (result.type === 'edit') {
 				if (
 					result.old_transfer_type &&
@@ -937,40 +890,6 @@ const createExchangeFormHandler = action => {
 							: 'to_us_exchange-table'
 					)
 				}
-
-				// counted_from_us =
-				// 	result.transfer_type === 'from_us'
-				// 		? Array.isArray(result?.counted_from_us) &&
-				// 		  result.counted_from_us.length > 0
-				// 			? result.counted_from_us
-				// 			: [0]
-				// 		: []
-				// TableManager.calculateTableSummary(
-				// 	result.transfer_type === 'from_us'
-				// 		? 'from_us_exchange-table'
-				// 		: 'to_us_exchange-table',
-				// 	['amount'],
-				// 	{
-				// 		ids: result.transfer_type === 'from_us' ? counted_from_us : [],
-				// 	}
-				// )
-				// const counted_from_us_old =
-				// 	result.old_transfer_type === 'from_us'
-				// 		? Array.isArray(result?.counted_from_us) &&
-				// 		  result.counted_from_us.length > 0
-				// 			? result.counted_from_us
-				// 			: [0]
-				// 		: []
-				// TableManager.calculateTableSummary(
-				// 	result.old_transfer_type === 'from_us'
-				// 		? 'from_us_exchange-table'
-				// 		: 'to_us_exchange-table',
-				// 	['amount'],
-				// 	{
-				// 		ids:
-				// 			result.old_transfer_type === 'from_us' ? counted_from_us_old : [],
-				// 	}
-				// )
 			}
 
 			let to_us_completed = result.to_us_completed || []
@@ -1497,9 +1416,6 @@ const colorizeRemainingAmountByDebts = (debts = {}) => {
 	let profitCol = -1
 
 	headers.forEach((header, idx) => {
-		if (header.dataset.name === 'supplier_percentage') {
-			// remainingAmountCol = idx
-		}
 		if (header.dataset.name === 'bonus') {
 			bonusCol = idx
 		}
@@ -1779,7 +1695,6 @@ const setupSupplierAccountSelects = (isCollection = false) => {
 					accountInput.value || accountInput.getAttribute('value')
 				SelectHandler.restoreSelectValue(accountSelect, currentVal)
 			}
-			// --- Если выбран чужой поставщик, выбираем Р/с Втб ---
 			if (otherSuppliers.includes(String(supplierId))) {
 				selectVtbAccount()
 			}
@@ -2659,8 +2574,6 @@ const moneyTransfersFormHandler = createFormHandler(
 	[
 		{ id: 'source_supplier', url: `${BASE_URL}${SUPPLIERS}/list/` },
 		{ id: 'destination_supplier', url: `${BASE_URL}${SUPPLIERS}/list/` },
-		// { id: 'source_account', url: `${BASE_URL}accounts/list/` },
-		// { id: 'destination_account', url: `${BASE_URL}accounts/list/` },
 	],
 	{
 		url: '/components/main/add_money_transfers/',
@@ -3771,93 +3684,249 @@ const handleExchange = () => {
 }
 
 function renderBalance(data) {
+	const assetsTotal =
+		data?.assets !== undefined
+			? formatAmount(data.assets)
+			: formatAmount(data?.assets_total || 0)
+	const liabilitiesTotal =
+		data?.liabilities?.total !== undefined
+			? formatAmount(data.liabilities.total)
+			: formatAmount(0)
+
+	const mapItems = items =>
+		Array.isArray(items)
+			? items.map(i => ({
+					name: i.branch ?? i.name ?? i.title ?? '-',
+					amount: i.amount ?? i.total ?? 0,
+					formatted: i.formatted_total ?? null,
+					table_html: i.table_html ?? i.html ?? null,
+			  }))
+			: []
+
+	const inventory = mapItems(data?.current_assets?.inventory?.items)
+	const debtors = mapItems(data?.current_assets?.debtors?.items)
+	const cash = mapItems(data?.current_assets?.cash?.items)
+
+	const inventoryOptions = {}
+	if (data?.current_assets?.inventory?.html)
+		inventoryOptions.table_html = data.current_assets.inventory.html
+	else if (data?.current_assets?.inventory?.table_html)
+		inventoryOptions.table_html = data.current_assets.inventory.table_html
+	else if (data?.current_assets?.inventory?.formatted_total)
+		inventoryOptions.formatted = data.current_assets.inventory.formatted_total
+
+	const debtorsOptions = {}
+	if (data?.current_assets?.debtors?.html)
+		debtorsOptions.table_html = data.current_assets.debtors.html
+	else if (data?.current_assets?.debtors?.table_html)
+		debtorsOptions.table_html = data.current_assets.debtors.table_html
+	else if (data?.current_assets?.debtors?.formatted_total)
+		debtorsOptions.formatted = data.current_assets.debtors.formatted_total
+
+	const cashOptions = {}
+	if (data?.current_assets?.cash?.html)
+		cashOptions.table_html = data.current_assets.cash.html
+	else if (data?.current_assets?.cash?.table_html)
+		cashOptions.table_html = data.current_assets.cash.table_html
+	else if (data?.current_assets?.cash?.formatted_total)
+		cashOptions.formatted = data.current_assets.cash.formatted_total
+
+	let liabilitiesHtml = ''
+	if (Array.isArray(data?.liabilities?.items)) {
+		liabilitiesHtml = data.liabilities.items
+			.map(item => {
+				const opt = {}
+				if (item.formatted_total) opt.formatted = item.formatted_total
+
+				const nestedItems = Array.isArray(item.items)
+					? item.items.map(i => ({
+							name: i.branch ?? i.name ?? i.title ?? '-',
+							amount: i.amount ?? i.total ?? 0,
+							formatted: i.formatted_total ?? null,
+					  }))
+					: null
+
+				if (item.name === 'Нераспределенная прибыль') {
+					return renderSimple(item.name, item.amount ?? 0, opt)
+				}
+
+				if (nestedItems && nestedItems.length > 0) {
+					return renderGroup(
+						item.name,
+						item.amount ?? 0,
+						nestedItems,
+						'name',
+						opt
+					)
+				}
+
+				if (item.html || item.table_html) {
+					opt.table_html = item.html || item.table_html
+					return renderGroup(item.name, item.amount ?? 0, null, 'name', opt)
+				}
+
+				return renderGroup(item.name, item.amount ?? 0, null, 'name', opt)
+			})
+			.join('')
+	} else {
+		liabilitiesHtml = renderGroup(
+			'Пассивы',
+			data?.liabilities?.total ?? 0,
+			null,
+			'name',
+			{
+				formatted: data?.liabilities?.formatted_total,
+			}
+		)
+	}
+
 	return `
         <div>
-            <div class="debtors-office-list__header">Внеоборотные активы</div>
-			<ul class="debtors-office-list">
-				${renderGroup(
-					'Основные средства',
-					data.non_current_assets.total,
-					data.non_current_assets.items
-				)}
-			</ul>
-
-            <div class="debtors-office-list__header">Оборотные активы</div>
-            <ul class="debtors-office-list">
-			${renderGroup(
-				'Товарные остатки',
-				data.current_assets.inventory.total,
-				data.current_assets.inventory.items
-			)}
-            ${renderGroup(
-							'Дебиторская задолженность',
-							data.current_assets.debtors.total,
-							data.current_assets.debtors.items,
-							'branch'
-						)}
-            ${renderGroup(
-							'Денежные средства',
-							data.current_assets.cash.total,
-							data.current_assets.cash.items
-						)}</ul>
-
-						<div class="debtors-header" id="summary-header">
+            <div class="debtors-header">
                 <h2 class="debtors-office-list__header">Активы</h2>
-                <span class="debtors-total">${formatAmount(data.assets)}</span>
+                <span class="debtors-total">${assetsTotal}</span>
             </div>
 
             <ul class="debtors-office-list">
-			${renderGroup('Обязательства', null, data.liabilities.items)}
-			</ul>
+                ${renderGroup(
+									'ТМЦ',
+									data?.current_assets?.inventory?.total ?? 0,
+									inventory,
+									'name',
+									inventoryOptions
+								)}
+                ${renderGroup(
+									'Дебиторская задолженность',
+									data?.current_assets?.debtors?.total ?? 0,
+									debtors,
+									'name',
+									debtorsOptions
+								)}
+                ${renderGroup(
+									'Денежные средства',
+									data?.current_assets?.cash?.total ?? 0,
+									cash,
+									'name',
+									cashOptions
+								)}
+            </ul>
 
-						<div class="debtors-header" id="summary-header">
+            <div class="debtors-header">
                 <h2 class="debtors-office-list__header">Пассивы</h2>
-                <span class="debtors-total">${formatAmount(
-									data.liabilities.total
-								)}</span>
+                <span class="debtors-total">${liabilitiesTotal}</span>
             </div>
-						<div class="debtors-header" id="summary-header">
-                <h2 class="debtors-office-list__header">Капитал</h2>
-                <span class="debtors-total">${formatAmount(data.capital)}</span>
-            </div>
+
+            <ul class="debtors-office-list">
+                ${liabilitiesHtml}
+                ${renderSimple(
+									'Капитал',
+									data?.capital ?? data?.liabilities?.capital?.value ?? 0,
+									{
+										formatted:
+											data?.liabilities?.capital?.formatted ??
+											data?.capital?.formatted,
+									}
+								)}
+            </ul>
         </div>
     `
 }
 
-function renderGroup(title, total, items, nameKey = 'name') {
-	let detailsHtml
-	if (!items || items.length === 0) {
-		detailsHtml = `<div class="debtors-office-list__row-item debtors-office-list__empty">Нет данных</div>`
-	} else {
+function renderSimple(title, total, options = {}) {
+	const totalHtml =
+		options.formatted !== undefined
+			? `<span class="debtors-office-list__amount">${options.formatted}</span>`
+			: total !== null && total !== undefined
+			? `<span class="debtors-office-list__amount">${formatAmount(
+					total
+			  )}</span>`
+			: ''
+
+	return `
+        <li class="debtors-office-list__item">
+            <div class="debtors-office-list__row">
+                <span class="debtors-office-list__title">${title}</span>
+                ${totalHtml}
+            </div>
+        </li>
+    `
+}
+
+function renderGroup(title, total, items, nameKey = 'name', options = {}) {
+	let detailsHtml = ''
+
+	if (items && items.length > 0) {
 		detailsHtml = items
 			.map(
 				i =>
 					`<div class="debtors-office-list__row-item">
-                        <h4>${i[nameKey]}</h4> <span>${formatAmount(
-						i.amount
-					)}</span>
+                        <h4>${
+													i[nameKey] ?? i.name ?? '-'
+												}</h4> <span>${formatAmount(i.amount)}</span>
                     </div>`
 			)
 			.join('')
+	} else {
+		const tableHtml = options.html || options.table_html
+		if (tableHtml) {
+			detailsHtml =
+				tableHtml ||
+				'<div class="debtors-office-list__row-item debtors-office-list__empty">Нет данных</div>'
+		} else {
+			detailsHtml = `<div class="debtors-office-list__row-item debtors-office-list__empty">Нет данных</div>`
+		}
 	}
+
+	const totalHtml =
+		options.formatted !== undefined
+			? `<span class="debtors-office-list__amount">${options.formatted}</span>`
+			: total !== null && total !== undefined
+			? `<span class="debtors-office-list__amount">${formatAmount(
+					total
+			  )}</span>`
+			: ''
+
+	const loadedAttr =
+		options.html || options.table_html || (items && items.length > 0)
+			? ' data-loaded="1"'
+			: ''
+
 	return `
         <li class="debtors-office-list__item">
             <div class="debtors-office-list__row">
                 <button class="debtors-office-list__toggle">+</button>
                 <span class="debtors-office-list__title">${title}</span>
-                ${
-									total !== null && total !== undefined
-										? `<span class="debtors-office-list__amount">${formatAmount(
-												total
-										  )}</span>`
-										: ''
-								}
+                ${totalHtml}
             </div>
-            <div class="debtors-office-list__details">
+            <div class="debtors-office-list__details"${loadedAttr}>
                 ${detailsHtml}
             </div>
         </li>
     `
+}
+
+function initBalanceInsertedTables() {
+	const balanceTableIds = [
+		'inventory-table',
+		'debtors-table',
+		'accounts-table',
+		'credits-table',
+		'short-term-table',
+		'investors-table',
+	]
+	balanceTableIds.forEach(id => {
+		const table = document.getElementById(id)
+		if (table) {
+			if (typeof TableManager.initTable === 'function') {
+				TableManager.initTable(id)
+			}
+			if (typeof TableManager.formatCurrencyValues === 'function') {
+				try {
+					TableManager.formatCurrencyValues(id)
+				} catch (e) {}
+			}
+		}
+	})
 }
 
 function formatAmount(value) {
@@ -3963,6 +4032,25 @@ const handleDebtors = async () => {
 													data.transactions_table_id,
 													['supplier_debt']
 												)
+											}
+										}
+
+										if (tableId === data.repayments_table_id) {
+											const rows = Array.from(
+												table.querySelectorAll(
+													'tbody tr:not(.table__row--summary)'
+												)
+											)
+
+											if (rows.length > 10) {
+												rows.slice(0, rows.length - 10).forEach(row => {
+													row.classList.add('hidden-row')
+												})
+												rows.slice(-10).forEach(row => {
+													row.classList.remove('hidden-row')
+												})
+											} else {
+												rows.forEach(row => row.classList.remove('hidden-row'))
 											}
 										}
 									}
@@ -4121,6 +4209,14 @@ const handleDebtors = async () => {
 			const data = await response.json()
 
 			balanceContainer.innerHTML = renderBalance(data)
+			initBalanceInsertedTables()
+			if (
+				typeof TableManager !== 'undefined' &&
+				TableManager &&
+				typeof TableManager.init === 'function'
+			) {
+				TableManager.init()
+			}
 
 			balanceContainer
 				.querySelectorAll('.debtors-office-list__row')
@@ -4130,6 +4226,8 @@ const handleDebtors = async () => {
 							.closest('.debtors-office-list__item')
 							.querySelector('.debtors-office-list__details')
 						const btn = row.querySelector('.debtors-office-list__toggle')
+						if (!details) return
+						if (!btn) return
 						btn.classList.toggle('open')
 						details.classList.toggle('open')
 					})
@@ -4283,7 +4381,6 @@ const handleDebtors = async () => {
 				}
 			}
 			window.drawCharts = drawCharts
-			// window.addEventListener('resize', resizeCharts)
 
 			if (data.capitals_by_month) {
 				window.lastBalanceData = data
@@ -4320,6 +4417,7 @@ const handleDebtors = async () => {
 				const data = await response.json()
 
 				balanceContainer.innerHTML = renderBalance(data)
+				initBalanceInsertedTables()
 
 				balanceContainer
 					.querySelectorAll('.debtors-office-list__row')
