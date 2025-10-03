@@ -89,4 +89,8 @@ urlpatterns = [
     path("hidden_rows/get/", views.get_hidden_rows, name="get_hidden_rows"),
     path("hidden_rows/set/", views.set_hidden_rows, name="set_hidden_rows"),
     path("hidden_rows/clear/", views.clear_hidden_rows, name="clear_hidden_rows"),
+    path("balance_items/add/", views.add_balance_item, name="add_balance_item"),
+    path("balance_items/edit/<int:pk>/", views.edit_balance_item, name="edit_balance_item"),
+    # path("balance_items/delete/<int:pk>/", views.delete_balance_item, name="delete_balance_item"),
+	path("balance_items/<str:type>/<int:pk>/", views.balance_item_detail, name="balance_item_detail"),
 ]

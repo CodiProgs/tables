@@ -1,0 +1,54 @@
+{% load components %}
+{% add_style 'css/modal-form.css' %}
+<form class="modal-form" id="cash_flow-form" method="post">
+    <div class="modal-form__content">
+        {% csrf_token %}
+        <input class="modal-form__input"
+               type="text"
+               id="operation_type"
+               name="operation_type"
+               hidden>
+		<div class="modal-form__group">
+            <input class="modal-form__input"
+                   type="text"
+                   id="name"
+                   name="name"
+                   spellcheck="false"
+                   autocomplete="off"
+                   placeholder="Введите наименование">
+        </div>
+		<div class="modal-form__group">
+            <input class="modal-form__input"
+                   type="text"
+                   id="quantity"
+                   name="quantity"
+                   spellcheck="false"
+                   autocomplete="off"
+				   hidden
+                   placeholder="Введите количество">
+        </div>
+		<div class="modal-form__group">
+            <input class="modal-form__input"
+                   type="text"
+                   id="price"
+                   name="price"
+                   spellcheck="false"
+                   autocomplete="off"
+				   hidden
+                   placeholder="Введите цену">
+        </div>
+        <div class="modal-form__group">
+            <input class="modal-form__input"
+                   type="text"
+                   id="amount"
+                   name="amount"
+                   spellcheck="false"
+                   autocomplete="off"
+                   placeholder="Введите сумму">
+        </div>
+        <div class="modal-form__buttons">
+            <button class="button modal-form__button" type="submit">Сохранить</button>
+            <button class="button modal-form__button button--cancel" type="button">Отменить</button>
+        </div>
+    </div>
+</form>

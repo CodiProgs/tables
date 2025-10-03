@@ -77,6 +77,12 @@ def clean_percentage(value):
         value = value.replace(" ", "")
     return value
 
+def strip_cents(value):
+    try:
+        return int(Decimal(str(value or 0)))
+    except Exception:
+        return 0
+
 @login_required
 def index(request):
     user_type = getattr(getattr(request.user, 'user_type', None), 'name', None)
@@ -110,23 +116,23 @@ def index(request):
     is_admin = user_type == 'Администратор'
 
     supplier_debts = [
-        getattr(t, 'supplier_debt', 0) 
-        for t in page.object_list 
+        strip_cents(getattr(t, 'supplier_debt', 0))
+        for t in page.object_list
     ]
 
     client_debts = [
-        getattr(t, 'client_debt', 0) 
-        for t in page.object_list 
+        strip_cents(getattr(t, 'client_debt', 0))
+        for t in page.object_list
     ]
 
     bonus_debts = [
-        round(float(t.amount or 0) * float(t.bonus_percentage or 0) / 100 - float(t.returned_bonus or 0), 2)
+        strip_cents(Decimal(str(t.amount or 0)) * Decimal(str(t.bonus_percentage or 0)) / Decimal('100') - Decimal(str(t.returned_bonus or 0)))
         for t in page.object_list
     ]
 
     investor_debts = [
-        getattr(t, 'investor_debt', 0) 
-        for t in page.object_list 
+        strip_cents(getattr(t, 'investor_debt', 0))
+        for t in page.object_list
     ]
 
     context = {
@@ -3883,7 +3889,7 @@ def company_balance_stats(request):
 
     assets_total = equipment + inventory_total + total_debtors + safe_amount
 
-    provisional_liabilities = credit_total + client_debts + short_total + total_summary_debts + investors_total + undistributed_profit
+    provisional_liabilities = credit_total + short_total + total_summary_debts + investors_total + undistributed_profit
 
     current_capital = assets_total - provisional_liabilities
 
@@ -3948,6 +3954,11 @@ def company_balance_stats(request):
             "capitals": capitals,
             "total": total_capital
         },
+        "ids":{
+            "credit_ids": [c.id for c in credits_qs],
+            "short_ids": [s.id for s in short_qs],
+            "inventory_ids": [i.id for i in inventory_qs],
+        }
     }
     return JsonResponse(data, safe=False)
 
@@ -4777,3 +4788,403 @@ def investor_debt_operation(request, pk: int):
         "operation_id": operation_obj.id,
         "investor_id": investor.id,
     })
+
+
+@forbid_supplier
+@login_required
+@require_http_methods(["POST"])
+def add_balance_item(request):
+    try:
+        type_ = request.POST.get("operation_type")
+        name = (request.POST.get("name") or "").strip()
+        if not type_ or not name:
+            return JsonResponse({"status": "error", "message": "Не указаны обязательные параметры"}, status=400)
+
+        def parse_decimal(v):
+            try:
+                return Decimal(str(clean_currency(v))) if v is not None else Decimal(0)
+            except Exception:
+                return Decimal(0)
+
+        created_obj = None
+        row_html = ""
+        if type_ == "inventory":
+            qty_raw = request.POST.get("quantity")
+            price_raw = request.POST.get("price")
+            if qty_raw is None or price_raw is None:
+                return JsonResponse({"status": "error", "message": "Не заданы quantity или price"}, status=400)
+            try:
+                quantity = Decimal(str(qty_raw).replace(",", "."))
+                price = parse_decimal(price_raw)
+            except Exception:
+                return JsonResponse({"status": "error", "message": "Некорректные значения quantity/price"}, status=400)
+            item = InventoryItem.objects.create(name=name, quantity=quantity, price=price)
+            created_obj = item
+
+            inventory_fields = [
+                {"name": "name", "verbose_name": "Наименование"},
+                {"name": "quantity", "verbose_name": "Количество"},
+                {"name": "price", "verbose_name": "Цена за ед.", "is_amount": True},
+                {"name": "total", "verbose_name": "Сумма", "is_amount": True},
+            ]
+            row_html = render_to_string("components/table_row.html", {"item": item, "fields": inventory_fields})
+
+        elif type_ == "credit":
+            amount_raw = request.POST.get("amount")
+            if amount_raw is None:
+                return JsonResponse({"status": "error", "message": "Не указана сумма"}, status=400)
+            try:
+                amount = parse_decimal(amount_raw)
+            except Exception:
+                return JsonResponse({"status": "error", "message": "Некорректная сумма"}, status=400)
+            credit = Credit.objects.create(name=name, amount=amount)
+            created_obj = credit
+
+            credit_fields = [
+                {"name": "name", "verbose_name": "Наименование"},
+                {"name": "amount", "verbose_name": "Сумма", "is_amount": True},
+            ]
+            row_html = render_to_string("components/table_row.html", {"item": credit, "fields": credit_fields})
+
+        elif type_ in ("short_term", "short_term_liability"):
+            amount_raw = request.POST.get("amount")
+            if amount_raw is None:
+                return JsonResponse({"status": "error", "message": "Не указана сумма"}, status=400)
+            try:
+                amount = parse_decimal(amount_raw)
+            except Exception:
+                return JsonResponse({"status": "error", "message": "Некорректная сумма"}, status=400)
+            st = ShortTermLiability.objects.create(name=name, amount=amount)
+            created_obj = st
+
+            short_fields = [
+                {"name": "name", "verbose_name": "Наименование"},
+                {"name": "amount", "verbose_name": "Сумма", "is_amount": True},
+            ]
+            row_html = render_to_string("components/table_row.html", {"item": st, "fields": short_fields})
+        else:
+            return JsonResponse({"status": "error", "message": "Неизвестный тип"}, status=400)
+
+        equipment = BalanceData.objects.filter(name="Оборудование").aggregate(total=Sum("amount"))["total"] or Decimal(0)
+
+        inventory_total = InventoryItem.objects.aggregate(total=Sum("total"))["total"] or Decimal(0)
+        credit_total = Credit.objects.aggregate(total=Sum("amount"))["total"] or Decimal(0)
+        short_total = ShortTermLiability.objects.aggregate(total=Sum("amount"))["total"] or Decimal(0)
+
+        total_debtors = Decimal(0)
+        for branch in Supplier.objects.exclude(branch=None).values_list("branch__id", "branch__name").distinct():
+            branch_id, branch_name = branch
+            if branch_name != "Филиал 1" and branch_name != "Наши ИП":
+                branch_debt = sum(
+                    (t.supplier_debt or Decimal(0))
+                    for t in Transaction.objects.filter(supplier__branch_id=branch_id, paid_amount__gt=0)
+                )
+                total_debtors += branch_debt
+
+        safe_amount = SupplierAccount.objects.filter(
+            supplier__visible_in_summary=True
+        ).aggregate(total=Sum("balance"))["total"] or Decimal(0)
+
+        cash_account = Account.objects.filter(name__iexact="Наличные").first()
+        cash_balance = Decimal(cash_account.balance) if cash_account and cash_account.balance is not None else Decimal(0)
+        safe_amount = Decimal(safe_amount) + cash_balance
+
+        bonuses = sum((t.bonus_debt or Decimal(0)) for t in Transaction.objects.filter(paid_amount__gt=0))
+        total_remaining = sum((t.client_debt_paid or Decimal(0)) for t in Transaction.objects.filter(paid_amount__gt=0))
+
+        transactionsInvestors = [
+            t for t in Transaction.objects.filter(paid_amount__gt=0)
+            if getattr(t, 'bonus_debt', 0) == 0
+            and getattr(t, 'client_debt', 0) == 0
+            and getattr(t, 'profit', 0) > 0
+        ]
+        cashflows = CashFlow.objects.filter(
+            purpose__operation_type=PaymentPurpose.INCOME
+        ).exclude(purpose__name__in=["Оплата", "Внесение инвестора"])
+
+        total_profit_decimal = sum(
+            (Decimal(str(getattr(t, 'profit', 0) or 0)) - Decimal(str(getattr(t, 'returned_to_investor', 0) or 0)))
+            for t in transactionsInvestors
+        ) + sum(
+            (Decimal(str(cf.amount or 0)) - Decimal(str(cf.returned_to_investor or 0)))
+            for cf in cashflows
+        )
+
+        assets_total = equipment + inventory_total + total_debtors + safe_amount
+
+        investors_total = Investor.objects.aggregate(total=Sum("balance"))["total"] or Decimal(0)
+        total_summary_debts = (bonuses or Decimal(0)) + (total_remaining or Decimal(0)) + (total_profit_decimal or Decimal(0))
+        undistributed_profit = Decimal(0)
+        provisional_liabilities = credit_total + short_total + total_summary_debts + (investors_total or Decimal(0)) + undistributed_profit
+
+        current_capital = assets_total - provisional_liabilities
+        liabilities_total = provisional_liabilities + current_capital
+
+        response = {
+            "status": "success",
+            "type": type_,
+            "id": getattr(created_obj, "id", None),
+            "html": row_html,
+            "assets": float(assets_total),
+            "inventory_total": float(inventory_total),
+            "credit_total": float(credit_total),
+            "short_term_total": float(short_total),
+            "liabilities": float(liabilities_total),
+            "capital": float(current_capital),
+        }
+
+        return JsonResponse(response)
+    except Exception as e:
+        return JsonResponse({"status": "error", "message": str(e)}, status=400)
+
+@forbid_supplier
+@login_required
+@require_http_methods(["POST"])
+def edit_balance_item(request, pk=None):
+    try:
+        type_ = request.POST.get("operation_type")
+        item_id = pk or request.POST.get("id")
+        name = (request.POST.get("name") or "").strip()
+        if not type_ or not item_id or not name:
+            return JsonResponse({"status": "error", "message": "Не указаны обязательные параметры"}, status=400)
+
+        def parse_decimal(v):
+            try:
+                return Decimal(str(clean_currency(v))) if v is not None else Decimal(0)
+            except Exception:
+                return Decimal(0)
+
+        row_html = ""
+        updated_obj = None
+
+        if type_ == "inventory":
+            qty_raw = request.POST.get("quantity")
+            price_raw = request.POST.get("price")
+            if qty_raw is None or price_raw is None:
+                return JsonResponse({"status": "error", "message": "Не заданы quantity или price"}, status=400)
+            try:
+                quantity = Decimal(str(qty_raw).replace(",", "."))
+                price = parse_decimal(price_raw)
+            except Exception:
+                return JsonResponse({"status": "error", "message": "Некорректные значения quantity/price"}, status=400)
+
+            item = get_object_or_404(InventoryItem, id=item_id)
+            item.name = name
+            item.quantity = quantity
+            item.price = price
+            item.save()
+            updated_obj = item
+
+            inventory_fields = [
+                {"name": "name", "verbose_name": "Наименование"},
+                {"name": "quantity", "verbose_name": "Количество"},
+                {"name": "price", "verbose_name": "Цена за ед.", "is_amount": True},
+                {"name": "total", "verbose_name": "Сумма", "is_amount": True},
+            ]
+            row_html = render_to_string("components/table_row.html", {"item": item, "fields": inventory_fields})
+
+        elif type_ == "credit":
+            amount_raw = request.POST.get("amount")
+            if amount_raw is None:
+                return JsonResponse({"status": "error", "message": "Не указана сумма"}, status=400)
+            try:
+                amount = parse_decimal(amount_raw)
+            except Exception:
+                return JsonResponse({"status": "error", "message": "Некорректная сумма"}, status=400)
+
+            credit = get_object_or_404(Credit, id=item_id)
+            credit.name = name
+            credit.amount = amount
+            credit.save()
+            updated_obj = credit
+
+            credit_fields = [
+                {"name": "name", "verbose_name": "Наименование"},
+                {"name": "amount", "verbose_name": "Сумма", "is_amount": True},
+            ]
+            row_html = render_to_string("components/table_row.html", {"item": credit, "fields": credit_fields})
+
+        elif type_ in ("short_term", "short_term_liability"):
+            amount_raw = request.POST.get("amount")
+            if amount_raw is None:
+                return JsonResponse({"status": "error", "message": "Не указана сумма"}, status=400)
+            try:
+                amount = parse_decimal(amount_raw)
+            except Exception:
+                return JsonResponse({"status": "error", "message": "Некорректная сумма"}, status=400)
+
+            st = get_object_or_404(ShortTermLiability, id=item_id)
+            st.name = name
+            st.amount = amount
+            st.save()
+            updated_obj = st
+
+            short_fields = [
+                {"name": "name", "verbose_name": "Наименование"},
+                {"name": "amount", "verbose_name": "Сумма", "is_amount": True},
+            ]
+            row_html = render_to_string("components/table_row.html", {"item": st, "fields": short_fields})
+        else:
+            return JsonResponse({"status": "error", "message": "Неизвестный тип"}, status=400)
+
+        equipment = BalanceData.objects.filter(name="Оборудование").aggregate(total=Sum("amount"))["total"] or Decimal(0)
+        inventory_total = InventoryItem.objects.aggregate(total=Sum("total"))["total"] or Decimal(0)
+        credit_total = Credit.objects.aggregate(total=Sum("amount"))["total"] or Decimal(0)
+        short_total = ShortTermLiability.objects.aggregate(total=Sum("amount"))["total"] or Decimal(0)
+
+        total_debtors = Decimal(0)
+        for branch in Supplier.objects.exclude(branch=None).values_list("branch__id", "branch__name").distinct():
+            branch_id, branch_name = branch
+            if branch_name != "Филиал 1" and branch_name != "Наши ИП":
+                branch_debt = sum(
+                    (t.supplier_debt or Decimal(0))
+                    for t in Transaction.objects.filter(supplier__branch_id=branch_id, paid_amount__gt=0)
+                )
+                total_debtors += branch_debt
+
+        safe_amount = SupplierAccount.objects.filter(
+            supplier__visible_in_summary=True
+        ).aggregate(total=Sum("balance"))["total"] or Decimal(0)
+
+        cash_account = Account.objects.filter(name__iexact="Наличные").first()
+        cash_balance = Decimal(cash_account.balance) if cash_account and cash_account.balance is not None else Decimal(0)
+        safe_amount = Decimal(safe_amount) + cash_balance
+
+        bonuses = sum((t.bonus_debt or Decimal(0)) for t in Transaction.objects.filter(paid_amount__gt=0))
+        total_remaining = sum((t.client_debt_paid or Decimal(0)) for t in Transaction.objects.filter(paid_amount__gt=0))
+
+        transactionsInvestors = [
+            t for t in Transaction.objects.filter(paid_amount__gt=0)
+            if getattr(t, 'bonus_debt', 0) == 0
+            and getattr(t, 'client_debt', 0) == 0
+            and getattr(t, 'profit', 0) > 0
+        ]
+        cashflows = CashFlow.objects.filter(
+            purpose__operation_type=PaymentPurpose.INCOME
+        ).exclude(purpose__name__in=["Оплата", "Внесение инвестора"])
+
+        total_profit_decimal = sum(
+            (Decimal(str(getattr(t, 'profit', 0) or 0)) - Decimal(str(getattr(t, 'returned_to_investor', 0) or 0)))
+            for t in transactionsInvestors
+        ) + sum(
+            (Decimal(str(cf.amount or 0)) - Decimal(str(cf.returned_to_investor or 0)))
+            for cf in cashflows
+        )
+
+        assets_total = equipment + inventory_total + total_debtors + safe_amount
+
+        investors_total = Investor.objects.aggregate(total=Sum("balance"))["total"] or Decimal(0)
+        total_summary_debts = (bonuses or Decimal(0)) + (total_remaining or Decimal(0)) + (total_profit_decimal or Decimal(0))
+        undistributed_profit = Decimal(0)
+        provisional_liabilities = credit_total + short_total + total_summary_debts + (investors_total or Decimal(0)) + undistributed_profit
+
+        current_capital = assets_total - provisional_liabilities
+        liabilities_total = provisional_liabilities + current_capital
+
+        response = {
+            "status": "success",
+            "type": type_,
+            "id": getattr(updated_obj, "id", None),
+            "html": row_html,
+            "assets": float(assets_total),
+            "inventory_total": float(inventory_total),
+            "credit_total": float(credit_total),
+            "short_term_total": float(short_total),
+            "liabilities": float(liabilities_total),
+            "capital": float(current_capital),
+        }
+        return JsonResponse(response)
+    except Exception as e:
+        return JsonResponse({"status": "error", "message": str(e)}, status=400)
+
+@forbid_supplier
+@login_required
+def balance_item_detail(request, type, pk):
+    type_ = (type or "").strip().lower()
+
+    def _to_float(v):
+        try:
+            return float(v) if v is not None else 0.0
+        except Exception:
+            return 0.0
+
+    try:
+        if type_ == "inventory":
+            obj = get_object_or_404(InventoryItem, id=pk)
+            data = model_to_dict(obj)
+            data["quantity"] = _to_float(getattr(obj, "quantity", 0))
+            data["price"] = _to_float(getattr(obj, "price", 0))
+            data["total"] = _to_float(getattr(obj, "total", getattr(obj, "amount", 0)))
+            data["type"] = "inventory"
+
+        elif type_ == "credit":
+            obj = get_object_or_404(Credit, id=pk)
+            data = model_to_dict(obj)
+            data["amount"] = _to_float(getattr(obj, "amount", 0))
+            data["type"] = "credit"
+
+        elif type_ in ("short_term", "short_term_liability"):
+            obj = get_object_or_404(ShortTermLiability, id=pk)
+            data = model_to_dict(obj)
+            data["amount"] = _to_float(getattr(obj, "amount", 0))
+            data["type"] = "short_term"
+
+        elif type_ in ("equipment", "balancedata", "balance_data"):
+            obj = get_object_or_404(BalanceData, id=pk)
+            data = model_to_dict(obj)
+            data["amount"] = _to_float(getattr(obj, "amount", 0))
+            data["type"] = "equipment"
+
+        else:
+            found = False
+            try:
+                obj = InventoryItem.objects.filter(id=pk).first()
+                if obj:
+                    data = model_to_dict(obj)
+                    data["quantity"] = _to_float(getattr(obj, "quantity", 0))
+                    data["price"] = _to_float(getattr(obj, "price", 0))
+                    data["total"] = _to_float(getattr(obj, "total", getattr(obj, "amount", 0)))
+                    data["type"] = "inventory"
+                    found = True
+            except Exception:
+                pass
+
+            if not found:
+                try:
+                    obj = Credit.objects.filter(id=pk).first()
+                    if obj:
+                        data = model_to_dict(obj)
+                        data["amount"] = _to_float(getattr(obj, "amount", 0))
+                        data["type"] = "credit"
+                        found = True
+                except Exception:
+                    pass
+
+            if not found:
+                try:
+                    obj = ShortTermLiability.objects.filter(id=pk).first()
+                    if obj:
+                        data = model_to_dict(obj)
+                        data["amount"] = _to_float(getattr(obj, "amount", 0))
+                        data["type"] = "short_term"
+                        found = True
+                except Exception:
+                    pass
+
+            if not found:
+                try:
+                    obj = BalanceData.objects.filter(id=pk).first()
+                    if obj:
+                        data = model_to_dict(obj)
+                        data["amount"] = _to_float(getattr(obj, "amount", 0))
+                        data["type"] = "equipment"
+                        found = True
+                except Exception:
+                    pass
+
+            if not found:
+                return JsonResponse({"status": "error", "message": "Элемент баланса не найден"}, status=404)
+
+        return JsonResponse({"data": data})
+    except Exception as e:
+        return JsonResponse({"status": "error", "message": str(e)}, status=400)

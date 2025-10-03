@@ -710,6 +710,18 @@ const addMenuHandler = () => {
 				if (contributionButton) contributionButton.style.display = 'none'
 				if (showAllButton) showAllButton.style.display = 'block'
 
+				const pathname = window.location.pathname
+				const regex = /^(?:\/[\w-]+)?\/([\w-]+)\/?$/
+				const match = pathname.match(regex)
+				const urlName = match ? match[1].replace(/-/g, '_') : null
+
+				if (urlName === 'balance') {
+					if (showAllButton) showAllButton.style.display = 'none'
+					if (hideAllButton) hideAllButton.style.display = 'none'
+					if (hideButton) hideButton.style.display = 'none'
+					if (addButton) addButton.style.display = 'none'
+				}
+
 				showMenu(e.pageX, e.pageY)
 			}
 
@@ -1477,6 +1489,7 @@ const colorizeRemainingAmountByDebts = (debts = {}) => {
 		if (bonusCol !== -1 && debts.bonus_debt) {
 			const cell = row.querySelectorAll('td')[bonusCol]
 			const debt = debts.bonus_debt[idx]
+			console.log('cell', cell, debt)
 			if (cell) {
 				if (
 					(debt === 0 ||
@@ -1999,17 +2012,26 @@ export class TablePaginator {
 		document.body.appendChild(loader)
 
 		try {
-			const response = await fetchData(
+			const res = await fetch(
 				`${this.baseUrl}${this.entityName}/list/?page=${page}`
 			)
-			const data = await response
+			if (!res.ok) {
+				let errBody = { message: `HTTP error! status: ${res.status}` }
+				try {
+					errBody = await res.json()
+				} catch (e) {}
+				this.handleError(errBody, res)
+				return
+			}
 
-			if (response.ok && data.html && data.context) {
+			const data = await res.json()
+
+			if (res.ok && data.html && data.context) {
 				this.updateTable(data.html)
 				this.updatePagination(data.context)
 				this.onDataLoaded(data)
 			} else {
-				this.handleError(data, response)
+				this.handleError(data, res)
 			}
 		} catch (error) {
 			console.error(`Ошибка при загрузке данных для ${this.entityName}:`, error)
@@ -2644,6 +2666,362 @@ const moneyTransfersFormHandler = createFormHandler(
 	}
 )
 
+const updateBalanceSpans = data => {
+	try {
+		const headers = Array.from(
+			document.querySelectorAll('#balance-container .debtors-header')
+		)
+		if (headers.length >= 2) {
+			const assetsSpan = headers[0].querySelector('.debtors-total')
+			const liabilitiesSpan = headers[1].querySelector('.debtors-total')
+			if (assetsSpan && data.assets !== undefined)
+				assetsSpan.textContent = formatAmount(data.assets)
+			if (liabilitiesSpan && data.liabilities !== undefined)
+				liabilitiesSpan.textContent = formatAmount(data.liabilities)
+		}
+
+		const setItemTotalByTitle = (title, value) => {
+			const titleNodes = Array.from(
+				document.querySelectorAll('.debtors-office-list__title')
+			)
+			const node = titleNodes.find(n => n.textContent.trim() === title)
+			if (node) {
+				const amountSpan = node.parentElement.querySelector(
+					'.debtors-office-list__amount'
+				)
+				if (amountSpan) amountSpan.textContent = formatAmount(value)
+			}
+		}
+
+		if (data.inventory_total !== undefined)
+			setItemTotalByTitle('ТМЦ', data.inventory_total)
+		if (data.credit_total !== undefined)
+			setItemTotalByTitle('Кредит', data.credit_total)
+		if (data.short_term_total !== undefined)
+			setItemTotalByTitle('Краткосрочные обязательства', data.short_term_total)
+		if (data.capital !== undefined) setItemTotalByTitle('Капитал', data.capital)
+	} catch (e) {
+		console.error('updateBalanceSpans error', e)
+	}
+}
+
+const insertRowToTable = (tableId, html, newId) => {
+	try {
+		if (!html) return
+		TableManager.addTableRow({ html }, tableId)
+		if (newId) setLastRowId(newId, tableId)
+		TableManager.formatCurrencyValues(tableId)
+	} catch (e) {
+		console.error('insertRowToTable error', e)
+	}
+}
+
+const balanceFormHandler = createFormHandler(
+	'/balance_items/add/',
+	'',
+	'cash_flow-form',
+	[],
+	[],
+	{
+		url: '/components/main/add_balance_item/',
+		title: 'Добавить элемент баланса',
+	},
+	result => {
+		if (!result) return
+		if (result.status !== 'success') {
+			showError(result.message || 'Ошибка добавления')
+			return
+		}
+
+		if (result.type === 'inventory') {
+			insertRowToTable('inventory-table', result.html, result.id)
+		} else if (result.type === 'credit') {
+			insertRowToTable('credits-table', result.html, result.id)
+		} else if (
+			result.type === 'short_term' ||
+			result.type === 'short_term_liability'
+		) {
+			insertRowToTable('short-term-table', result.html, result.id)
+		}
+
+		updateBalanceSpans(result)
+	}
+)
+
+const balanceEditFormHandler = createFormHandler(
+	`${BASE_URL}balance_items/edit/`,
+	'',
+	'cash_flow-form',
+	`${BASE_URL}balance_items/`,
+	[],
+	{
+		url: '/components/main/add_balance_item/',
+		title: 'Редактировать элемент баланса',
+	},
+	result => {
+		if (!result) return
+		if (result.status !== 'success') {
+			showError(result.message || 'Ошибка изменения')
+			return
+		}
+
+		const targetTable =
+			result.type === 'inventory'
+				? 'inventory-table'
+				: result.type === 'credit'
+				? 'credits-table'
+				: result.type === 'short_term' || result.type === 'short_term_liability'
+				? 'short-term-table'
+				: null
+
+		;['inventory-table', 'credits-table', 'short-term-table'].forEach(tid => {
+			if (tid === targetTable) return
+			const row = document.querySelector(`#${tid} tr[data-id="${result.id}"]`)
+			if (row) row.remove()
+		})
+
+		if (targetTable) {
+			const existingRow = document.querySelector(
+				`#${targetTable} tr[data-id="${result.id}"]`
+			)
+			if (existingRow) {
+				TableManager.updateTableRow(
+					{ html: result.html, id: result.id },
+					targetTable
+				)
+			} else {
+				TableManager.addTableRow({ html: result.html }, targetTable)
+				setLastRowId(result.id, targetTable)
+			}
+			const row = TableManager.getRowById(result.id, targetTable)
+			TableManager.formatCurrencyValuesForRow(targetTable, row)
+		}
+
+		updateBalanceSpans(result)
+	}
+)
+
+function initBalanceAddButton() {
+	const addButton = document.getElementById('add-button')
+	if (!addButton) return
+
+	addButton.addEventListener('click', async function (e) {
+		const selectedCell = document.querySelector('td.table__cell--selected')
+		const table = selectedCell ? selectedCell.closest('table') : null
+		let type = 'inventory'
+
+		if (table) {
+			if (table.id === 'inventory-table') {
+				type = 'inventory'
+			} else if (table.id === 'credits-table' || table.id === 'credit-table') {
+				type = 'credit'
+			} else if (table.id === 'short-term-table') {
+				type = 'short_term'
+			}
+		}
+
+		balanceFormHandler.config.modalConfig.title =
+			'Добавить ' +
+			(type === 'inventory'
+				? 'ТМЦ'
+				: type === 'credit'
+				? 'Кредит'
+				: 'Краткосрочное обязательство')
+
+		await balanceFormHandler.init(0)
+
+		const form = document.getElementById('cash_flow-form')
+		if (!form) {
+			showError('Форма добавления недоступна')
+			return
+		}
+
+		let typeInput = form.querySelector('#operation_type')
+
+		if (!typeInput) {
+			typeInput = document.createElement('input')
+			typeInput.type = 'hidden'
+			typeInput.id = 'operation_type'
+			typeInput.name = 'operation_type'
+			form.appendChild(typeInput)
+		}
+		typeInput.value = type
+
+		const quantity = form.querySelector('#quantity') || null
+		const price = form.querySelector('#price') || null
+		const amountInput = form.querySelector('#amount')
+		const quantityInput = form.querySelector('#quantity')
+		const priceInput = form.querySelector('#price')
+		const nameInput = form.querySelector('#name')
+
+		if (quantity) quantity.hidden = true
+		if (price) price.hidden = true
+		if (quantityInput) quantityInput.value = ''
+		if (priceInput) priceInput.value = ''
+		if (amountInput) {
+			amountInput.readOnly = false
+			amountInput.placeholder = 'Введите сумму'
+			amountInput.value = ''
+		}
+
+		if (type === 'inventory') {
+			if (quantity) quantity.hidden = false
+			if (price) price.hidden = false
+			if (amountInput) {
+				amountInput.placeholder = 'Сумма'
+				amountInput.readOnly = true
+			}
+			setupCurrencyInput('price')
+			setupCurrencyInput('amount')
+
+			const recalcAmount = () => {
+				const qv = quantityInput
+					? (quantityInput.value || '').replace(',', '.')
+					: '0'
+				let qty = Number(qv)
+				if (isNaN(qty)) qty = 0
+				let priceVal = 0
+				if (priceInput && priceInput.autoNumeric) {
+					priceVal = Number(priceInput.autoNumeric.getNumericString() || 0)
+				} else {
+					priceVal =
+						Number(
+							(priceInput ? priceInput.value || 0 : 0)
+								.toString()
+								.replace(/\s/g, '')
+								.replace(',', '.')
+						) || 0
+				}
+				const total = qty * priceVal
+				if (amountInput && amountInput.autoNumeric) {
+					amountInput.autoNumeric.set(total || 0)
+				} else if (amountInput) {
+					amountInput.value = total ? String(total) : ''
+				}
+			}
+			quantityInput?.addEventListener('input', recalcAmount)
+			priceInput?.addEventListener('input', recalcAmount)
+		} else {
+			if (amountInput) {
+				amountInput.readOnly = false
+				amountInput.placeholder = 'Введите сумму'
+			}
+			setupCurrencyInput('amount')
+		}
+
+		nameInput?.focus()
+	})
+}
+
+function initBalanceEditButton() {
+	const editBtn = document.getElementById('edit-button')
+	if (editBtn) {
+		editBtn.addEventListener('click', async function (e) {
+			e.preventDefault()
+			const selectedCell = document.querySelector('td.table__cell--selected')
+			const table = selectedCell ? selectedCell.closest('table') : null
+			const tableId = table ? table.id : null
+			const id = TableManager.getSelectedRowId(tableId)
+
+			if (!id) {
+				showError('Выберите строку для редактирования')
+				return
+			}
+
+			if (tableId === 'inventory-table') {
+				balanceEditFormHandler.config.getUrl = `${BASE_URL}balance_items/inventory/`
+			} else if (tableId === 'credits-table' || tableId === 'credit-table') {
+				balanceEditFormHandler.config.getUrl = `${BASE_URL}balance_items/credit/`
+			} else if (tableId === 'short-term-table') {
+				balanceEditFormHandler.config.getUrl = `${BASE_URL}balance_items/short_term/`
+			} else {
+				showError('Выберите строку для редактирования')
+				return
+			}
+
+			// Инициализируем форму редактирования
+			await balanceEditFormHandler.init(id)
+
+			// Подготовка UI формы (аналогично логике добавления)
+			const form = document.getElementById('cash_flow-form')
+			if (!form) return
+
+			let type = 'inventory'
+			if (tableId === 'inventory-table') type = 'inventory'
+			else if (tableId === 'credits-table' || tableId === 'credit-table')
+				type = 'credit'
+			else if (tableId === 'short-term-table') type = 'short_term'
+
+			let typeInput = form.querySelector('#operation_type')
+			if (!typeInput) {
+				typeInput = document.createElement('input')
+				typeInput.type = 'hidden'
+				typeInput.id = 'operation_type'
+				typeInput.name = 'operation_type'
+				form.appendChild(typeInput)
+			}
+			typeInput.value = type
+
+			const quantity = form.querySelector('#quantity') || null
+			const price = form.querySelector('#price') || null
+			const amountInput = form.querySelector('#amount')
+			const quantityInput = form.querySelector('#quantity')
+			const priceInput = form.querySelector('#price')
+			const nameInput = form.querySelector('#name')
+
+			if (quantity) quantity.hidden = type !== 'inventory'
+			if (price) price.hidden = type !== 'inventory'
+
+			if (type === 'inventory') {
+				if (quantity) quantity.hidden = false
+				if (price) price.hidden = false
+				if (amountInput) {
+					amountInput.placeholder = 'Сумма'
+					amountInput.readOnly = true
+				}
+				setupCurrencyInput('price')
+				setupCurrencyInput('amount')
+
+				const recalcAmount = () => {
+					const qv = quantityInput
+						? (quantityInput.value || '').replace(',', '.')
+						: '0'
+					let qty = Number(qv)
+					if (isNaN(qty)) qty = 0
+					let priceVal = 0
+					if (priceInput && priceInput.autoNumeric) {
+						priceVal = Number(priceInput.autoNumeric.getNumericString() || 0)
+					} else {
+						priceVal =
+							Number(
+								(priceInput ? priceInput.value || 0 : 0)
+									.toString()
+									.replace(/\s/g, '')
+									.replace(',', '.')
+							) || 0
+					}
+					const total = qty * priceVal
+					if (amountInput && amountInput.autoNumeric) {
+						amountInput.autoNumeric.set(total || 0)
+					} else if (amountInput) {
+						amountInput.value = total ? String(total) : ''
+					}
+				}
+				quantityInput?.addEventListener('input', recalcAmount)
+				priceInput?.addEventListener('input', recalcAmount)
+			} else {
+				if (amountInput) {
+					amountInput.readOnly = false
+					amountInput.placeholder = 'Введите сумму'
+					setupCurrencyInput('amount')
+				}
+			}
+
+			nameInput?.focus()
+		})
+	}
+}
+
 const handleTransactions = async config => {
 	try {
 		const transactionIdsData = document.getElementById('data-ids')?.textContent
@@ -3206,16 +3584,16 @@ const handleCashFlow = async config => {
 			setIds(cash_flow_ids, `${CASH_FLOW}-table`)
 			colorizeAmounts(`${CASH_FLOW}-table`)
 
-			TableManager.createColumnsForTable(
-				'cash_flow-table',
-				[
-					{ name: 'created_at' },
-					{ name: 'account', url: '/accounts/list/' },
-					{ name: 'supplier', url: '/suppliers/list/' },
-					{ name: 'amount' },
-				],
-				['profit']
-			)
+			// TableManager.createColumnsForTable(
+			// 	'cash_flow-table',
+			// 	[
+			// 		{ name: 'created_at' },
+			// 		{ name: 'account', url: '/accounts/list/' },
+			// 		{ name: 'supplier', url: '/suppliers/list/' },
+			// 		{ name: 'amount' },
+			// 	],
+			// 	['profit']
+			// )
 		},
 	})
 
@@ -4413,6 +4791,15 @@ const handleDebtors = async () => {
 				window.lastBalanceData = data
 				resizeCharts()
 			}
+
+			const dataIdsData = data.ids
+			if (dataIdsData) {
+				setIds(dataIdsData.credit_ids, 'credits-table')
+				setIds(dataIdsData.short_ids, 'short-term-table')
+				setIds(dataIdsData.inventory_ids, 'inventory-table')
+			} else {
+				console.warn("Element with ID 'data-ids' not found or empty.")
+			}
 		} catch (error) {
 			console.error('Ошибка при загрузке данных:', error)
 			balanceContainer.innerHTML = '<p>Ошибка при загрузке данных.</p>'
@@ -5392,6 +5779,8 @@ document.addEventListener('DOMContentLoaded', function () {
 				break
 			case `balance`:
 				handleDebtors()
+				initBalanceAddButton()
+				initBalanceEditButton()
 				break
 			case `profit_distribution`:
 				handleProfitDistribution()
@@ -5407,4 +5796,4 @@ document.addEventListener('DOMContentLoaded', function () {
 	}
 })
 
-// сделать чтобы на странице баланса Кнопка добавить не показывалась если это не клик по таблице и также для скрыть и показать все
+// сделать кнопки на странице balance: добавить, редактировать, удалить, скрыть, показать все для inventory-table (тмц) credits-table (кредит) short-term-table (краткосрочные обязательства)
