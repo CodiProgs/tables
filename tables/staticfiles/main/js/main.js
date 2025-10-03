@@ -2939,10 +2939,8 @@ function initBalanceEditButton() {
 				return
 			}
 
-			// Инициализируем форму редактирования
 			await balanceEditFormHandler.init(id)
 
-			// Подготовка UI формы (аналогично логике добавления)
 			const form = document.getElementById('cash_flow-form')
 			if (!form) return
 
@@ -3020,6 +3018,90 @@ function initBalanceEditButton() {
 			nameInput?.focus()
 		})
 	}
+}
+
+function initBalanceDeleteButton() {
+	const deleteBtn = document.getElementById('delete-button')
+	if (!deleteBtn) return
+
+	deleteBtn.addEventListener('click', async function (e) {
+		e.preventDefault()
+		const selectedCell = document.querySelector('td.table__cell--selected')
+		const table = selectedCell ? selectedCell.closest('table') : null
+		const tableId = table ? table.id : null
+		const id = TableManager.getSelectedRowId(tableId)
+
+		if (!id) {
+			showError('Выберите строку для удаления')
+			return
+		}
+
+		let operation_type = 'inventory'
+		if (tableId === 'inventory-table') operation_type = 'inventory'
+		else if (tableId === 'credits-table' || tableId === 'credit-table')
+			operation_type = 'credit'
+		else if (tableId === 'short-term-table') operation_type = 'short_term'
+		else operation_type = 'balance'
+
+		showQuestion(
+			'Вы действительно хотите удалить запись?',
+			'Удаление',
+			async () => {
+				const loader = createLoader()
+				document.body.appendChild(loader)
+				try {
+					const url = `${BASE_URL}balance_items/delete/${id}/`
+					const res = await fetch(url, {
+						method: 'POST',
+						headers: {
+							'X-CSRFToken': getCSRFToken(),
+							'Content-Type': 'application/json',
+						},
+						body: JSON.stringify({ operation_type: operation_type }),
+					})
+
+					if (!res.ok) {
+						let err = { message: `HTTP error! status: ${res.status}` }
+						try {
+							err = await res.json()
+						} catch (e) {}
+						throw new Error(err.message || 'Ошибка удаления')
+					}
+
+					const data = await res.json()
+					if (!data || data.status !== 'success') {
+						showError(data?.message || 'Не удалось удалить запись')
+						return
+					}
+
+					const row = document.querySelector(`#${tableId} tr[data-id="${id}"]`)
+					if (row) {
+						row.remove()
+					} else {
+						document
+							.querySelectorAll(`tr[data-id="${id}"]`)
+							.forEach(r => r.remove())
+					}
+
+					try {
+						if (tableId) {
+							TableManager.formatCurrencyValues(tableId)
+						}
+					} catch (err) {}
+
+					try {
+						updateBalanceSpans(data)
+					} catch (err) {}
+				} catch (err) {
+					console.error('Ошибка при удалении элемента баланса:', err)
+					showError(err.message || 'Ошибка при удалении')
+				} finally {
+					const loaderEl = document.querySelector('.loader')
+					if (loaderEl) loaderEl.remove()
+				}
+			}
+		)
+	})
 }
 
 const handleTransactions = async config => {
@@ -3240,8 +3322,6 @@ const handleProfitDistribution = async () => {
 			const transactionId = TableManager.getSelectedRowId(
 				'profit_distribution-table'
 			)
-
-			// await profitDistributionFormHandler.init(transactionId || 0) TODO:
 		})
 	}
 }
@@ -3315,68 +3395,18 @@ const handleSupplierAccounts = async () => {
 	try {
 		const summaryContainer = document.getElementById('summary-container')
 		if (summaryContainer) {
-			const loader = createLoader()
-			summaryContainer.innerHTML = ''
-			summaryContainer.appendChild(loader)
-			const response = await fetch('/money_logs/')
-			if (!response.ok) throw new Error('Ошибка загрузки логов')
-			const data = await response.json()
-			summaryContainer.innerHTML = data.html
+			const moneyLogsPaginator = new TablePaginator({
+				baseUrl: BASE_URL,
+				entityName: 'money_logs',
+				tableId: 'money-logs-table',
+				onDataLoaded: data => {
+					const ctx = data.context || {}
+					if (Array.isArray(ctx.money_log_ids)) {
+						setIds(ctx.money_log_ids, 'money-logs-table')
+					}
 
-			TableManager.initTable('money-logs-table')
-
-			const table = document.getElementById('money-logs-table')
-			if (table) {
-				const headers = table.querySelectorAll('thead th')
-				let amountCol = -1
-				headers.forEach((th, idx) => {
-					if (th.dataset.name === 'amount') amountCol = idx
-				})
-				if (amountCol !== -1) {
-					const rows = table.querySelectorAll('tbody tr')
-					rows.forEach(row => {
-						const cells = row.querySelectorAll('td')
-						if (cells.length > amountCol) {
-							const cell = cells[amountCol]
-							let value = cell.textContent
-								.replace(/\s/g, '')
-								.replace('р.', '')
-								.replace('р', '')
-								.replace(',', '.')
-							let num = Number(value)
-							if (!isNaN(num)) {
-								if (num < 0) {
-									cell.classList.add('text-red')
-									cell.classList.remove('text-green')
-								} else {
-									cell.classList.add('text-green')
-									cell.classList.remove('text-red')
-								}
-							}
-						}
-					})
-				}
-			}
-
-			if (!document.getElementById('refresh-money-logs-btn')) {
-				const refreshBtn = document.createElement('button')
-				refreshBtn.id = 'refresh-money-logs-btn'
-				refreshBtn.className = 'refresh-money-logs-btn'
-				refreshBtn.title = 'Обновить'
-				refreshBtn.innerHTML = `<img src="/static/images/arrows-rotate.svg" alt="Обновить" height="16" width="16">`
-
-				refreshBtn.addEventListener('click', async () => {
-					refreshBtn.disabled = true
-					const loader = createLoader()
-					summaryContainer.innerHTML = ''
-					summaryContainer.appendChild(loader)
+					TableManager.initTable('money-logs-table')
 					try {
-						const response = await fetch('/money_logs/')
-						if (!response.ok) throw new Error('Ошибка загрузки логов')
-						const data = await response.json()
-						summaryContainer.innerHTML = data.html
-						TableManager.initTable('money-logs-table')
-						summaryContainer.appendChild(refreshBtn)
 						const table = document.getElementById('money-logs-table')
 						if (table) {
 							const headers = table.querySelectorAll('thead th')
@@ -3410,8 +3440,28 @@ const handleSupplierAccounts = async () => {
 							}
 						}
 					} catch (e) {
-						summaryContainer.innerHTML =
-							'<div class="error">Ошибка загрузки логов</div>'
+						console.error('Ошибка при подсветке money-logs:', e)
+					}
+				},
+			})
+
+			await moneyLogsPaginator.goToPage(moneyLogsPaginator.currentPage || 1)
+
+			if (!document.getElementById('refresh-money-logs-btn')) {
+				const refreshBtn = document.createElement('button')
+				refreshBtn.id = 'refresh-money-logs-btn'
+				refreshBtn.className = 'refresh-money-logs-btn'
+				refreshBtn.title = 'Обновить'
+				refreshBtn.innerHTML = `<img src="/static/images/arrows-rotate.svg" alt="Обновить" height="16" width="16">`
+
+				refreshBtn.addEventListener('click', async () => {
+					try {
+						refreshBtn.disabled = true
+						await moneyLogsPaginator.goToPage(
+							moneyLogsPaginator.currentPage || 1
+						)
+					} catch (e) {
+						console.error('Ошибка при обновлении money-logs:', e)
 					} finally {
 						refreshBtn.disabled = false
 					}
@@ -3583,17 +3633,6 @@ const handleCashFlow = async config => {
 			const { cash_flow_ids = [] } = data.context
 			setIds(cash_flow_ids, `${CASH_FLOW}-table`)
 			colorizeAmounts(`${CASH_FLOW}-table`)
-
-			// TableManager.createColumnsForTable(
-			// 	'cash_flow-table',
-			// 	[
-			// 		{ name: 'created_at' },
-			// 		{ name: 'account', url: '/accounts/list/' },
-			// 		{ name: 'supplier', url: '/suppliers/list/' },
-			// 		{ name: 'amount' },
-			// 	],
-			// 	['profit']
-			// )
 		},
 	})
 
@@ -5325,8 +5364,6 @@ const handleDebtors = async () => {
 				const operation_type = document.getElementById('operation_type')
 				if (operation_type) {
 					const container = operation_type.closest('.modal-form__group')
-
-					// container.setAttribute('hidden', 'true')
 				}
 			}
 			if (type === 'transactions.investors') {
@@ -5781,6 +5818,7 @@ document.addEventListener('DOMContentLoaded', function () {
 				handleDebtors()
 				initBalanceAddButton()
 				initBalanceEditButton()
+				initBalanceDeleteButton()
 				break
 			case `profit_distribution`:
 				handleProfitDistribution()
@@ -5795,5 +5833,3 @@ document.addEventListener('DOMContentLoaded', function () {
 		updateHiddenRowsCounter()
 	}
 })
-
-// сделать кнопки на странице balance: добавить, редактировать, удалить, скрыть, показать все для inventory-table (тмц) credits-table (кредит) short-term-table (краткосрочные обязательства)

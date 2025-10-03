@@ -98,7 +98,7 @@ def index(request):
     if is_assistant:
         transactions_qs = transactions_qs.filter(supplier__visible_for_assistant=True)
 
-    paginator = Paginator(transactions_qs, 500)
+    paginator = Paginator(transactions_qs, 200)
     page_number = request.GET.get('page', 1)
     page = paginator.get_page(page_number)
 
@@ -1016,7 +1016,7 @@ def client_delete(request, pk=None):
 def cash_flow(request):
     cash_flow = CashFlow.objects.all().order_by('created_at')
 
-    paginator = Paginator(cash_flow, 500)
+    paginator = Paginator(cash_flow, 200)
     page_number = request.GET.get('page', 1)
     page = paginator.get_page(page_number)
 
@@ -1035,7 +1035,7 @@ def cash_flow(request):
 def cash_flow_list(request):
     fields = get_cash_flow_fields()
     cash_flow = CashFlow.objects.all().order_by('created_at')
-    paginator = Paginator(cash_flow, 500)
+    paginator = Paginator(cash_flow, 200)
     page_number = request.GET.get('page', 1)
     page = paginator.get_page(page_number)
     cash_flow_ids = [tr.id for tr in page.object_list]
@@ -1100,7 +1100,7 @@ def transaction_list(request):
 
     fields = get_transaction_fields(is_accountant, is_assistant)
     transactions = Transaction.objects.select_related('client', 'supplier').all().order_by('created_at')
-    paginator = Paginator(transactions, 500)
+    paginator = Paginator(transactions, 200)
     page_number = request.GET.get('page', 1)
     page = paginator.get_page(page_number)
     changed_cells = {}
@@ -1195,6 +1195,15 @@ def supplier_accounts(request):
 
     grand_total_with_cash = grand_total + cash_balance
 
+    logs_fields = [
+        {"name": "date", "verbose_name": "Дата"},
+        {"name": "type", "verbose_name": "Тип"},
+        {"name": "info", "verbose_name": "Инфо"},
+        {"name": "amount", "verbose_name": "Сумма", "is_amount": True},
+        {"name": "comment", "verbose_name": "Комментарий"},
+        {"name": "created_by", "verbose_name": "Создал"}
+    ]
+
     context = {
         "fields": supplier_fields,
         "data": rows,
@@ -1204,6 +1213,7 @@ def supplier_accounts(request):
         "account_ids": account_ids,
         "cash_balance": format_currency(cash_balance),
         "grand_total_with_cash": format_currency(grand_total_with_cash),
+        "logs_fields": logs_fields,
     }
     return render(request, "main/supplierAccount.html", context)
 
@@ -4442,14 +4452,134 @@ def money_logs(request):
         {"name": "created_by", "verbose_name": "Создал"}
     ]
 
+    # html = render_to_string("components/table.html", {
+    #     "id": "money-logs-table",
+    #     "fields": fields,
+    #     "data": rows,
+    # })
+
+    # return JsonResponse({"html": html})
+
+    page_number = request.GET.get('page') or request.POST.get('page')
+    try:
+        page_number = int(page_number) if page_number is not None else 1
+    except Exception:
+        page_number = 1
+
+    paginator = Paginator(rows, 200)
+    page = paginator.get_page(page_number)
+
     html = render_to_string("components/table.html", {
         "id": "money-logs-table",
         "fields": fields,
-        "data": rows,
+        "data": page.object_list,
     })
 
-    return JsonResponse({"html": html})
+    return JsonResponse({
+        "html": html,
+        "total_pages": paginator.num_pages,
+        "current_page": page.number,
+    })
 
+@forbid_supplier
+@login_required
+def money_logs_list(request):
+    cash_flows = CashFlow.objects.select_related('account', 'supplier', 'purpose', 'transaction').all()
+    debt_repayments = SupplierDebtRepayment.objects.select_related('supplier').all()
+    investor_ops = InvestorDebtOperation.objects.select_related('investor').filter(operation_type="profit")
+
+    class LogRow:
+        def __init__(self, id, dt, type, info, amount, comment="", created_by=None):
+            self.id = id
+            self.dt = dt
+            self.date = timezone.localtime(dt).strftime("%d.%m.%Y %H:%M") if dt else ""
+            self.type = type
+            self.info = info
+            self.amount = amount
+            self.comment = comment
+            self.created_by = created_by
+
+    rows = []
+
+    for cf in cash_flows:
+        rows.append(LogRow(
+            id=f"cf-{cf.id}",
+            dt=cf.created_at,
+            type="Движение ДС",
+            info=f"Счет: {cf.account}, Поставщик: {cf.supplier}, Назначение: {cf.purpose}",
+            amount=cf.amount,
+            comment=cf.comment or "",
+            created_by=str(cf.created_by) if cf.created_by else ""
+        ))
+
+    for dr in debt_repayments:
+        rows.append(LogRow(
+            id=f"dr-{dr.id}",
+            dt=dr.created_at,
+            type="Погашение долга",
+            info=f"Поставщик: {dr.supplier}",
+            amount=dr.amount,
+            comment=dr.comment or "",
+            created_by=str(dr.created_by) if dr.created_by else ""
+        ))
+
+    for io in investor_ops:
+        rows.append(LogRow(
+            id=f"io-{io.id}",
+            dt=io.created_at,
+            type=f"Инвестор: {io.get_operation_type_display()}",
+            info=f"Инвестор: {io.investor}",
+            amount=io.amount,
+            comment="",
+            created_by=str(io.created_by) if io.created_by else ""
+        ))
+
+    # сортировка по дате (новые сверху)
+    rows.sort(key=lambda x: x.dt or timezone.make_aware(datetime.min), reverse=True)
+
+    fields = [
+        {"name": "date", "verbose_name": "Дата"},
+        {"name": "type", "verbose_name": "Тип"},
+        {"name": "info", "verbose_name": "Инфо"},
+        {"name": "amount", "verbose_name": "Сумма", "is_amount": True},
+        {"name": "comment", "verbose_name": "Комментарий"},
+        {"name": "created_by", "verbose_name": "Создал"}
+    ]
+
+    # пагинация
+    page_number = request.GET.get('page', 1)
+    try:
+        page_number = int(page_number)
+    except Exception:
+        page_number = 1
+
+    per_page = request.GET.get('per_page', 200)
+    try:
+        per_page = int(per_page)
+        if per_page <= 0:
+            per_page = 200
+    except Exception:
+        per_page = 200
+
+    paginator = Paginator(rows, per_page)
+    page = paginator.get_page(page_number)
+
+    # Формируем HTML только для строк (как в других list-эндпоинтах)
+    html = "".join(
+        render_to_string("components/table_row.html", {"item": row, "fields": fields})
+        for row in page.object_list
+    )
+
+    money_log_ids = [row.id for row in page.object_list]
+
+    return JsonResponse({
+        "html": html,
+        "context": {
+            "current_page": page.number,
+            "total_pages": paginator.num_pages,
+            "money_log_ids": money_log_ids,
+        },
+    })
 
 @forbid_supplier
 @login_required
@@ -5188,3 +5318,115 @@ def balance_item_detail(request, type, pk):
         return JsonResponse({"data": data})
     except Exception as e:
         return JsonResponse({"status": "error", "message": str(e)}, status=400)
+
+@forbid_supplier
+@login_required
+@require_http_methods(["POST"])
+def delete_balance_item(request, pk=None):
+    try:
+        type_ = request.POST.get("operation_type")
+        item_id = pk or request.POST.get("id")
+        if not type_ or not item_id:
+            try:
+                body = json.loads(request.body.decode("utf-8") or "{}")
+                type_ = type_ or body.get("operation_type") or body.get("type")
+                item_id = item_id or body.get("id")
+            except Exception:
+                pass
+
+        if not type_ or not item_id:
+            return JsonResponse({"status": "error", "message": "Не указаны обязательные параметры"}, status=400)
+
+        type_norm = (type_ or "").strip().lower()
+        if type_norm == "inventory":
+            obj = InventoryItem.objects.filter(id=item_id).first()
+            if not obj:
+                return JsonResponse({"status": "error", "message": "Элемент инвентаря не найден"}, status=404)
+            obj.delete()
+        elif type_norm == "credit":
+            obj = Credit.objects.filter(id=item_id).first()
+            if not obj:
+                return JsonResponse({"status": "error", "message": "Кредит не найден"}, status=404)
+            obj.delete()
+        elif type_norm in ("short_term", "short_term_liability"):
+            obj = ShortTermLiability.objects.filter(id=item_id).first()
+            if not obj:
+                return JsonResponse({"status": "error", "message": "Краткосрочное обязательство не найдено"}, status=404)
+            obj.delete()
+        elif type_norm in ("equipment", "balancedata", "balance_data"):
+            obj = BalanceData.objects.filter(id=item_id).first()
+            if not obj:
+                return JsonResponse({"status": "error", "message": "Запись баланса не найдена"}, status=404)
+            obj.delete()
+        else:
+            return JsonResponse({"status": "error", "message": "Неизвестный тип"}, status=400)
+
+        equipment = BalanceData.objects.filter(name="Оборудование").aggregate(total=Sum("amount"))["total"] or Decimal(0)
+        inventory_total = InventoryItem.objects.aggregate(total=Sum("total"))["total"] or Decimal(0)
+        credit_total = Credit.objects.aggregate(total=Sum("amount"))["total"] or Decimal(0)
+        short_total = ShortTermLiability.objects.aggregate(total=Sum("amount"))["total"] or Decimal(0)
+
+        total_debtors = Decimal(0)
+        for branch in Supplier.objects.exclude(branch=None).values_list("branch__id", "branch__name").distinct():
+            branch_id, branch_name = branch
+            if branch_name != "Филиал 1" and branch_name != "Наши ИП":
+                branch_debt = sum(
+                    (t.supplier_debt or Decimal(0))
+                    for t in Transaction.objects.filter(supplier__branch_id=branch_id, paid_amount__gt=0)
+                )
+                total_debtors += branch_debt
+
+        safe_amount = SupplierAccount.objects.filter(
+            supplier__visible_in_summary=True
+        ).aggregate(total=Sum("balance"))["total"] or Decimal(0)
+
+        cash_account = Account.objects.filter(name__iexact="Наличные").first()
+        cash_balance = Decimal(cash_account.balance) if cash_account and cash_account.balance is not None else Decimal(0)
+        safe_amount = Decimal(safe_amount) + cash_balance
+
+        bonuses = sum((t.bonus_debt or Decimal(0)) for t in Transaction.objects.filter(paid_amount__gt=0))
+        total_remaining = sum((t.client_debt_paid or Decimal(0)) for t in Transaction.objects.filter(paid_amount__gt=0))
+
+        transactionsInvestors = [
+            t for t in Transaction.objects.filter(paid_amount__gt=0)
+            if getattr(t, 'bonus_debt', 0) == 0
+            and getattr(t, 'client_debt', 0) == 0
+            and getattr(t, 'profit', 0) > 0
+        ]
+        cashflows = CashFlow.objects.filter(
+            purpose__operation_type=PaymentPurpose.INCOME
+        ).exclude(purpose__name__in=["Оплата", "Внесение инвестора"])
+
+        total_profit_decimal = sum(
+            (Decimal(str(getattr(t, 'profit', 0) or 0)) - Decimal(str(getattr(t, 'returned_to_investor', 0) or 0)))
+            for t in transactionsInvestors
+        ) + sum(
+            (Decimal(str(cf.amount or 0)) - Decimal(str(cf.returned_to_investor or 0)))
+            for cf in cashflows
+        )
+
+        assets_total = equipment + inventory_total + total_debtors + safe_amount
+
+        investors_total = Investor.objects.aggregate(total=Sum("balance"))["total"] or Decimal(0)
+        total_summary_debts = (bonuses or Decimal(0)) + (total_remaining or Decimal(0)) + (total_profit_decimal or Decimal(0))
+        undistributed_profit = Decimal(0)
+        provisional_liabilities = credit_total + short_total + total_summary_debts + (investors_total or Decimal(0)) + undistributed_profit
+
+        current_capital = assets_total - provisional_liabilities
+        liabilities_total = provisional_liabilities + current_capital
+
+        response = {
+            "status": "success",
+            "type": type_norm,
+            "id": item_id,
+            "assets": float(assets_total),
+            "inventory_total": float(inventory_total),
+            "credit_total": float(credit_total),
+            "short_term_total": float(short_total),
+            "liabilities": float(liabilities_total),
+            "capital": float(current_capital),
+        }
+        return JsonResponse(response)
+    except Exception as e:
+        return JsonResponse({"status": "error", "message": str(e)}, status=400)
+    

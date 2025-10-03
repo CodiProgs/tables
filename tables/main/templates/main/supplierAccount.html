@@ -6,6 +6,61 @@
         {% include "components/table.html" with id="suppliers-account-table" fields=fields data=data %}
         </div>
         <div id="summary-container" class="summary-container">
+        {% include "components/table.html" with id="money-logs-table" fields=logs_fields data=logs_data %}
+        </div>
+        <div class="pagination-controls">
+            <button class="pagination-button"
+                    id="first-page"
+                    title="Первая страница"
+                    disabled>
+                <img src="{% static 'images/angle-double-left.svg' %}"
+                     alt="angle-double-left"
+                     class="icon"
+                     height="12"
+                     width="12">
+            </button>
+            <button class="pagination-button"
+                    id="prev-page"
+                    title="Предыдущая страница"
+                    disabled>
+                <img src="{% static 'images/angle-left.svg' %}"
+                     alt="angle-double-left"
+                     class="icon"
+                     height="12"
+                     width="12">
+            </button>
+            <div class="pagination-line"></div>
+            <div class="pagination-input-container">
+                <span>Страница</span>
+                <input type="text"
+                       id="current-page"
+                       class="pagination-input"
+                       value="0"
+                       disabled>
+                <span>из</span>
+                <span id="total-pages">0</span>
+            </div>
+            <div class="pagination-line"></div>
+            <button class="pagination-button"
+                    id="next-page"
+                    title="Следующая страница"
+                    disabled>
+                <img src="{% static 'images/angle-right.svg' %}"
+                     alt="angle-double-left"
+                     class="icon"
+                     height="12"
+                     width="12">
+            </button>
+            <button class="pagination-button"
+                    id="last-page"
+                    title="Последняя страница"
+                    disabled>
+                <img src="{% static 'images/angle-double-right.svg' %}"
+                     alt="angle-double-left"
+                     class="icon"
+                     height="12"
+                     width="12">
+            </button>
         </div>
         <div id="context-menu"
              class="dropdown-menu"
