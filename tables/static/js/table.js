@@ -972,6 +972,19 @@ export const TableManager = {
 		}
 	},
 
+	normalizeString(str) {
+		if (str === null || str === undefined) return ''
+		try {
+			let s = String(str)
+			s = s.replace(/[\u200B-\u200D\uFEFF]/g, '')
+			s = s.replace(/[\u00A0\u1680\u180E\u2000-\u200A\u202F\u205F\u3000]/g, ' ')
+			s = s.replace(/\s+/g, ' ').trim().normalize('NFKC').toLowerCase()
+			return s
+		} catch (e) {
+			return String(str).trim().toLowerCase()
+		}
+	},
+
 	sortTable(tableId, columnIndex, direction, columnType = 'default') {
 		const table = document.getElementById(tableId)
 		if (!table) {
@@ -1845,7 +1858,8 @@ export const TableManager = {
 
 					dropdownOptions.forEach(option => {
 						option.addEventListener('click', () => {
-							const filterText = option.textContent.toLowerCase()
+							const filterText = this.normalizeString(option.textContent)
+
 							filters.set(columnIndex, {
 								type: 'select',
 								value: filterText,
@@ -1865,8 +1879,8 @@ export const TableManager = {
 				const selectInput = inputElement.querySelector('.select__input')
 				const selectText = inputElement.querySelector('.select__text')
 
-				selectInput.value = ''
-				selectText.textContent = ''
+				if (selectInput) selectInput.value = ''
+				if (selectText) selectText.textContent = ''
 				filters.delete(columnIndex)
 				this.applyFilters(table, filters)
 				updateSummary()
@@ -1878,7 +1892,7 @@ export const TableManager = {
 			if (!input || !clearButton) return
 
 			input.addEventListener('input', () => {
-				const filterValue = input.value.toLowerCase()
+				const filterValue = this.normalizeString(input.value)
 				if (filterValue) {
 					filters.set(columnIndex, {
 						type: 'text',
@@ -1908,6 +1922,32 @@ export const TableManager = {
 		return this.tableFilters.get(tableId)
 	},
 
+	getFiltersQueryParams(tableId) {
+		const filters = this.getTableFilters(tableId)
+		if (!filters || filters.size === 0) return ''
+
+		const table = document.getElementById(tableId)
+		if (!table) return ''
+
+		const headers = Array.from(table.querySelectorAll('thead th'))
+		const params = new URLSearchParams()
+
+		filters.forEach((filterValue, colIndex) => {
+			const header = headers[colIndex]
+			const name =
+				(header && header.dataset && header.dataset.name) || `col${colIndex}`
+
+			if (filterValue && typeof filterValue.value !== 'undefined') {
+				const v = filterValue.value
+				if (v !== null && v !== undefined && String(v).trim() !== '') {
+					params.append(name, v)
+				}
+			}
+		})
+
+		return params.toString()
+	},
+
 	applyFilters(table, filters) {
 		const tbody = table.querySelector('tbody')
 
@@ -1920,12 +1960,13 @@ export const TableManager = {
 				const cell = row.querySelector(`td:nth-child(${colIndex + 1})`)
 				if (!cell) return
 
-				const cellText = cell.textContent.trim().toLowerCase()
+				const cellText = this.normalizeString(cell.textContent)
+				const filterVal = this.normalizeString(filterValue.value)
 
 				if (filterValue.type === 'select') {
-					shouldShow = shouldShow && cellText === filterValue.value
+					shouldShow = shouldShow && cellText === filterVal
 				} else {
-					shouldShow = shouldShow && cellText.includes(filterValue.value)
+					shouldShow = shouldShow && cellText.includes(filterVal)
 				}
 			})
 

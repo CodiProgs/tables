@@ -1489,7 +1489,7 @@ const colorizeRemainingAmountByDebts = (debts = {}) => {
 		if (bonusCol !== -1 && debts.bonus_debt) {
 			const cell = row.querySelectorAll('td')[bonusCol]
 			const debt = debts.bonus_debt[idx]
-			console.log('cell', cell, debt)
+
 			if (cell) {
 				if (
 					(debt === 0 ||
@@ -2027,7 +2027,23 @@ export class TablePaginator {
 			const data = await res.json()
 
 			if (res.ok && data.html && data.context) {
-				this.updateTable(data.html)
+				TableManager.updateTable(data.html, this.tableId)
+
+				try {
+					const filters = TableManager.getTableFilters(this.tableId)
+					if (filters && filters.size > 0) {
+						const tableEl = document.getElementById(this.tableId)
+						if (tableEl) {
+							TableManager.applyFilters(tableEl, filters)
+						}
+					}
+				} catch (e) {
+					console.warn(
+						'Ошибка при применении клиентских фильтров после пагинации:',
+						e
+					)
+				}
+
 				this.updatePagination(data.context)
 				this.onDataLoaded(data)
 			} else {
@@ -3586,7 +3602,7 @@ const handleCashFlow = async config => {
 	if (idPurpose || createdAt) {
 		if (createdAt) {
 			const createdAtInput = document.querySelector('input[name="created_at"]')
-			console.log('Setting created_at to:', createdAtInput)
+
 			if (createdAtInput) {
 				createdAtInput.value = createdAt
 				createdAtInput.dispatchEvent(new Event('input', { bubbles: true }))
@@ -5665,7 +5681,7 @@ const handleDebtors = async () => {
 			}
 
 			const selectedRow = document.querySelector('.table__row--selected')
-			console.log('selectedRow', selectedRow)
+
 			const idInput = document.getElementById('id')
 			if (selectedRow && idInput) {
 				const rowId = selectedRow.getAttribute('data-id')
@@ -5816,6 +5832,7 @@ document.addEventListener('DOMContentLoaded', function () {
 				break
 			case `balance`:
 				handleDebtors()
+
 				initBalanceAddButton()
 				initBalanceEditButton()
 				initBalanceDeleteButton()
