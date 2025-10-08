@@ -559,17 +559,43 @@ const addMenuHandler = () => {
 	const withdrawalButton = document.getElementById('withdrawal-button')
 	const contributionButton = document.getElementById('contribution-button')
 
-	function showMenu(x, y) {
+	function showMenu(pageX, pageY) {
 		menu.style.display = 'block'
-		const menuHeight = menu.offsetHeight || 180
-		const windowHeight = window.innerHeight
 
-		let top = y
-		if (y > windowHeight * (2 / 3)) {
-			top = y - menuHeight
-			if (top < 10) top = 10
+		const clientX = pageX - window.scrollX
+		const clientY = pageY - window.scrollY
+
+		const viewportWidth =
+			window.innerWidth || document.documentElement.clientWidth
+		const viewportHeight =
+			window.innerHeight || document.documentElement.clientHeight
+
+		const rect = menu.getBoundingClientRect()
+		const menuWidth = rect.width || 200
+		const menuHeight = rect.height || 200
+
+		const margin = 8
+		const offset = 10
+
+		let left = clientX + offset
+		if (left + menuWidth > viewportWidth - margin) {
+			left = Math.max(margin, viewportWidth - menuWidth - margin)
 		}
-		menu.style.left = `${x + 10}px`
+		if (left < margin) left = margin
+
+		const bottomThreshold = viewportHeight * 0.75
+		let top
+		if (clientY > bottomThreshold) {
+			top = clientY - menuHeight - offset
+			if (top < margin) top = margin
+		} else {
+			top = clientY + offset
+			if (top + menuHeight > viewportHeight - margin) {
+				top = Math.max(margin, viewportHeight - menuHeight - margin)
+			}
+		}
+
+		menu.style.left = `${left}px`
 		menu.style.top = `${top}px`
 	}
 
