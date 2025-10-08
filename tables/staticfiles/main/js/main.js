@@ -744,6 +744,65 @@ const addMenuHandler = () => {
 			}
 		})
 
+		let touchTimer = null
+		let touchStartTarget = null
+		let touchStartX = 0
+		let touchStartY = 0
+		const LONG_PRESS_DELAY = 600
+
+		document.addEventListener(
+			'touchstart',
+			function (ev) {
+				if (ev.touches && ev.touches.length > 1) return
+				const t = ev.touches ? ev.touches[0] : null
+				if (!t) return
+				touchStartX = t.pageX
+				touchStartY = t.pageY
+				touchStartTarget = ev.target
+
+				touchTimer = setTimeout(() => {
+					const evt = new MouseEvent('contextmenu', {
+						bubbles: true,
+						cancelable: true,
+						view: window,
+						clientX: touchStartX,
+						clientY: touchStartY,
+						pageX: touchStartX,
+						pageY: touchStartY,
+					})
+					try {
+						touchStartTarget.dispatchEvent(evt)
+					} catch (e) {
+						document.dispatchEvent(evt)
+					}
+					touchTimer = null
+				}, LONG_PRESS_DELAY)
+			},
+			{ passive: true }
+		)
+
+		document.addEventListener(
+			'touchmove',
+			function () {
+				if (touchTimer) {
+					clearTimeout(touchTimer)
+					touchTimer = null
+				}
+			},
+			{ passive: true }
+		)
+
+		document.addEventListener(
+			'touchend',
+			function () {
+				if (touchTimer) {
+					clearTimeout(touchTimer)
+					touchTimer = null
+				}
+			},
+			{ passive: true }
+		)
+
 		document.addEventListener('click', () => {
 			menu.style.display = 'none'
 		})
