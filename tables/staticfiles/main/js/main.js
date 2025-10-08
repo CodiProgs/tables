@@ -774,6 +774,7 @@ const addMenuHandler = () => {
 		let touchStartTarget = null
 		let touchStartX = 0
 		let touchStartY = 0
+		let touchMenuOpened = false
 		const LONG_PRESS_DELAY = 600
 
 		document.addEventListener(
@@ -787,20 +788,8 @@ const addMenuHandler = () => {
 				touchStartTarget = ev.target
 
 				touchTimer = setTimeout(() => {
-					const evt = new MouseEvent('contextmenu', {
-						bubbles: true,
-						cancelable: true,
-						view: window,
-						clientX: touchStartX,
-						clientY: touchStartY,
-						pageX: touchStartX,
-						pageY: touchStartY,
-					})
-					try {
-						touchStartTarget.dispatchEvent(evt)
-					} catch (e) {
-						document.dispatchEvent(evt)
-					}
+					showMenu(touchStartX, touchStartY)
+					touchMenuOpened = true
 					touchTimer = null
 				}, LONG_PRESS_DELAY)
 			},
@@ -829,7 +818,14 @@ const addMenuHandler = () => {
 			{ passive: true }
 		)
 
-		document.addEventListener('click', () => {
+		document.addEventListener('click', e => {
+			if (touchMenuOpened) {
+				touchMenuOpened = false
+				if (e.target.closest && e.target.closest('#context-menu')) {
+					return
+				}
+				return
+			}
 			menu.style.display = 'none'
 		})
 	}
