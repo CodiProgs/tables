@@ -4484,69 +4484,8 @@ def money_logs(request):
 @forbid_supplier
 @login_required
 def money_logs_list(request):
-    cash_flows = CashFlow.objects.select_related('account', 'supplier', 'purpose', 'transaction').all()
-    debt_repayments = SupplierDebtRepayment.objects.select_related('supplier').all()
-    investor_ops = InvestorDebtOperation.objects.select_related('investor').filter(operation_type="profit")
+    from django.db import connection
 
-    class LogRow:
-        def __init__(self, id, dt, type, info, amount, comment="", created_by=None):
-            self.id = id
-            self.dt = dt
-            self.date = timezone.localtime(dt).strftime("%d.%m.%Y %H:%M") if dt else ""
-            self.type = type
-            self.info = info
-            self.amount = amount
-            self.comment = comment
-            self.created_by = created_by
-
-    rows = []
-
-    for cf in cash_flows:
-        rows.append(LogRow(
-            id=f"cf-{cf.id}",
-            dt=cf.created_at,
-            type="Движение ДС",
-            info=f"Счет: {cf.account}, Поставщик: {cf.supplier}, Назначение: {cf.purpose}",
-            amount=cf.amount,
-            comment=cf.comment or "",
-            created_by=str(cf.created_by) if cf.created_by else ""
-        ))
-
-    for dr in debt_repayments:
-        rows.append(LogRow(
-            id=f"dr-{dr.id}",
-            dt=dr.created_at,
-            type="Погашение долга",
-            info=f"Поставщик: {dr.supplier}",
-            amount=dr.amount,
-            comment=dr.comment or "",
-            created_by=str(dr.created_by) if dr.created_by else ""
-        ))
-
-    for io in investor_ops:
-        rows.append(LogRow(
-            id=f"io-{io.id}",
-            dt=io.created_at,
-            type=f"Инвестор: {io.get_operation_type_display()}",
-            info=f"Инвестор: {io.investor}",
-            amount=io.amount,
-            comment="",
-            created_by=str(io.created_by) if io.created_by else ""
-        ))
-
-    # сортировка по дате (новые сверху)
-    rows.sort(key=lambda x: x.dt or timezone.make_aware(datetime.min), reverse=True)
-
-    fields = [
-        {"name": "date", "verbose_name": "Дата"},
-        {"name": "type", "verbose_name": "Тип"},
-        {"name": "info", "verbose_name": "Инфо"},
-        {"name": "amount", "verbose_name": "Сумма", "is_amount": True},
-        {"name": "comment", "verbose_name": "Комментарий"},
-        {"name": "created_by", "verbose_name": "Создал"}
-    ]
-
-    # пагинация
     page_number = request.GET.get('page', 1)
     try:
         page_number = int(page_number)
@@ -4561,22 +4500,158 @@ def money_logs_list(request):
     except Exception:
         per_page = 200
 
-    paginator = Paginator(rows, per_page)
-    page = paginator.get_page(page_number)
+    offset = (page_number - 1) * per_page
 
-    # Формируем HTML только для строк (как в других list-эндпоинтах)
+    cf_table = CashFlow._meta.db_table
+    dr_table = SupplierDebtRepayment._meta.db_table
+    io_table = InvestorDebtOperation._meta.db_table
+    acc_table = Account._meta.db_table
+    sup_table = Supplier._meta.db_table
+    purp_table = PaymentPurpose._meta.db_table
+    inv_table = Investor._meta.db_table
+    user_table = User._meta.db_table
+
+    select_cf = f"""
+        SELECT
+            CONCAT('cf-', cf.id) AS id,
+            cf.created_at AS dt,
+            'cf' AS src,
+            NULL AS operation_type,
+            acc.name AS account_name,
+            sup.name AS supplier_name,
+            purp.name AS purpose_name,
+            NULL AS investor_name,
+            cf.amount AS amount,
+            COALESCE(cf.comment,'') AS comment,
+            COALESCE(u.username,'') AS created_by
+        FROM {cf_table} cf
+        LEFT JOIN {acc_table} acc ON acc.id = cf.account_id
+        LEFT JOIN {sup_table} sup ON sup.id = cf.supplier_id
+        LEFT JOIN {purp_table} purp ON purp.id = cf.purpose_id
+        LEFT JOIN {user_table} u ON u.id = cf.created_by_id
+    """
+
+    select_dr = f"""
+        SELECT
+            CONCAT('dr-', dr.id) AS id,
+            dr.created_at AS dt,
+            'dr' AS src,
+            NULL AS operation_type,
+            NULL AS account_name,
+            sup.name AS supplier_name,
+            NULL AS purpose_name,
+            NULL AS investor_name,
+            dr.amount AS amount,
+            COALESCE(dr.comment,'') AS comment,
+            COALESCE(u.username,'') AS created_by
+        FROM {dr_table} dr
+        LEFT JOIN {sup_table} sup ON sup.id = dr.supplier_id
+        LEFT JOIN {user_table} u ON u.id = dr.created_by_id
+    """
+
+    select_io = f"""
+        SELECT
+            CONCAT('io-', io.id) AS id,
+            io.created_at AS dt,
+            'io' AS src,
+            io.operation_type AS operation_type,
+            NULL AS account_name,
+            NULL AS supplier_name,
+            NULL AS purpose_name,
+            inv.name AS investor_name,
+            io.amount AS amount,
+            '' AS comment,
+            COALESCE(u.username,'') AS created_by
+        FROM {io_table} io
+        LEFT JOIN {inv_table} inv ON inv.id = io.investor_id
+        LEFT JOIN {user_table} u ON u.id = io.created_by_id
+    """
+
+    union_sql = f"({select_cf}) UNION ALL ({select_dr}) UNION ALL ({select_io})"
+
+    count_sql = f"SELECT COUNT(*) FROM ({union_sql}) AS combined"
+    with connection.cursor() as cur:
+        cur.execute(count_sql)
+        total_count = cur.fetchone()[0] or 0
+
+    total_pages = max(1, (total_count + per_page - 1) // per_page)
+
+    page_sql = f"""
+        {union_sql}
+        ORDER BY dt DESC
+        LIMIT %s OFFSET %s
+    """
+
+    rows = []
+    with connection.cursor() as cur:
+        cur.execute(page_sql, [per_page, offset])
+        cols = [c[0] for c in cur.description]
+        for r in cur.fetchall():
+            rowdict = dict(zip(cols, r))
+            if rowdict['src'] == 'cf':
+                parts = []
+                if rowdict.get('account_name'):
+                    parts.append(f"Счет: {rowdict['account_name']}")
+                if rowdict.get('supplier_name'):
+                    parts.append(f"Поставщик: {rowdict['supplier_name']}")
+                if rowdict.get('purpose_name'):
+                    parts.append(f"Назначение: {rowdict['purpose_name']}")
+                info = ", ".join(parts)
+                type_label = "Движение ДС"
+            elif rowdict['src'] == 'dr':
+                info = f"Поставщик: {rowdict.get('supplier_name') or ''}"
+                type_label = "Погашение долга"
+            else:  # io
+                info = f"Инвестор: {rowdict.get('investor_name') or ''}"
+                op = rowdict.get('operation_type') or ""
+                type_label = f"Инвестор: {op}"
+
+            def ensure_aware(dt):
+                if not dt:
+                    return None
+                try:
+                    if timezone.is_naive(dt):
+                        return timezone.make_aware(dt, timezone.get_current_timezone())
+                except Exception:
+                    try:
+                        return timezone.make_aware(dt)
+                    except Exception:
+                        return dt
+                return dt
+
+            dt_val = ensure_aware(rowdict.get('dt'))
+
+            obj = type("LogRow", (), {})()
+            obj.id = rowdict.get('id')
+            obj.dt = rowdict.get('dt')
+            obj.date = timezone.localtime(dt_val).strftime("%d.%m.%Y %H:%M") if dt_val else ""
+            obj.type = type_label
+            obj.info = info
+            obj.amount = rowdict.get('amount')
+            obj.comment = rowdict.get('comment') or ""
+            obj.created_by = rowdict.get('created_by') or ""
+
+            rows.append(obj)
+
     html = "".join(
-        render_to_string("components/table_row.html", {"item": row, "fields": fields})
-        for row in page.object_list
+        render_to_string("components/table_row.html", {"item": row, "fields": [
+            {"name": "date", "verbose_name": "Дата"},
+            {"name": "type", "verbose_name": "Тип"},
+            {"name": "info", "verbose_name": "Инфо"},
+            {"name": "amount", "verbose_name": "Сумма", "is_amount": True},
+            {"name": "comment", "verbose_name": "Комментарий"},
+            {"name": "created_by", "verbose_name": "Создал"}
+        ]})
+        for row in rows
     )
 
-    money_log_ids = [row.id for row in page.object_list]
+    money_log_ids = [row.id for row in rows]
 
     return JsonResponse({
         "html": html,
         "context": {
-            "current_page": page.number,
-            "total_pages": paginator.num_pages,
+            "current_page": page_number,
+            "total_pages": total_pages,
             "money_log_ids": money_log_ids,
         },
     })
