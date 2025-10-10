@@ -2088,8 +2088,7 @@ export const TableManager = {
 			const sum = rows.reduce((acc, row) => {
 				const cell = row.cells[columnIndex]
 				if (cell) {
-					const rawValue = cell.textContent.trim().replace(/[^\d,-]/g, '')
-					const value = parseFloat(rawValue.replace(',', '.'))
+					const value = TableManager.extractNumericValue(cell.textContent || '')
 					if (!isNaN(value)) {
 						return acc + value
 					}
@@ -2097,7 +2096,7 @@ export const TableManager = {
 				return acc
 			}, 0)
 
-			summaryData[columnName] = sum.toFixed(0).replace('.', ',')
+			summaryData[columnName] = Math.round(sum)
 		})
 
 		return summaryData
@@ -2121,14 +2120,19 @@ export const TableManager = {
 			if (summaryData[columnName] !== undefined) {
 				cell.classList.add('table__cell--summary')
 
-				const formattedValue = this.formatNumber(summaryData[columnName])
+				const raw = summaryData[columnName]
+				const numericValue =
+					typeof raw === 'number'
+						? raw
+						: parseFloat(String(raw).replace(',', '.')) || 0
+
+				const formattedValue = this.formatNumber(numericValue)
 				cell.textContent = `${formattedValue} р.`
 
 				if (className) {
 					cell.classList.add(className)
 				} else {
-					const value = parseFloat(summaryData[columnName].replace(',', '.'))
-					if (value >= 0) {
+					if (numericValue >= 0) {
 						cell.classList.add('text-green')
 					} else {
 						cell.classList.add('text-red')

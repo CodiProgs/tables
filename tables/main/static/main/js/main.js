@@ -2253,10 +2253,10 @@ const mainConfig = createConfig(TRANSACTION, {
 			table && table.querySelector('th[data-name="profit"]')
 
 		if (hasProfitColumn) {
-			TableManager.calculateTableSummary(`${TRANSACTION}-table`, ['profit'], {
-				grouped: true,
-				total: true,
-			})
+			TableManager.calculateTableSummary(`${TRANSACTION}-table`, [
+				'amount',
+				'profit',
+			])
 		}
 
 		colorizeRemainingAmountByDebtsRow(row, result.debts)
@@ -2272,10 +2272,10 @@ const mainConfig = createConfig(TRANSACTION, {
 			table && table.querySelector('th[data-name="profit"]')
 
 		if (hasProfitColumn) {
-			TableManager.calculateTableSummary(`${TRANSACTION}-table`, ['profit'], {
-				grouped: true,
-				total: true,
-			})
+			TableManager.calculateTableSummary(`${TRANSACTION}-table`, [
+				'amount',
+				'profit',
+			])
 		}
 
 		colorizeRemainingAmountByDebtsRow(row, result.debts)
@@ -2287,10 +2287,10 @@ const mainConfig = createConfig(TRANSACTION, {
 			table && table.querySelector('th[data-name="profit"]')
 
 		if (hasProfitColumn) {
-			TableManager.calculateTableSummary(`${TRANSACTION}-table`, ['profit'], {
-				grouped: true,
-				total: true,
-			})
+			TableManager.calculateTableSummary(`${TRANSACTION}-table`, [
+				'amount',
+				'profit',
+			])
 		}
 	},
 	modalConfig: {
@@ -3265,10 +3265,10 @@ const handleTransactions = async config => {
 				table && table.querySelector('th[data-name="profit"]')
 
 			if (hasProfitColumn) {
-				TableManager.calculateTableSummary(`${TRANSACTION}-table`, ['profit'], {
-					grouped: true,
-					total: true,
-				})
+				TableManager.calculateTableSummary(`${TRANSACTION}-table`, [
+					'amount',
+					'profit',
+				])
 			}
 		},
 	})
@@ -3277,10 +3277,10 @@ const handleTransactions = async config => {
 	const hasProfitColumn = table && table.querySelector('th[data-name="profit"]')
 
 	if (hasProfitColumn) {
-		TableManager.calculateTableSummary(`${TRANSACTION}-table`, ['profit'], {
-			grouped: true,
-			total: true,
-		})
+		TableManager.calculateTableSummary(`${TRANSACTION}-table`, [
+			'amount',
+			'profit',
+		])
 	}
 
 	TableManager.createColumnsForTable(
@@ -3301,7 +3301,7 @@ const handleTransactions = async config => {
 			{ name: 'debt' },
 			{ name: 'documents' },
 		],
-		['profit']
+		['amount', 'profit']
 	)
 
 	const paymentButton = document.getElementById('payment-button')
