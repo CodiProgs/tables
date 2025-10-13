@@ -938,6 +938,7 @@ class ResizableTable {
 export const TableManager = {
 	tables: new Map(),
 	tableFilters: new Map(),
+	ignoreNextClick: false,
 
 	init() {
 		this.destroyTables()
@@ -1046,48 +1047,35 @@ export const TableManager = {
 	},
 
 	attachGlobalCellClickHandler() {
-		document.addEventListener('click', event => this.onTableCellClick(event))
+		document.addEventListener('click', event => {
+			if (this.ignoreNextClick && (event.ctrlKey || event.metaKey)) {
+				this.ignoreNextClick = false
+				return
+			}
+			this.onTableCellClick(event)
+		})
 		document.addEventListener('contextmenu', event => {
 			event.preventDefault()
 			this.onTableCellClick(event, true)
 		})
 
-		// document.addEventListener(
-		// 	'click',
-		// 	event => {
-		// 		const cell = event.target.closest('.table__cell')
-		// 		const table = event.target.closest('.table')
-		// 		if (!cell && !table) {
-		// 			const tables = document.querySelectorAll('.table')
-		// 			tables.forEach(tableEl => {
-		// 				const selectedCells = tableEl.querySelectorAll(
-		// 					'.table__cell--selected'
-		// 				)
-		// 				if (selectedCells.length <= 1) return
+		document.addEventListener('mousedown', event => {
+			if (event.button !== 0) return
 
-		// 				const rows = Array.from(
-		// 					tableEl.querySelectorAll('.table__row')
-		// 				).filter(row => !row.classList.contains('hidden-row'))
-		// 				const firstRow = rows[0]
-		// 				const firstCell = firstRow?.querySelector('.table__cell')
+			if (!(event.ctrlKey || event.metaKey)) return
 
-		// 				tableEl.querySelectorAll('.table__cell--selected').forEach(el => {
-		// 					el.classList.remove('table__cell--selected')
-		// 				})
-		// 				tableEl.querySelectorAll('.table__row--selected').forEach(el => {
-		// 					el.classList.remove('table__row--selected')
-		// 				})
+			const cell = event.target.closest && event.target.closest('.table__cell')
+			if (!cell) return
 
-		// 				if (firstRow) firstRow.classList.add('table__row--selected')
-		// 				if (firstCell) firstCell.classList.add('table__cell--selected')
-		// 			})
+			event.preventDefault()
 
-		// 			const sumDiv = document.querySelector('.table-sum-indicator')
-		// 			if (sumDiv) sumDiv.style.display = 'none'
-		// 		}
-		// 	},
-		// 	true
-		// )
+			this.ignoreNextClick = true
+			setTimeout(() => {
+				this.ignoreNextClick = false
+			}, 300)
+
+			this.onTableCellClick(event)
+		})
 	},
 
 	onTableCellClick(event, isContextMenu = false) {
