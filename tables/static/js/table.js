@@ -1055,6 +1055,15 @@ export const TableManager = {
 			this.onTableCellClick(event)
 		})
 		document.addEventListener('contextmenu', event => {
+			const cell = event.target.closest && event.target.closest('.table__cell')
+			if (!cell) return
+
+			if (event.ctrlKey || event.metaKey) {
+				event.preventDefault()
+				this.onTableCellClick(event)
+				return
+			}
+
 			event.preventDefault()
 			this.onTableCellClick(event, true)
 		})
