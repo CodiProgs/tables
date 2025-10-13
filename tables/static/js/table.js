@@ -1050,11 +1050,13 @@ export const TableManager = {
 		return parseFloat(numStr) || 0
 	},
 
+	// ...existing code...
 	attachGlobalCellClickHandler() {
 		document.addEventListener(
 			'contextmenu',
 			event => {
-				if (event.ctrlKey) {
+				const isModifier = this.isMac ? event.metaKey : event.ctrlKey
+				if (isModifier) {
 					event.preventDefault()
 					return
 				}
@@ -1073,7 +1075,9 @@ export const TableManager = {
 			const cell = event.target.closest && event.target.closest('.table__cell')
 			if (!cell) return
 
-			if (event.ctrlKey || event.metaKey) {
+			const isModifier = this.isMac ? event.metaKey : event.ctrlKey
+
+			if (isModifier) {
 				event.preventDefault()
 				this.onTableCellClick(event)
 				return
@@ -1084,7 +1088,8 @@ export const TableManager = {
 		})
 
 		document.addEventListener('mousedown', event => {
-			if (!(event.ctrlKey || event.metaKey)) return
+			const isModifier = this.isMac ? event.metaKey : event.ctrlKey
+			if (!isModifier) return
 
 			const cell = event.target.closest && event.target.closest('.table__cell')
 			if (!cell) return
@@ -1114,6 +1119,7 @@ export const TableManager = {
 			)
 		}
 	},
+	// ...existing code...
 
 	onTableCellClick(event, isContextMenu = false) {
 		const cell = event.target.closest('.table__cell')
