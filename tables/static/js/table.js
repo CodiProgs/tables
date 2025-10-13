@@ -2329,8 +2329,6 @@ export const TableManager = {
 }
 
 document.addEventListener('DOMContentLoaded', function () {
-	alert('test')
-
 	const navList = document.querySelector('.nav-list')
 	if (navList) {
 		const itemsCount = navList.children.length
