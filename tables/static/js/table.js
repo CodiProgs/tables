@@ -1060,8 +1060,6 @@ export const TableManager = {
 		})
 
 		document.addEventListener('mousedown', event => {
-			if (event.button !== 0) return
-
 			if (!(event.ctrlKey || event.metaKey)) return
 
 			const cell = event.target.closest && event.target.closest('.table__cell')
@@ -1156,20 +1154,61 @@ export const TableManager = {
 		document.querySelectorAll('.table__cell--selected').forEach(cell => {
 			cell.classList.remove('table__cell--selected')
 		})
+		document.querySelectorAll('.table__row--selected').forEach(row => {
+			const isHiddenLike =
+				row.classList.contains('hidden-row') ||
+				row.classList.contains('row-done') ||
+				row.classList.contains('hidden') ||
+				getComputedStyle(row).display === 'none'
+			if (isHiddenLike) {
+				row.classList.remove('table__row--selected')
+				row.querySelectorAll('.table__cell--selected').forEach(c => {
+					c.classList.remove('table__cell--selected')
+				})
+			}
+		})
 
 		const firstTable = document.querySelector('.table')
-		if (firstTable) {
-			if (!firstTable.querySelector('.table__row--selected')) {
-				const firstRow = Array.from(
-					firstTable.querySelectorAll('.table__row')
-				).find(row => !row.classList.contains('hidden-row'))
-				if (firstRow) firstRow.classList.add('table__row--selected')
-			}
+		if (!firstTable) return
 
-			const firstRow = Array.from(
-				firstTable.querySelectorAll('.table__row')
-			).find(row => !row.classList.contains('hidden-row'))
-			const firstCell = firstRow?.querySelector('.table__cell')
+		const rows = Array.from(firstTable.querySelectorAll('.table__row'))
+		const firstVisibleRow = rows.find(row => {
+			if (
+				row.classList.contains('hidden-row') ||
+				row.classList.contains('row-done') ||
+				row.classList.contains('hidden') ||
+				row.classList.contains('table__row--summary')
+			) {
+				return false
+			}
+			if (getComputedStyle(row).display === 'none') return false
+
+			const visibleCell = Array.from(row.querySelectorAll('.table__cell')).find(
+				c =>
+					!c.classList.contains('hidden') &&
+					getComputedStyle(c).display !== 'none'
+			)
+			return !!visibleCell
+		})
+
+		if (firstVisibleRow) {
+			document
+				.querySelectorAll('.table__row--selected')
+				.forEach(r => r.classList.remove('table__row--selected'))
+			document
+				.querySelectorAll('.table__cell--selected')
+				.forEach(c => c.classList.remove('table__cell--selected'))
+
+			firstVisibleRow.classList.add('table__row--selected')
+
+			const firstCell = Array.from(
+				firstVisibleRow.querySelectorAll('.table__cell')
+			).find(
+				c =>
+					!c.classList.contains('hidden') &&
+					getComputedStyle(c).display !== 'none'
+			)
+
 			if (firstCell) firstCell.classList.add('table__cell--selected')
 		}
 	},

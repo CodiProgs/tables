@@ -412,6 +412,7 @@ const hideCompletedTransactions = debts => {
 	localStorage.setItem(`${TRANSACTION}-table-show-all`, 'false')
 
 	updateHiddenRowsCounter()
+	TableManager.setInitialCellSelection()
 }
 
 const toggleTransactionVisibility = rowId => {
@@ -422,6 +423,7 @@ const toggleTransactionVisibility = rowId => {
 
 	row.classList.toggle('hidden-row')
 	updateHiddenRowsCounter()
+	TableManager.setInitialCellSelection()
 }
 
 const toggleAllTransactions = (show, debts) => {
@@ -512,6 +514,7 @@ const toggleAllTransactions = (show, debts) => {
 	}
 
 	updateHiddenRowsCounter()
+	TableManager.setInitialCellSelection()
 }
 
 const updateHiddenRowsCounter = () => {
@@ -893,6 +896,8 @@ function hideCompletedExchangeRows(fromCompleted = [], toCompleted = []) {
 			row.classList.remove('row-done')
 		}
 	})
+
+	TableManager.setInitialCellSelection()
 }
 
 function toggleExchangeRowVisibility(rowId, tableId) {
@@ -918,6 +923,8 @@ function toggleAllExchangeRows(show, tableId, completedIds = []) {
 			}
 		})
 	}
+
+	TableManager.setInitialCellSelection()
 }
 
 const createExchangeFormHandler = action => {
@@ -1268,6 +1275,7 @@ const toggleDebtorVisibility = (rowId, tableId) => {
 
 	row.classList.toggle('hidden-row')
 	updateHiddenDebtorsCounter()
+	TableManager.setInitialCellSelection()
 }
 
 const toggleAllDebtors = (show, tableId) => {
@@ -1318,6 +1326,7 @@ const toggleAllDebtors = (show, tableId) => {
 	}
 
 	updateHiddenDebtorsCounter()
+	TableManager.setInitialCellSelection()
 }
 
 const updateHiddenDebtorsCounter = () => {
@@ -1474,6 +1483,7 @@ const hideDebtorRowIfNoDebt = (row, tableId, type) => {
 	}
 
 	updateHiddenDebtorsCounter()
+	TableManager.setInitialCellSelection()
 }
 
 const colorizeZeroDebts = tableId => {
@@ -4215,6 +4225,7 @@ const handleExchange = () => {
 						)
 						fromRows.forEach(row => row.classList.add('hidden-row'))
 						toRows.forEach(row => row.classList.add('hidden-row'))
+						TableManager.setInitialCellSelection()
 					} catch (e) {
 						showError('Ошибка завершения переводов.')
 					}
@@ -5859,6 +5870,7 @@ document.addEventListener('DOMContentLoaded', function () {
 			try {
 				updateHiddenRowsCounter()
 				saveHiddenRowsState(tableId)
+				TableManager.setInitialCellSelection()
 			} catch (err) {
 				console.error('Ошибка при сохранении скрытых строк:', err)
 			}
