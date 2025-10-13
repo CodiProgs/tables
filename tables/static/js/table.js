@@ -1078,12 +1078,13 @@ export const TableManager = {
 			const isModifier = this.isMac ? event.metaKey : event.ctrlKey
 
 			if (isModifier) {
+				// при модификаторе предотвращаем нативное меню и обрабатываем множественный выбор
 				event.preventDefault()
 				this.onTableCellClick(event)
 				return
 			}
 
-			event.preventDefault()
+			// без модификатора — не preventDefault, чтобы показывалось нативное контекстное меню на macOS
 			this.onTableCellClick(event, true)
 		})
 
