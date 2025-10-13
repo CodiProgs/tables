@@ -939,6 +939,10 @@ export const TableManager = {
 	tables: new Map(),
 	tableFilters: new Map(),
 	ignoreNextClick: false,
+	isMac:
+		typeof navigator !== 'undefined' &&
+		/Mac|iPod|iPhone|iPad/.test(navigator.platform || ''),
+	_forceMeta: false,
 
 	init() {
 		this.destroyTables()
@@ -1083,14 +1087,35 @@ export const TableManager = {
 
 			this.onTableCellClick(event)
 		})
+
+		if (this.isMac) {
+			document.addEventListener(
+				'click',
+				event => {
+					try {
+						if (event.ctrlKey && event.button === 0) {
+							this._forceMeta = true
+							this.onTableCellClick(event)
+						}
+					} finally {
+						this._forceMeta = false
+					}
+				},
+				true
+			)
+		}
 	},
 
 	onTableCellClick(event, isContextMenu = false) {
 		const cell = event.target.closest('.table__cell')
 		if (!cell) return
 
-		if (event.ctrlKey || event.metaKey) {
-			event.preventDefault()
+		const isMulti = this._forceMeta || event.ctrlKey || event.metaKey
+
+		if (isMulti) {
+			try {
+				if (typeof event.preventDefault === 'function') event.preventDefault()
+			} catch (e) {}
 		}
 
 		const sumDiv = document.querySelector('.table-sum-indicator')
@@ -1108,7 +1133,7 @@ export const TableManager = {
 			return
 		}
 
-		if (event.ctrlKey || event.metaKey) {
+		if (isMulti) {
 			if (cell.classList.contains('table__cell--selected')) {
 				cell.classList.remove('table__cell--selected')
 				cell.parentElement.classList.remove('table__row--selected')
