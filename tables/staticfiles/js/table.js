@@ -1094,7 +1094,7 @@ export const TableManager = {
 		const cell = event.target.closest('.table__cell')
 		if (!cell) return
 
-		if (event.ctrlKey) {
+		if (event.ctrlKey || event.metaKey) {
 			event.preventDefault()
 		}
 
@@ -1113,7 +1113,7 @@ export const TableManager = {
 			return
 		}
 
-		if (event.ctrlKey) {
+		if (event.ctrlKey || event.metaKey) {
 			if (cell.classList.contains('table__cell--selected')) {
 				cell.classList.remove('table__cell--selected')
 				cell.parentElement.classList.remove('table__row--selected')
@@ -2279,7 +2279,7 @@ document.addEventListener('DOMContentLoaded', function () {
 		if (!selectedCell) return
 
 		if (
-			e.ctrlKey &&
+			(e.ctrlKey || e.metaKey) &&
 			(e.key === 'c' ||
 				e.key === 'C' ||
 				e.key === 'с' ||
