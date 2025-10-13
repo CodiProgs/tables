@@ -1051,6 +1051,18 @@ export const TableManager = {
 	},
 
 	attachGlobalCellClickHandler() {
+		// Не показывать контекстное меню глобально, если зажат Ctrl
+		document.addEventListener(
+			'contextmenu',
+			event => {
+				if (event.ctrlKey) {
+					event.preventDefault()
+					return
+				}
+			},
+			true // capture — срабатывает раньше обычных обработчиков
+		)
+
 		document.addEventListener('click', event => {
 			if (this.ignoreNextClick && (event.ctrlKey || event.metaKey)) {
 				this.ignoreNextClick = false
@@ -1088,17 +1100,20 @@ export const TableManager = {
 			this.onTableCellClick(event)
 		})
 
+		// ...changed code...
+		// Для macOS: не вызывать onTableCellClick в capture-фазе —
+		// просто пометить _forceMeta, чтобы обычный (bubble) click
+		// обработчик увидел мультивыбор. Это предотвращает двойной вызов.
 		if (this.isMac) {
 			document.addEventListener(
 				'click',
 				event => {
-					try {
-						if (event.ctrlKey && event.button === 0) {
-							this._forceMeta = true
-							this.onTableCellClick(event)
-						}
-					} finally {
-						this._forceMeta = false
+					if (event.ctrlKey && event.button === 0) {
+						this._forceMeta = true
+						// сбросим флаг асинхронно, после прохода других слушателей
+						setTimeout(() => {
+							this._forceMeta = false
+						}, 0)
 					}
 				},
 				true
