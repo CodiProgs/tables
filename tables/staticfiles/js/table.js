@@ -943,6 +943,7 @@ export const TableManager = {
 		typeof navigator !== 'undefined' &&
 		/Mac|iPod|iPhone|iPad/.test(navigator.platform || ''),
 	_forceMeta: false,
+	currentCell: null,
 
 	init() {
 		this.destroyTables()
@@ -1050,7 +1051,6 @@ export const TableManager = {
 		return parseFloat(numStr) || 0
 	},
 
-	// ...existing code...
 	attachGlobalCellClickHandler() {
 		document.addEventListener(
 			'contextmenu',
@@ -1120,8 +1120,8 @@ export const TableManager = {
 			)
 		}
 	},
-	// ...existing code...
 
+	// ...existing code...
 	onTableCellClick(event, isContextMenu = false) {
 		const cell = event.target.closest('.table__cell')
 		if (!cell) return
@@ -1152,11 +1152,20 @@ export const TableManager = {
 		if (isMulti) {
 			if (cell.classList.contains('table__cell--selected')) {
 				cell.classList.remove('table__cell--selected')
-				cell.parentElement.classList.remove('table__row--selected')
+				const row = cell.parentElement
+				const selectedCellsInRow = row.querySelectorAll(
+					'.table__cell--selected'
+				)
+				if (selectedCellsInRow.length === 0) {
+					row.classList.remove('table__row--selected')
+				}
 			} else {
 				cell.classList.add('table__cell--selected')
 				cell.parentElement.classList.add('table__row--selected')
 			}
+
+			// Обновляем текущую ячейку — важно для навигации стрелками после Ctrl/Cmd+клика
+			this.currentCell = cell
 
 			let sum = 0
 			let allRub = true
@@ -1198,8 +1207,10 @@ export const TableManager = {
 		cell.parentElement.classList.add('table__row--selected')
 
 		if (sumDiv) sumDiv.style.display = 'none'
-	},
 
+		TableManager.currentCell = cell // Обновление текущей ячейки при клике
+	},
+	// ...existing code...
 	setInitialCellSelection() {
 		document.querySelectorAll('.table__cell--selected').forEach(cell => {
 			cell.classList.remove('table__cell--selected')
@@ -1259,7 +1270,10 @@ export const TableManager = {
 					getComputedStyle(c).display !== 'none'
 			)
 
-			if (firstCell) firstCell.classList.add('table__cell--selected')
+			if (firstCell) {
+				firstCell.classList.add('table__cell--selected')
+				this.currentCell = firstCell // Инициализация текущей ячейки
+			}
 		}
 	},
 
@@ -2352,8 +2366,10 @@ document.addEventListener('DOMContentLoaded', function () {
 			return
 		}
 
-		const selectedCell = document.querySelector('.table__cell--selected')
-		if (!selectedCell) return
+		let currentCell =
+			TableManager.currentCell ||
+			document.querySelector('.table__cell--selected')
+		if (!currentCell) return
 
 		if (
 			(e.ctrlKey || e.metaKey) &&
@@ -2363,7 +2379,7 @@ document.addEventListener('DOMContentLoaded', function () {
 				e.key === 'С' ||
 				e.code === 'KeyC')
 		) {
-			const text = selectedCell.textContent.trim()
+			const text = currentCell.textContent.trim()
 
 			if (text) {
 				navigator.clipboard.writeText(text).catch(() => {
@@ -2379,37 +2395,37 @@ document.addEventListener('DOMContentLoaded', function () {
 			return
 		}
 
-		const row = selectedCell.parentElement
+		const row = currentCell.parentElement
 		const table = row.closest('.table')
 		if (!table) return
 
 		const rows = Array.from(
 			table.querySelectorAll('.table__row:not(.hidden-row)')
 		).filter(row => getComputedStyle(row).display !== 'none')
-		const rowIndex = rows.indexOf(row)
-		const cells = Array.from(
+		const currentRowIndex = rows.indexOf(row)
+		const currentCells = Array.from(
 			row.querySelectorAll('.table__cell:not(.hidden)')
 		).filter(cell => getComputedStyle(cell).display !== 'none')
-		const cellIndex = cells.indexOf(selectedCell)
+		const currentCellIndex = currentCells.indexOf(currentCell)
 
-		let newRowIndex = rowIndex
-		let newCellIndex = cellIndex
+		let newRowIndex = currentRowIndex
+		let newCellIndex = currentCellIndex
 
 		if (e.key === 'ArrowRight') {
-			newCellIndex = cellIndex + 1
-			if (newCellIndex >= cells.length) {
+			newCellIndex = currentCellIndex + 1
+			if (newCellIndex >= currentCells.length) {
 				newCellIndex = 0
 			}
 		} else if (e.key === 'ArrowLeft') {
-			newCellIndex = cellIndex - 1
+			newCellIndex = currentCellIndex - 1
 			if (newCellIndex < 0) {
-				newCellIndex = cells.length - 1
+				newCellIndex = currentCells.length - 1
 			}
 		} else if (e.key === 'ArrowDown') {
-			newRowIndex = rowIndex + 1
+			newRowIndex = currentRowIndex + 1
 			if (newRowIndex >= rows.length) newRowIndex = 0
 		} else if (e.key === 'ArrowUp') {
-			newRowIndex = rowIndex - 1
+			newRowIndex = currentRowIndex - 1
 			if (newRowIndex < 0) newRowIndex = rows.length - 1
 		} else {
 			return
@@ -2422,14 +2438,64 @@ document.addEventListener('DOMContentLoaded', function () {
 		const targetCell = targetCells[newCellIndex] || targetCells[0]
 
 		if (targetCell) {
-			document.querySelectorAll('.table__cell--selected').forEach(cell => {
-				cell.classList.remove('table__cell--selected')
-			})
-			document.querySelectorAll('.table__row--selected').forEach(r => {
-				r.classList.remove('table__row--selected')
-			})
-			targetCell.classList.add('table__cell--selected')
-			targetRow.classList.add('table__row--selected')
+			const isModifier = TableManager.isMac ? e.metaKey : e.ctrlKey
+			if (isModifier) {
+				if (targetCell.classList.contains('table__cell--selected')) {
+					targetCell.classList.remove('table__cell--selected')
+					const row = targetCell.parentElement
+					const selectedCellsInRow = row.querySelectorAll(
+						'.table__cell--selected'
+					)
+					if (selectedCellsInRow.length === 0) {
+						row.classList.remove('table__row--selected')
+					}
+				} else {
+					targetCell.classList.add('table__cell--selected')
+					targetCell.parentElement.classList.add('table__row--selected')
+				}
+
+				let sum = 0
+				let allRub = true
+				let allPercent = true
+
+				const currentSelected = document.querySelectorAll(
+					'.table__cell--selected'
+				)
+				currentSelected.forEach(selectedCell => {
+					const text = selectedCell.textContent.trim()
+					const val = text.replace(/[^\d.,-]/g, '').replace(',', '.')
+					const num = parseFloat(val)
+					if (!isNaN(num)) sum += num
+
+					if (!/р\.$/.test(text)) allRub = false
+					if (!/%$/.test(text)) allPercent = false
+				})
+
+				let suffix = ''
+				if (allRub) suffix = ' р.'
+				else if (allPercent) suffix = '%'
+
+				const sumDiv = document.querySelector('.table-sum-indicator')
+				if (sumDiv) {
+					sumDiv.textContent =
+						'Сумма: ' + TableManager.formatNumber(sum) + suffix
+					sumDiv.style.display = 'block'
+				}
+			} else {
+				document.querySelectorAll('.table__cell--selected').forEach(el => {
+					el.classList.remove('table__cell--selected')
+				})
+				document.querySelectorAll('.table__row--selected').forEach(row => {
+					row.classList.remove('table__row--selected')
+				})
+
+				targetCell.classList.add('table__cell--selected')
+				targetRow.classList.add('table__row--selected')
+
+				const sumDiv = document.querySelector('.table-sum-indicator')
+				if (sumDiv) sumDiv.style.display = 'none'
+			}
+			TableManager.currentCell = targetCell // Обновление текущей ячейки
 			targetCell.scrollIntoView({ block: 'nearest', inline: 'nearest' })
 			e.preventDefault()
 		}
