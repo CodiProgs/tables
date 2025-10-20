@@ -731,3 +731,42 @@ class ShortTermLiability(models.Model):
         verbose_name = "Краткосрочное обязательство"
         verbose_name_plural = "Краткосрочные обязательства"
         ordering = ['name']
+
+
+class ClientDebtRepayment(models.Model):
+    client = models.ForeignKey(
+        Client,
+        on_delete=models.CASCADE,
+        verbose_name="Клиент",
+        related_name="debt_repayments"
+    )
+    amount = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        verbose_name="Сумма погашения"
+    )
+    created_at = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name="Дата и время создания"
+    )
+    comment = models.TextField(
+        blank=True,
+        null=True,
+        verbose_name="Комментарий"
+    )
+    created_by = models.ForeignKey(
+        "users.User",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        verbose_name="Пользователь",
+        related_name="created_client_debt_repayments"
+    )
+
+    def __str__(self):
+        return f"{self.client.name}: {self.amount} р. ({self.created_at:%d.%m.%Y %H:%M})"
+
+    class Meta:
+        verbose_name = "Погашение долга клиента"
+        verbose_name_plural = "Погашения долгов клиентов"
+        ordering = ['created_at']

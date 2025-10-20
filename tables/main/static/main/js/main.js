@@ -3554,6 +3554,14 @@ const handleSupplierAccounts = async () => {
 
 			await moneyLogsPaginator.goToPage(moneyLogsPaginator.currentPage || 1)
 
+			await TableManager.createColumnsForTable('money-logs-table', [
+				{ name: 'date' },
+				{ name: 'type', url: '/money_logs/types/' },
+				{ name: 'info' },
+				{ name: 'amount' },
+				{ name: 'comment' },
+			])
+
 			if (!document.getElementById('refresh-money-logs-btn')) {
 				const refreshBtn = document.createElement('button')
 				refreshBtn.id = 'refresh-money-logs-btn'
@@ -4536,6 +4544,7 @@ const handleDebtors = async () => {
 
 					const loader = createLoader()
 					document.body.appendChild(loader)
+
 					try {
 						const response = await fetch(
 							`/suppliers/debtors/details/?type=${type}&value=${encodeURIComponent(
@@ -4715,6 +4724,38 @@ const handleDebtors = async () => {
 									tbody.appendChild(emptyRow)
 								} else {
 									setIds(data.data_ids, data.table_id)
+								}
+							}
+
+							if (
+								value === 'Выдачи клиентам' &&
+								data.html_client_debt_repayments
+							) {
+								const repaymentTitle = document.createElement('div')
+								repaymentTitle.className = 'debtors-details-title'
+								repaymentTitle.textContent = 'История выдач'
+								details.appendChild(repaymentTitle)
+
+								const repaymentContainer = document.createElement('div')
+								repaymentContainer.innerHTML = data.html_client_debt_repayments
+								details.appendChild(repaymentContainer)
+
+								const repaymentTable = repaymentContainer.querySelector('table')
+								if (repaymentTable) {
+									const tbody = repaymentTable.querySelector('.table__body')
+									if (tbody && !tbody.children.length) {
+										const emptyRow = document.createElement('tr')
+										emptyRow.className = 'table__row table__row--empty'
+										const td = document.createElement('td')
+										td.colSpan =
+											repaymentTable.querySelectorAll('thead th').length || 1
+										td.className = 'table__cell table__cell--empty'
+										td.textContent = 'Нет данных'
+										emptyRow.appendChild(td)
+										tbody.appendChild(emptyRow)
+									} else if (data.client_debt_repayment_ids) {
+										setIds(data.client_debt_repayment_ids, repaymentTable.id)
+									}
 								}
 							}
 						}
@@ -5112,6 +5153,32 @@ const handleDebtors = async () => {
 								break
 							case 'Выдачи клиентам':
 								tableId = 'summary-remaining'
+
+								if (result.html_client_debt_repayments) {
+									const repaymentTable = document.getElementById(
+										'client-debt-repayments-table'
+									)
+									if (repaymentTable) {
+										const tbody = repaymentTable.querySelector('tbody')
+										if (tbody) {
+											const emptyRow = tbody.querySelector('.table__row--empty')
+											if (emptyRow) {
+												emptyRow.remove()
+											}
+
+											TableManager.addTableRow(
+												{ html: result.html_client_debt_repayments },
+												'client-debt-repayments-table'
+											).then(row => {
+												TableManager.formatCurrencyValuesForRow(
+													'client-debt-repayments-table',
+													row
+												)
+											})
+										}
+									}
+								}
+
 								break
 							case 'Поставщики':
 								tableId = `branch-transactions-${result.branch}`
@@ -5496,10 +5563,20 @@ const handleDebtors = async () => {
 			const typeInput = document.getElementById('type')
 			if (typeInput) {
 				if (table) {
+					console.log('Table ID:', table.id)
 					if (table.id === 'summary-bonus') {
 						typeInput.value = 'bonus'
 					} else if (table.id === 'summary-remaining') {
 						typeInput.value = 'remaining'
+
+						const comment = document.getElementById('comment')
+
+						if (comment) {
+							if (comment.tagName.toLowerCase() === 'input') {
+								comment.type = 'text'
+							}
+							comment.removeAttribute('hidden')
+						}
 					} else if (table.id.startsWith('branch-transactions')) {
 						typeInput.value = 'branch'
 
@@ -5733,13 +5810,22 @@ const handleDebtors = async () => {
 
 			await investOperationFormHandler.init(selectedId)
 
+			await new Promise(resolve => setTimeout(resolve, 50))
+
 			setupSupplierAccountSelects()
+
+			await new Promise(resolve => setTimeout(resolve, 100))
 
 			const accountSelect = document
 				.getElementById('account')
 				?.closest('.select')
 
 			if (!accountSelect) return
+
+			if (typeof SelectHandler !== 'undefined') {
+				SelectHandler.setupSelectBehavior(accountSelect)
+			}
+
 			const dropdown = accountSelect.querySelector('.select__dropdown')
 			if (!dropdown) return
 

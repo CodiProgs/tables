@@ -2,7 +2,7 @@ from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
 from tables.utils import get_model_fields
 from django.db import transaction, models
-from .models import Transaction, Client, Supplier, Account, CashFlow, SupplierAccount, PaymentPurpose, MoneyTransfer, Branch, SupplierDebtRepayment, Investor, InvestorDebtOperation, BalanceData, MonthlyCapital, ShortTermLiability, Credit, InventoryItem
+from .models import Transaction, Client, Supplier, Account, CashFlow, SupplierAccount, PaymentPurpose, MoneyTransfer, Branch, SupplierDebtRepayment, Investor, InvestorDebtOperation, BalanceData, MonthlyCapital, ShortTermLiability, Credit, InventoryItem, ClientDebtRepayment
 from django.http import JsonResponse
 from django.forms.models import model_to_dict
 from django.template.loader import render_to_string
@@ -1196,12 +1196,12 @@ def supplier_accounts(request):
     grand_total_with_cash = grand_total + cash_balance
 
     logs_fields = [
-        {"name": "date", "verbose_name": "Дата"},
-        {"name": "type", "verbose_name": "Тип"},
+        {"name": "date", "verbose_name": "Дата", "is_date": True},
+        {"name": "type", "verbose_name": "Тип", "is_relation": True},
         {"name": "info", "verbose_name": "Инфо"},
         {"name": "amount", "verbose_name": "Сумма", "is_amount": True},
         {"name": "comment", "verbose_name": "Комментарий"},
-        {"name": "created_by", "verbose_name": "Создал"}
+        {"name": "created_by", "verbose_name": "Создал", "is_relation": True},
     ]
 
     context = {
@@ -3019,6 +3019,15 @@ def settle_supplier_debt(request, pk: int):
                 trans.returned_to_client = Decimal(str(trans.returned_to_client or 0)) + amount_value
                 trans.save()
 
+                user = request.user
+
+                clientDebtRepayment = ClientDebtRepayment.objects.create(
+                    client=trans.client,
+                    amount=amount_value,
+                    comment=comment,
+                    created_by=user
+                )
+
                 row = type("Row", (), {
                     "created_at": timezone.localtime(trans.created_at).strftime("%d.%m.%Y") if trans.created_at else "",
                     "client": str(trans.client) if trans.client else "",
@@ -3033,6 +3042,18 @@ def settle_supplier_debt(request, pk: int):
                     {"name": "client_debt_paid", "verbose_name": "Выдать", "is_amount": True},
                 ]
                 html = render_to_string("components/table_row.html", {"item": row, "fields": fields})
+
+                clientDebtRepayment.created_at = timezone.localtime(clientDebtRepayment.created_at).strftime("%d.%m.%Y %H:%M") if clientDebtRepayment.created_at else ""
+
+                html_client_debt_repayments = render_to_string("components/table_row.html", {
+                    "item": clientDebtRepayment,
+                    "fields": [
+                        {"name": "created_at", "verbose_name": "Дата", "is_date": True},
+                        {"name": "client", "verbose_name": "Клиент"},
+                        {"name": "amount", "verbose_name": "Сумма", "is_amount": True},
+                        {"name": "comment", "verbose_name": "Комментарий"}
+                    ]
+                })
 
                 total_debt = sum(float(getattr(t, 'client_debt_paid', 0) or 0) for t in Transaction.objects.filter(paid_amount__gt=0))
 
@@ -3072,6 +3093,8 @@ def settle_supplier_debt(request, pk: int):
                     "total_debt": total_debt,
                     "total_summary_debts": total_summary_debts,
                     "total_profit": total_profit,
+                    "html_client_debt_repayments": html_client_debt_repayments,
+                    "client_debt_repayment_id": clientDebtRepayment.id,
                 })
 
             elif type_ == "balance":
@@ -3610,7 +3633,33 @@ def debtor_details(request):
                 {"id": table_id, "fields": fields, "data": data}
             )
 
-            return JsonResponse({"html": html, "table_id": table_id, "data_ids": data_ids})
+            client_debt_repayments = ClientDebtRepayment.objects.order_by('-created_at')[:10]
+            repayment_fields = [
+                {"name": "created_at", "verbose_name": "Дата", "is_date": True},
+                {"name": "client", "verbose_name": "Клиент"},
+                {"name": "amount", "verbose_name": "Сумма", "is_amount": True},
+                {"name": "comment", "verbose_name": "Комментарий"}
+            ]
+            repayment_data = []
+            for cdr in client_debt_repayments:
+                repayment_data.append(type("Row", (), {
+                    "created_at": timezone.localtime(cdr.created_at).strftime("%d.%m.%Y %H:%M") if cdr.created_at else "",
+                    "client": str(cdr.client) if cdr.client else "",
+                    "amount": cdr.amount,
+                    "comment": cdr.comment or "",
+                })())
+
+            html_client_debt_repayments = render_to_string(
+                "components/table.html",
+                {"id": "client-debt-repayments-table", "fields": repayment_fields, "data": repayment_data}
+            )
+
+            return JsonResponse({
+                "html": html,
+                "table_id": table_id,
+                "data_ids": data_ids,
+                "html_client_debt_repayments": html_client_debt_repayments,
+            })
         elif value == "Бонусы":
             transactions = Transaction.objects.filter(paid_amount__gt=0)
             fields = [
@@ -4504,9 +4553,11 @@ def money_logs_list(request):
 
     cf_table = CashFlow._meta.db_table
     dr_table = SupplierDebtRepayment._meta.db_table
+    cdr_table = ClientDebtRepayment._meta.db_table
     io_table = InvestorDebtOperation._meta.db_table
     acc_table = Account._meta.db_table
     sup_table = Supplier._meta.db_table
+    cli_table = Client._meta.db_table
     purp_table = PaymentPurpose._meta.db_table
     inv_table = Investor._meta.db_table
     user_table = User._meta.db_table
@@ -4521,6 +4572,7 @@ def money_logs_list(request):
             sup.name AS supplier_name,
             purp.name AS purpose_name,
             NULL AS investor_name,
+            NULL AS client_name,
             cf.amount AS amount,
             COALESCE(cf.comment,'') AS comment,
             COALESCE(u.username,'') AS created_by
@@ -4529,6 +4581,7 @@ def money_logs_list(request):
         LEFT JOIN {sup_table} sup ON sup.id = cf.supplier_id
         LEFT JOIN {purp_table} purp ON purp.id = cf.purpose_id
         LEFT JOIN {user_table} u ON u.id = cf.created_by_id
+        WHERE purp.name != 'Забор инвестора'
     """
 
     select_dr = f"""
@@ -4541,12 +4594,32 @@ def money_logs_list(request):
             sup.name AS supplier_name,
             NULL AS purpose_name,
             NULL AS investor_name,
+            NULL AS client_name,
             dr.amount AS amount,
             COALESCE(dr.comment,'') AS comment,
             COALESCE(u.username,'') AS created_by
         FROM {dr_table} dr
         LEFT JOIN {sup_table} sup ON sup.id = dr.supplier_id
         LEFT JOIN {user_table} u ON u.id = dr.created_by_id
+    """
+
+    select_cdr = f"""
+        SELECT
+            CONCAT('cdr-', cdr.id) AS id,
+            cdr.created_at AS dt,
+            'cdr' AS src,
+            NULL AS operation_type,
+            NULL AS account_name,
+            NULL AS supplier_name,
+            NULL AS purpose_name,
+            NULL AS investor_name,
+            cli.name AS client_name,
+            cdr.amount AS amount,
+            COALESCE(cdr.comment,'') AS comment,
+            COALESCE(u.username,'') AS created_by
+        FROM {cdr_table} cdr
+        LEFT JOIN {cli_table} cli ON cli.id = cdr.client_id
+        LEFT JOIN {user_table} u ON u.id = cdr.created_by_id
     """
 
     select_io = f"""
@@ -4559,7 +4632,11 @@ def money_logs_list(request):
             NULL AS supplier_name,
             NULL AS purpose_name,
             inv.name AS investor_name,
-            io.amount AS amount,
+            NULL AS client_name,
+            CASE 
+                WHEN io.operation_type = 'withdrawal' THEN -io.amount
+                ELSE io.amount
+            END AS amount,
             '' AS comment,
             COALESCE(u.username,'') AS created_by
         FROM {io_table} io
@@ -4567,7 +4644,7 @@ def money_logs_list(request):
         LEFT JOIN {user_table} u ON u.id = io.created_by_id
     """
 
-    union_sql = f"({select_cf}) UNION ALL ({select_dr}) UNION ALL ({select_io})"
+    union_sql = f"({select_cf}) UNION ALL ({select_dr}) UNION ALL ({select_cdr}) UNION ALL ({select_io})"
 
     count_sql = f"SELECT COUNT(*) FROM ({union_sql}) AS combined"
     with connection.cursor() as cur:
@@ -4600,11 +4677,23 @@ def money_logs_list(request):
                 type_label = "Движение ДС"
             elif rowdict['src'] == 'dr':
                 info = f"Поставщик: {rowdict.get('supplier_name') or ''}"
-                type_label = "Погашение долга"
-            else:  # io
+                type_label = "Погашение долга поставщика"
+            elif rowdict['src'] == 'cdr':
+                info = f"Клиент: {rowdict.get('client_name') or ''}, Счет: Наличные"
+                type_label = "Погашение долга клиента"
+            else:
                 info = f"Инвестор: {rowdict.get('investor_name') or ''}"
                 op = rowdict.get('operation_type') or ""
-                type_label = f"Инвестор: {op}"
+                operation_type_map = {
+                    'withdrawal': 'Забор',
+                    'deposit': 'Внесение',
+                    'profit': 'Прибыль',
+                }
+                op_display = operation_type_map.get(op, op)
+                type_label = f"Инвестор: {op_display}"
+                
+                if op == 'withdrawal':
+                    info += ", Счет: Наличные"
 
             def ensure_aware(dt):
                 if not dt:
@@ -4635,12 +4724,12 @@ def money_logs_list(request):
 
     html = "".join(
         render_to_string("components/table_row.html", {"item": row, "fields": [
-            {"name": "date", "verbose_name": "Дата"},
-            {"name": "type", "verbose_name": "Тип"},
+            {"name": "date", "verbose_name": "Дата", "is_date": True},
+            {"name": "type", "verbose_name": "Тип", "is_relation": True},
             {"name": "info", "verbose_name": "Инфо"},
             {"name": "amount", "verbose_name": "Сумма", "is_amount": True},
             {"name": "comment", "verbose_name": "Комментарий"},
-            {"name": "created_by", "verbose_name": "Создал"}
+            {"name": "created_by", "verbose_name": "Создал", "is_relation": True},
         ]})
         for row in rows
     )
@@ -5504,4 +5593,17 @@ def delete_balance_item(request, pk=None):
         return JsonResponse(response)
     except Exception as e:
         return JsonResponse({"status": "error", "message": str(e)}, status=400)
-    
+
+@forbid_supplier
+@login_required
+def money_logs_types(request):
+    """Возвращает доступные типы операций для логов денежных средств"""
+    types = [
+        {"id": "cf", "name": "Движение ДС"},
+        {"id": "dr", "name": "Погашение долга поставщика"},
+        {"id": "cdr", "name": "Погашение долга клиента"},
+        {"id": "io-withdrawal", "name": "Инвестор: Забор"},
+        {"id": "io-deposit", "name": "Инвестор: Внесение"},
+        {"id": "io-profit", "name": "Инвестор: Прибыль"},
+    ]
+    return JsonResponse(types, safe=False)

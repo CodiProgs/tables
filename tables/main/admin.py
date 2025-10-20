@@ -18,7 +18,8 @@ from .models import (
 	MonthlyCapital,
 	Credit,
 	InventoryItem,
-	ShortTermLiability
+	ShortTermLiability,
+	ClientDebtRepayment
 )
 
 
@@ -40,3 +41,4 @@ admin.site.register(MonthlyCapital)
 admin.site.register(Credit)
 admin.site.register(InventoryItem)
 admin.site.register(ShortTermLiability)
+admin.site.register(ClientDebtRepayment)

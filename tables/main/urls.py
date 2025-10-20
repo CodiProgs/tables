@@ -86,6 +86,7 @@ urlpatterns = [
     path('exchange/', views.exchange, name='exchange'),
     path('money_logs/', views.money_logs, name='money_logs'),
     path('money_logs/list/', views.money_logs_list, name='money_logs_list'),
+    path('money_logs/types/', views.money_logs_types, name='money_logs_types'),
     path('suppliers/close_investor_debt/<pk>/', views.close_investor_debt, name='close_investor_debt'),
     path("hidden_rows/get/", views.get_hidden_rows, name="get_hidden_rows"),
     path("hidden_rows/set/", views.set_hidden_rows, name="set_hidden_rows"),
