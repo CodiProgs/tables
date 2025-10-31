@@ -94,7 +94,7 @@ def index(request):
 
     fields = get_transaction_fields(is_accountant, is_assistant)
 
-    transactions_qs = Transaction.objects.select_related('client', 'supplier').all().order_by('created_at')
+    transactions_qs = Transaction.objects.select_related('client', 'supplier').all().order_by('-created_at')
     if is_assistant:
         transactions_qs = transactions_qs.filter(supplier__visible_for_assistant=True)
 
@@ -1014,7 +1014,7 @@ def client_delete(request, pk=None):
 @forbid_supplier
 @login_required
 def cash_flow(request):
-    cash_flow = CashFlow.objects.all().order_by('created_at')
+    cash_flow = CashFlow.objects.all().order_by('-created_at')
 
     paginator = Paginator(cash_flow, 200)
     page_number = request.GET.get('page', 1)
@@ -1034,7 +1034,7 @@ def cash_flow(request):
 @login_required
 def cash_flow_list(request):
     fields = get_cash_flow_fields()
-    cash_flow = CashFlow.objects.all().order_by('created_at')
+    cash_flow = CashFlow.objects.all().order_by('-created_at')
     paginator = Paginator(cash_flow, 200)
     page_number = request.GET.get('page', 1)
     page = paginator.get_page(page_number)
@@ -1099,7 +1099,7 @@ def transaction_list(request):
     is_assistant = request.user.user_type.name == 'Ассистент' if hasattr(request.user, 'user_type') else False
 
     fields = get_transaction_fields(is_accountant, is_assistant)
-    transactions = Transaction.objects.select_related('client', 'supplier').all().order_by('created_at')
+    transactions = Transaction.objects.select_related('client', 'supplier').all().order_by('-created_at')
     paginator = Paginator(transactions, 200)
     page_number = request.GET.get('page', 1)
     page = paginator.get_page(page_number)
@@ -1121,6 +1121,27 @@ def transaction_list(request):
         )
         for tr in page.object_list
     )
+
+    supplier_debts = [
+        strip_cents(getattr(t, 'supplier_debt', 0))
+        for t in page.object_list
+    ]
+
+    client_debts = [
+        strip_cents(getattr(t, 'client_debt', 0))
+        for t in page.object_list
+    ]
+
+    bonus_debts = [
+        strip_cents(Decimal(str(t.amount or 0)) * Decimal(str(t.bonus_percentage or 0)) / Decimal('100') - Decimal(str(t.returned_bonus or 0)))
+        for t in page.object_list
+    ]
+
+    investor_debts = [
+        strip_cents(getattr(t, 'investor_debt', 0))
+        for t in page.object_list
+    ]
+
     return JsonResponse({
         "html": html,
         "context": {
@@ -1128,6 +1149,13 @@ def transaction_list(request):
             "current_page": page.number,
             "transaction_ids": transaction_ids,
             "changed_cells": changed_cells,
+            "supplier_debts": supplier_debts,
+            "debts": {
+                "supplier_debts": supplier_debts,
+                "client_debt": client_debts,
+                "bonus_debt": bonus_debts,
+                "investor_debt": investor_debts,
+            },
         },
     })
 

@@ -3280,6 +3280,20 @@ const handleTransactions = async config => {
 					'profit',
 				])
 			}
+
+			try {
+				const debts =
+					data.context && data.context.debts ? data.context.debts : {}
+				supplierDebtsAll = debts
+
+				colorizeRemainingAmountByDebts(debts)
+				hideCompletedTransactions(debts)
+
+				restoreHiddenRowsState(`${TRANSACTION}-table`)
+				updateHiddenRowsCounter()
+			} catch (err) {
+				console.error('Ошибка при обработке debts после пагинации:', err)
+			}
 		},
 	})
 
