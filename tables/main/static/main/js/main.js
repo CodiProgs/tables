@@ -6005,6 +6005,12 @@ document.addEventListener('DOMContentLoaded', function () {
 
 			const tableClone = table.cloneNode(true)
 
+			tableClone
+				.querySelectorAll(
+					'input, textarea, select, .select, .context-menu, .mark-read-btn, .refresh-money-logs-btn, .hidden-rows-counter, .loader, .modal'
+				)
+				.forEach(el => el.remove())
+
 			const thead = tableClone.querySelector('thead.table__header')
 			if (thead && thead.rows.length > 1) {
 				thead.deleteRow(1)
