@@ -78,9 +78,13 @@ const postData = async (url, data) => {
 async function saveHiddenRowsState(tableId) {
 	const rows = document.querySelectorAll(`#${tableId} tbody tr[data-id]`)
 	const hiddenIds = []
+	const pageIds = []
 	rows.forEach(row => {
+		const id = row.getAttribute('data-id')
+		if (!id) return
+		pageIds.push(id)
 		if (row.classList.contains('hidden-row')) {
-			hiddenIds.push(row.getAttribute('data-id'))
+			hiddenIds.push(id)
 		}
 	})
 	try {
@@ -90,7 +94,11 @@ async function saveHiddenRowsState(tableId) {
 				'X-CSRFToken': getCSRFToken(),
 				'Content-Type': 'application/json',
 			},
-			body: JSON.stringify({ table: tableId, hidden_ids: hiddenIds }),
+			body: JSON.stringify({
+				table: tableId,
+				hidden_ids: hiddenIds,
+				page_ids: pageIds,
+			}),
 		})
 	} catch (e) {
 		console.error('Ошибка сохранения скрытых строк:', e)
@@ -5977,6 +5985,136 @@ document.addEventListener('DOMContentLoaded', function () {
 
 			const menu = document.getElementById('context-menu')
 			if (menu) menu.style.display = 'none'
+		})
+	}
+
+	const printButton = document.getElementById('print-button')
+	if (printButton) {
+		printButton.addEventListener('click', function () {
+			const selectedCell = document.querySelector('td.table__cell--selected')
+			if (!selectedCell) {
+				showError('Выберите ячейку в таблице.')
+				return
+			}
+
+			const table = selectedCell.closest('table')
+			if (!table) {
+				showError('Таблица не найдена.')
+				return
+			}
+
+			const tableClone = table.cloneNode(true)
+
+			const thead = tableClone.querySelector('thead.table__header')
+			if (thead && thead.rows.length > 1) {
+				thead.deleteRow(1)
+			}
+
+			const hiddenColumns = []
+			const thList = tableClone.querySelectorAll('th')
+			thList.forEach((th, index) => {
+				if (th.classList.contains('hidden')) {
+					hiddenColumns.push(index + 1)
+				}
+			})
+			if (hiddenColumns.length > 0) {
+				hiddenColumns.forEach(colIndex => {
+					tableClone
+						.querySelectorAll(`tr > *:nth-child(${colIndex})`)
+						.forEach(cell => cell.remove())
+				})
+			}
+
+			const visibleThList = tableClone.querySelectorAll('th')
+			const autoWidthColumns = []
+
+			visibleThList.forEach((th, index) => {
+				const type = th.dataset.columnType
+				const cells = tableClone.querySelectorAll(
+					`tr > *:nth-child(${index + 1})`
+				)
+				if (type === 'amount' || type === 'percent') {
+					cells.forEach(td => td.classList.add('no-truncate'))
+					autoWidthColumns.push(index + 1)
+				} else {
+					cells.forEach(td => td.classList.add('truncate'))
+				}
+			})
+
+			const colgroup = document.createElement('colgroup')
+			visibleThList.forEach((th, index) => {
+				const col = document.createElement('col')
+				if (autoWidthColumns.includes(index + 1)) {
+					col.style.width = 'auto'
+				} else {
+					col.style.width = '1fr'
+				}
+				colgroup.appendChild(col)
+			})
+			tableClone.prepend(colgroup)
+
+			const printTab = window.open('', '_blank')
+
+			const styles = `
+			<style>
+				body {
+					font-family: Arial, sans-serif;
+					margin: 20px;
+				}
+				table {
+					width: 100%;
+					border-collapse: collapse;
+					table-layout: auto; /* чтобы auto-ширина работала */
+					font-size: 14px;
+				}
+				th, td {
+					border: 1px solid #ccc;
+					padding: 6px 8px;
+					text-align: left;
+					white-space: nowrap;
+					vertical-align: middle;
+				}
+				th {
+					background: #f0f0f0;
+					overflow: hidden;
+					text-overflow: ellipsis;
+				}
+				td.truncate {
+					overflow: hidden;
+					text-overflow: ellipsis;
+				}
+				td.no-truncate {
+					overflow: visible;
+					text-overflow: initial;
+				}
+				
+				@media print {
+					body { margin: 0; }
+				}
+			</style>
+		`
+
+			printTab.document.write(`
+			<html>
+				<head>
+					<title>Печать</title>
+					${styles}
+				</head>
+				<body>
+					${tableClone.outerHTML}
+					<script>
+						window.onload = function() {
+							window.print();
+							window.onafterprint = function() {
+								window.close();
+							};
+						};
+					</script>
+				</body>
+			</html>
+		`)
+
+			printTab.document.close()
 		})
 	}
 

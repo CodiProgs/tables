@@ -4529,14 +4529,6 @@ def money_logs(request):
         {"name": "created_by", "verbose_name": "Создал"}
     ]
 
-    # html = render_to_string("components/table.html", {
-    #     "id": "money-logs-table",
-    #     "fields": fields,
-    #     "data": rows,
-    # })
-
-    # return JsonResponse({"html": html})
-
     page_number = request.GET.get('page') or request.POST.get('page')
     try:
         page_number = int(page_number) if page_number is not None else 1
@@ -4927,12 +4919,15 @@ def set_hidden_rows(request):
         data = json.loads(request.body)
         table = data.get("table")
         hidden_ids = data.get("hidden_ids")
+        page_ids = data.get("page_ids", None)
     except Exception:
         table = request.POST.get("table")
         hidden_ids = request.POST.get("hidden_ids")
+        page_ids = request.POST.getlist("page_ids") if request.POST.get("page_ids") else None
 
     if not table or hidden_ids is None:
         return JsonResponse({"status": "error", "message": "Не указаны параметры"}, status=400)
+
     try:
         if isinstance(hidden_ids, str):
             hidden_ids_list = json.loads(hidden_ids)
@@ -4940,10 +4935,40 @@ def set_hidden_rows(request):
             hidden_ids_list = hidden_ids
     except Exception:
         hidden_ids_list = []
-    hidden, _ = HiddenRows.objects.get_or_create(user=request.user, table=table)
-    hidden.hidden_ids = hidden_ids_list
-    hidden.save()
-    return JsonResponse({"status": "success", "hidden_ids": hidden.hidden_ids})
+
+    try:
+        if page_ids is None:
+            page_ids_list = None
+        elif isinstance(page_ids, str):
+            page_ids_list = json.loads(page_ids)
+        else:
+            page_ids_list = page_ids
+    except Exception:
+        page_ids_list = None
+
+    hidden_obj, _ = HiddenRows.objects.get_or_create(user=request.user, table=table)
+    existing_ids = set(map(str, hidden_obj.hidden_ids or []))
+
+    if page_ids_list is not None:
+        page_set = set(map(str, page_ids_list))
+        incoming_set = set(map(str, hidden_ids_list))
+        new_set = (existing_ids - page_set) | incoming_set
+        if not new_set:
+            hidden_obj.delete()
+            return JsonResponse({"status": "success", "hidden_ids": []})
+        hidden_obj.hidden_ids = sorted(list(new_set), key=lambda x: int(x) if str(x).isdigit() else x)
+        hidden_obj.save()
+        return JsonResponse({"status": "success", "hidden_ids": hidden_obj.hidden_ids})
+
+    incoming_set = set(map(str, hidden_ids_list))
+    if not incoming_set:
+        HiddenRows.objects.filter(user=request.user, table=table).delete()
+        return JsonResponse({"status": "success", "hidden_ids": []})
+
+    merged = existing_ids | incoming_set
+    hidden_obj.hidden_ids = sorted(list(merged), key=lambda x: int(x) if str(x).isdigit() else x)
+    hidden_obj.save()
+    return JsonResponse({"status": "success", "hidden_ids": hidden_obj.hidden_ids})
 
 
 @login_required
@@ -5635,3 +5660,4 @@ def money_logs_types(request):
         {"id": "io-profit", "name": "Инвестор: Прибыль"},
     ]
     return JsonResponse(types, safe=False)
+

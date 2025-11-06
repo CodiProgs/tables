@@ -1078,13 +1078,11 @@ export const TableManager = {
 			const isModifier = this.isMac ? event.metaKey : event.ctrlKey
 
 			if (isModifier) {
-				// при модификаторе предотвращаем нативное меню и обрабатываем множественный выбор
 				event.preventDefault()
 				this.onTableCellClick(event)
 				return
 			}
 
-			// без модификатора — не preventDefault, чтобы показывалось нативное контекстное меню на macOS
 			this.onTableCellClick(event, true)
 		})
 
@@ -1121,7 +1119,6 @@ export const TableManager = {
 		}
 	},
 
-	// ...existing code...
 	onTableCellClick(event, isContextMenu = false) {
 		const cell = event.target.closest('.table__cell')
 		if (!cell) return
@@ -1164,7 +1161,6 @@ export const TableManager = {
 				cell.parentElement.classList.add('table__row--selected')
 			}
 
-			// Обновляем текущую ячейку — важно для навигации стрелками после Ctrl/Cmd+клика
 			this.currentCell = cell
 
 			let sum = 0
@@ -1208,9 +1204,8 @@ export const TableManager = {
 
 		if (sumDiv) sumDiv.style.display = 'none'
 
-		TableManager.currentCell = cell // Обновление текущей ячейки при клике
+		TableManager.currentCell = cell
 	},
-	// ...existing code...
 	setInitialCellSelection() {
 		document.querySelectorAll('.table__cell--selected').forEach(cell => {
 			cell.classList.remove('table__cell--selected')
@@ -1272,7 +1267,7 @@ export const TableManager = {
 
 			if (firstCell) {
 				firstCell.classList.add('table__cell--selected')
-				this.currentCell = firstCell // Инициализация текущей ячейки
+				this.currentCell = firstCell
 			}
 		}
 	},
@@ -1885,6 +1880,13 @@ export const TableManager = {
 			const td = document.createElement('td')
 			td.className = 'table__cell-header table__filter-cell'
 
+			if (th.classList.contains('hidden')) {
+				td.classList.add('hidden')
+				formColumnsContainer.appendChild(td)
+				newHeaderCells.push(td)
+				continue
+			}
+
 			const columnConfig = columnConfigs.find(config => config.name === colName)
 
 			if (columnConfig) {
@@ -2495,7 +2497,7 @@ document.addEventListener('DOMContentLoaded', function () {
 				const sumDiv = document.querySelector('.table-sum-indicator')
 				if (sumDiv) sumDiv.style.display = 'none'
 			}
-			TableManager.currentCell = targetCell // Обновление текущей ячейки
+			TableManager.currentCell = targetCell
 			targetCell.scrollIntoView({ block: 'nearest', inline: 'nearest' })
 			e.preventDefault()
 		}
