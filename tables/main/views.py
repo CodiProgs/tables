@@ -163,11 +163,9 @@ def get_transaction_fields(is_accountant, is_assistant=False):
 
     field_order = [
         "created_at", "client", "supplier", "account", "amount", "client_percentage",
-        "remaining_amount", "bonus_percentage", "bonus",
+        "remaining_amount", "bonus_percentage", "bonus", "supplier_percentage", "profit",
+        "paid_amount", "debt", "documents"
     ]
-    if not is_accountant:
-        field_order.extend(["supplier_percentage", "profit"])
-    field_order.extend(["paid_amount", "debt", "documents"])
 
     if is_assistant:
         field_order = [
@@ -186,18 +184,11 @@ def get_transaction_fields(is_accountant, is_assistant=False):
         (6, {"name": "remaining_amount", "verbose_name": "Выдать", "is_amount": True }),
         (7, {"name": "bonus_percentage", "verbose_name": "%", "is_percent": True, }),
         (8, {"name": "bonus", "verbose_name": "Бонус", "is_amount": True}),
+        (9, {"name": "supplier_percentage", "verbose_name": "%", "is_percent": True, }),
+        (10, {"name": "profit", "verbose_name": "Прибыль", "is_amount": True}),
+        (11, {"name": "paid_amount", "verbose_name": "Оплачено", "is_amount": True}),
+        (12, {"name": "debt", "verbose_name": "Долг", "is_amount": True}),
     ]
-
-    if not is_accountant:
-        insertions.extend([
-            (9, {"name": "supplier_percentage", "verbose_name": "%", "is_percent": True, }),
-            (10, {"name": "profit", "verbose_name": "Прибыль", "is_amount": True}),
-        ])
-
-    insertions.extend([
-        (11 if not is_accountant else 8, {"name": "paid_amount", "verbose_name": "Оплачено", "is_amount": True}),
-        (12 if not is_accountant else 9, {"name": "debt", "verbose_name": "Долг", "is_amount": True}),
-    ])
 
     if is_assistant:
         insertions = [
