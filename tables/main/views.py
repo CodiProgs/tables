@@ -2135,6 +2135,7 @@ def money_transfer_create(request):
             destination_account_id = request.POST.get("destination_account")
 
             amount = clean_currency(request.POST.get("amount"))
+            comment = request.POST.get("comment", "")
 
             is_exchange = request.GET.get("exchange") == "true"
 
@@ -2207,7 +2208,9 @@ def money_transfer_create(request):
                 destination_supplier=destination_supplier,
                 amount=amount_value,
                 transfer_type=transfer_type if is_exchange else None,
-                is_counted=is_counted if is_exchange else None
+                is_counted=is_counted if is_exchange else None,
+                comment=comment,
+                created_at=timezone.now()
             )
 
             source_supplier_account.balance = Decimal(source_supplier_account.balance or 0) - Decimal(amount_value)
@@ -2227,21 +2230,31 @@ def money_transfer_create(request):
                     name="Перевод",
                     operation_type=PaymentPurpose.EXPENSE
                 )
+            
+            if comment:
+                comment_source = comment
+                comment_destination = comment
+            else:
+                comment_source = f"Перевод {destination_supplier.name} на счет {destination_account.name}"
+                comment_destination = f"Получено от {source_supplier.name} со счета {source_account.name}"
+                
             CashFlow.objects.create(
                 account=source_account,
                 supplier=source_supplier,
                 amount=-amount_value,
                 purpose=transfer_purpose,
-                comment=f"Перевод {destination_supplier.name} на счет {destination_account.name}",
-                created_by=request.user
+                comment=comment_source,
+                created_by=request.user,
+                created_at=timezone.now()
             )
             CashFlow.objects.create(
                 account=destination_account,
                 supplier=destination_supplier,
                 amount=amount_value,
                 purpose=transfer_purpose,
-                comment=f"Получено от {source_supplier.name} со счета {source_account.name}",
-                created_by=request.user
+                comment=comment_destination,
+                created_by=request.user,
+                created_at=timezone.now()
             )
 
             suppliers = Supplier.objects.filter(visible_in_summary=True).order_by('name')
@@ -2362,7 +2375,6 @@ def money_transfer_create(request):
     except Exception as e:
         return JsonResponse({"status": "error", "message": str(e)}, status=400)
 
-
 @forbid_supplier
 @login_required
 @require_http_methods(["POST"])
@@ -2380,6 +2392,7 @@ def money_transfer_edit(request, pk: int):
             source_supplier_id = request.POST.get("source_supplier")
             destination_supplier_id = request.POST.get("destination_supplier")
             amount = clean_currency(request.POST.get("amount"))
+            comment = request.POST.get("comment", "")
 
             source_account_id = request.POST.get("source_account")
             destination_account_id = request.POST.get("destination_account")
@@ -2497,6 +2510,7 @@ def money_transfer_edit(request, pk: int):
             money_transfer.amount = amount_value
             money_transfer.transfer_type = transfer_type
             money_transfer.is_counted = is_counted
+            money_transfer.comment = comment
             money_transfer.save()
 
             transfer_purpose = PaymentPurpose.objects.filter(name="Перевод").first()
@@ -2521,12 +2535,19 @@ def money_transfer_edit(request, pk: int):
                 comment__icontains=old_source_supplier.name if old_source_supplier else ""
             ).delete()
 
+            if comment:
+                comment_source = comment
+                comment_destination = comment
+            else:
+                comment_source = f"Перевод {new_destination_supplier.name} на счет {new_destination_account.name}"
+                comment_destination = f"Получено от {new_source_supplier.name} со счета {new_source_account.name}"
+
             CashFlow.objects.create(
                 account=new_source_account,
                 supplier=new_source_supplier,
                 amount=-amount_value,
                 purpose=transfer_purpose,
-                comment=f"Перевод {new_destination_supplier.name} на счет {new_destination_account.name}",
+                comment=comment_source,
                 created_by=request.user
             )
             CashFlow.objects.create(
@@ -2534,7 +2555,7 @@ def money_transfer_edit(request, pk: int):
                 supplier=new_destination_supplier,
                 amount=amount_value,
                 purpose=transfer_purpose,
-                comment=f"Получено от {new_source_supplier.name} со счета {new_source_account.name}",
+                comment=comment_destination,
                 created_by=request.user
             )
 
@@ -2589,7 +2610,6 @@ def money_transfer_edit(request, pk: int):
             })
     except Exception as e:
         return JsonResponse({"status": "error", "message": str(e)}, status=400)
-
 
 @forbid_supplier
 @login_required

@@ -4,14 +4,13 @@
     <div class="modal-form__content">
         {% csrf_token %}
         <div class="modal-form__group">
-            <input class="modal-form__input"
-                   type="text"
+            <textarea class="modal-form__textarea"
                    id="comment"
                    name="comment"
                    spellcheck="false"
                    placeholder="Введите комментарий"
                    autocomplete="off"
-            />
+            ></textarea>
         </div>
         <div class="modal-form__buttons">
             <button class="button modal-form__button" type="submit">Сохранить</button>

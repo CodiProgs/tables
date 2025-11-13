@@ -2756,7 +2756,7 @@ const moneyTransfersFormHandler = createFormHandler(
 				if (newTable) {
 					table.parentNode.replaceChild(newTable, table)
 					TableManager.init()
-					handleSupplierAccounts()
+					handleSupplierAccounts(false)
 				}
 			}
 		}
@@ -3455,7 +3455,7 @@ const handleProfitDistribution = async () => {
 	}
 }
 
-const handleSupplierAccounts = async () => {
+const handleSupplierAccounts = async (is_init = true) => {
 	const table = document.getElementById('suppliers-account-table')
 	if (table) {
 		const rows = table.querySelectorAll('tbody tr')
@@ -3576,13 +3576,16 @@ const handleSupplierAccounts = async () => {
 
 			await moneyLogsPaginator.goToPage(moneyLogsPaginator.currentPage || 1)
 
-			await TableManager.createColumnsForTable('money-logs-table', [
-				{ name: 'date' },
-				{ name: 'type', url: '/money_logs/types/' },
-				{ name: 'info' },
-				{ name: 'amount' },
-				{ name: 'comment' },
-			])
+			if (is_init) {
+				await TableManager.createColumnsForTable('money-logs-table', [
+					{ name: 'date' },
+					{ name: 'type', url: '/money_logs/types/' },
+					{ name: 'info' },
+					{ name: 'amount' },
+					{ name: 'comment' },
+					{ name: 'created_by', url: '/users/list/' },
+				])
+			}
 
 			if (!document.getElementById('refresh-money-logs-btn')) {
 				const refreshBtn = document.createElement('button')

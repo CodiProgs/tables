@@ -14,14 +14,14 @@
                    placeholder="Введите оплаченную сумму">
         </div>
         <div class="modal-form__group">
-            <input class="modal-form__input"
-                   type="hidden"
+            <textarea class="modal-form__textarea"
                    id="comment"
                    name="comment"
                    spellcheck="false"
-                   autocomplete="off"
                    placeholder="Введите комментарий"
-                   hidden>
+                   autocomplete="off"
+                   hidden
+            ></textarea>
         </div>
         <div class="modal-form__group" hidden>
             {% include "components/select.html" with id="investor_select" placeholder="Выберите инвестора" %}

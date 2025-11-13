@@ -540,7 +540,11 @@ class MoneyTransfer(models.Model):
         default=False,
         verbose_name="Завершен"
     )
-
+    comment = models.TextField(
+        blank=True,
+        null=True,
+        verbose_name="Комментарий"
+    )
 
     def __str__(self):
         source = f"{self.source_supplier.name} - " if self.source_supplier else ""
