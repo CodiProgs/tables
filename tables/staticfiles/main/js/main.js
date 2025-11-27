@@ -2031,6 +2031,7 @@ export class TablePaginator {
 			const totalPagesData = document.getElementById(
 				this.selectors.totalPagesData
 			)?.textContent
+
 			if (totalPagesData) {
 				this.totalPages = JSON.parse(totalPagesData)
 				if (this.totalPagesSpan) {
@@ -3723,43 +3724,85 @@ const handleCashFlow = async config => {
 	const idPurpose = urlParams.get('id_purpose')
 	const createdAt = urlParams.get('created_at')
 
-	if (idPurpose || createdAt) {
-		if (createdAt) {
-			const createdAtInput = document.querySelector('input[name="created_at"]')
+	let filtered = false
 
-			if (createdAtInput) {
-				createdAtInput.value = createdAt
-				createdAtInput.dispatchEvent(new Event('input', { bubbles: true }))
-			}
+	if (createdAt) {
+		const createdAtInput = document.querySelector('input[name="created_at"]')
+		if (createdAtInput) {
+			createdAtInput.value = createdAt
 		}
-
-		const selectInput = document.getElementById('id_purpose')
-		const select = selectInput ? selectInput.closest('.select') : null
-		const selectControl = select
-			? select.querySelector('.select__control')
-			: null
-
-		if (
-			select &&
-			selectControl &&
-			idPurpose &&
-			idPurpose !== 0 &&
-			idPurpose !== '0'
-		) {
-			selectControl.click()
-
-			const trySelectOption = () => {
-				const option = select.querySelector(
-					`.select__option[data-value="${idPurpose}"]`
-				)
-				if (option) {
-					option.click()
-				} else {
-					setTimeout(trySelectOption, 100)
+	}
+	if (idPurpose) {
+		const purposeInput = document.getElementById('id_purpose')
+		if (purposeInput) {
+			purposeInput.value = idPurpose
+			const select = purposeInput.closest('.select')
+			if (select) {
+				const dropdown = select.querySelector('.select__dropdown')
+				const textSpan = select.querySelector('.select__text')
+				const option = dropdown
+					? dropdown.querySelector(`.select__option[data-value="${idPurpose}"]`)
+					: null
+				if (option && textSpan) {
+					textSpan.textContent = option.textContent
+					textSpan.classList.remove('select__placeholder')
+					select.classList.add('has-value')
+				} else if (dropdown && typeof SelectHandler !== 'undefined') {
+					SelectHandler.fetchSelectOptions(
+						'/payment_purposes/list/?all=True'
+					).then(options => {
+						SelectHandler.updateSelectOptions(select, options)
+						const newOption = dropdown.querySelector(
+							`.select__option[data-value="${idPurpose}"]`
+						)
+						if (newOption && textSpan) {
+							textSpan.textContent = newOption.textContent
+							textSpan.classList.remove('select__placeholder')
+							select.classList.add('has-value')
+						}
+					})
 				}
 			}
-			trySelectOption()
 		}
+	}
+
+	if (idPurpose || createdAt) {
+		let url = `${BASE_URL}${CASH_FLOW}/list/?`
+		if (idPurpose) url += `id_purpose=${encodeURIComponent(idPurpose)}&`
+		if (createdAt) url += `created_at=${encodeURIComponent(createdAt)}&`
+
+		const loader = createLoader()
+		document.body.appendChild(loader)
+		try {
+			const res = await fetch(url)
+			if (!res.ok) throw new Error('Ошибка фильтрации')
+			const data = await res.json()
+			if (data.html && data.context) {
+				TableManager.updateTable(data.html, `${CASH_FLOW}-table`)
+				const { cash_flow_ids = [] } = data.context
+				setIds(cash_flow_ids, `${CASH_FLOW}-table`)
+				colorizeAmounts(`${CASH_FLOW}-table`)
+				filtered = true
+
+				const currentPageData = document.getElementById('current-page-data')
+				const totalPagesData = document.getElementById('total-pages-data')
+
+				totalPagesData.textContent = data.context.total_pages || '1'
+				currentPageData.textContent = data.context.current_page || '1'
+			}
+		} catch (e) {
+			console.error('Ошибка фильтрации cash_flow:', e)
+		} finally {
+			loader.remove()
+		}
+	}
+
+	const cashflowIdsData = document.getElementById('data-ids')?.textContent
+	if (cashflowIdsData && !filtered) {
+		const cashflowIds = JSON.parse(cashflowIdsData)
+		setIds(cashflowIds, `${CASH_FLOW}-table`)
+	} else if (!filtered) {
+		console.warn("Element with ID 'data-ids' not found or empty.")
 	}
 
 	colorizeAmounts(`${CASH_FLOW}-table`)

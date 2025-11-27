@@ -1026,6 +1026,38 @@ def cash_flow(request):
 def cash_flow_list(request):
     fields = get_cash_flow_fields()
     cash_flow = CashFlow.objects.all().order_by('-created_at')
+
+    id_purpose = request.GET.get('id_purpose')
+    created_at = request.GET.get('created_at')
+    
+    if id_purpose:
+        cash_flow = cash_flow.filter(purpose_id=id_purpose)
+    if created_at:
+        from datetime import datetime
+        from django.utils.timezone import make_aware
+        try:
+            if '.' in created_at and len(created_at.split('.')) == 2:
+                month, year = map(int, created_at.split('.'))
+                dt = make_aware(datetime(year, month, 1))
+                from calendar import monthrange
+                last_day = monthrange(year, month)[1]
+                dt_end = make_aware(datetime(year, month, last_day, 23, 59, 59))
+            elif '.' in created_at:
+                dt = make_aware(datetime.strptime(created_at, "%d.%m.%Y"))
+                dt_end = make_aware(datetime.strptime(created_at, "%d.%m.%Y").replace(hour=23, minute=59, second=59))
+            elif '-' in created_at and len(created_at.split('-')) == 2:
+                year, month = map(int, created_at.split('-'))
+                dt = make_aware(datetime(year, month, 1))
+                from calendar import monthrange
+                last_day = monthrange(year, month)[1]
+                dt_end = make_aware(datetime(year, month, last_day, 23, 59, 59))
+            else:
+                dt = make_aware(datetime.strptime(created_at, "%Y-%m-%d"))
+                dt_end = make_aware(datetime.strptime(created_at, "%Y-%m-%d").replace(hour=23, minute=59, second=59))
+            cash_flow = cash_flow.filter(created_at__range=(dt, dt_end))
+        except Exception:
+            cash_flow = CashFlow.objects.none()
+
     paginator = Paginator(cash_flow, 200)
     page_number = request.GET.get('page', 1)
     page = paginator.get_page(page_number)

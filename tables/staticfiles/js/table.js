@@ -2373,29 +2373,29 @@ document.addEventListener('DOMContentLoaded', function () {
 			document.querySelector('.table__cell--selected')
 		if (!currentCell) return
 
-		if (
-			(e.ctrlKey || e.metaKey) &&
-			(e.key === 'c' ||
-				e.key === 'C' ||
-				e.key === 'с' ||
-				e.key === 'С' ||
-				e.code === 'KeyC')
-		) {
-			const text = currentCell.textContent.trim()
+		// if (
+		// 	(e.ctrlKey || e.metaKey) &&
+		// 	(e.key === 'c' ||
+		// 		e.key === 'C' ||
+		// 		e.key === 'с' ||
+		// 		e.key === 'С' ||
+		// 		e.code === 'KeyC')
+		// ) {
+		// 	const text = currentCell.textContent.trim()
 
-			if (text) {
-				navigator.clipboard.writeText(text).catch(() => {
-					const textarea = document.createElement('textarea')
-					textarea.value = text
-					document.body.appendChild(textarea)
-					textarea.select()
-					document.execCommand('copy')
-					document.body.removeChild(textarea)
-				})
-			}
-			e.preventDefault()
-			return
-		}
+		// 	if (text) {
+		// 		navigator.clipboard.writeText(text).catch(() => {
+		// 			const textarea = document.createElement('textarea')
+		// 			textarea.value = text
+		// 			document.body.appendChild(textarea)
+		// 			textarea.select()
+		// 			document.execCommand('copy')
+		// 			document.body.removeChild(textarea)
+		// 		})
+		// 	}
+		// 	e.preventDefault()
+		// 	return
+		// }
 
 		const row = currentCell.parentElement
 		const table = row.closest('.table')
