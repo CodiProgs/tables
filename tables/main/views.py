@@ -5796,8 +5796,17 @@ def profit_by_month(request):
 
     transactions = Transaction.objects.filter(
         created_at__range=(first_day, last_day),
-        paid_amount__gt=0
+        paid_amount__gte=models.F('amount')
     )
+
+    transactions = [
+        t for t in transactions
+        if (getattr(t, 'bonus_debt', 0) == 0 and
+            getattr(t, 'client_debt', 0) == 0 and
+            getattr(t, 'investor_debt', 0) == 0 and
+            getattr(t, 'supplier_debt', 0) == 0)
+    ]
+
     total_profit = sum(float(t.profit or 0) for t in transactions)
 
     return JsonResponse({
