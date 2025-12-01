@@ -3333,6 +3333,7 @@ const handleTransactions = async config => {
 			{ name: 'paid_amount' },
 			{ name: 'debt' },
 			{ name: 'documents' },
+			{ name: 'fully_paid_at' },
 		],
 		['amount', 'profit']
 	)
