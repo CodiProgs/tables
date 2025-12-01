@@ -12,17 +12,9 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = 'django-insecure-7$m0khwvsrv67jtr7a*9ei3)3*datk7v+ub1*xto3+b0&yvykj'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = False
+DEBUG = True
 
-ALLOWED_HOSTS = [
-    '93.183.80.15',
-    'localhost',
-    '127.0.0.1',
-    '0.0.0.0',
-    'mytables.duckdns.org'
-]
-#ALLOWED_HOSTS = ['*']
-
+ALLOWED_HOSTS = ["*"]
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
 
@@ -33,55 +25,31 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-	"users",
-	"main",
+    "users",    "main",
 ]
-
-MIDDLEWARE = [
-    'django.middleware.security.SecurityMiddleware',
-    'django.contrib.sessions.middleware.SessionMiddleware',
-    'django.middleware.common.CommonMiddleware',
-    'django.middleware.csrf.CsrfViewMiddleware',
-    'django.contrib.auth.middleware.AuthenticationMiddleware',
-    'django.contrib.messages.middleware.MessageMiddleware',
-    'django.middleware.clickjacking.XFrameOptionsMiddleware',
-	'main.middleware.BlockSiteMiddleware',
-	"users.middleware.AuthMiddleware",
+MIDDLEWARE = [    'django.middleware.security.SecurityMiddleware',
+    'django.contrib.sessions.middleware.SessionMiddleware',    'django.middleware.common.CommonMiddleware',
+    'django.middleware.csrf.CsrfViewMiddleware',    'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'django.contrib.messages.middleware.MessageMiddleware',    'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'main.middleware.BlockSiteMiddleware',    "users.middleware.AuthMiddleware",
 ]
-
 ROOT_URLCONF = 'tables.urls'
-
-TEMPLATES = [
-    {
-        'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': ["templates"],
-        'APP_DIRS': True,
-        'OPTIONS': {
+TEMPLATES = [    {
+        'BACKEND': 'django.template.backends.django.DjangoTemplates',        'DIRS': ["templates"],
+        'APP_DIRS': True,        'OPTIONS': {
             'context_processors': [
-				"django.template.context_processors.debug",
-                'django.template.context_processors.request',
-                'django.contrib.auth.context_processors.auth',
-                'django.contrib.messages.context_processors.messages',
-            ],
-        },
-    },
-]
-
+                "django.template.context_processors.debug",                'django.template.context_processors.request',
+                'django.contrib.auth.context_processors.auth',                'django.contrib.messages.context_processors.messages',
+            ],        },
+    },]
 WSGI_APPLICATION = 'tables.wsgi.application'
 
+# Database# https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
-# Database
-# https://docs.djangoproject.com/en/5.2/ref/settings/#databases
-
-
-DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.mysql",
-        "NAME": "tables",
-        "USER": "root",
-        "PASSWORD": "DjBEF0on1f@",
-        "HOST": "localhost",
-        "PORT": "3306",
+DATABASES = {    "default": {
+        "ENGINE": "django.db.backends.mysql",        "NAME": "tables",
+        "USER": "root",        "PASSWORD": "root",
+        "HOST": "localhost",        "PORT": "3306",
         "OPTIONS": {
             "init_command": "SET sql_mode='STRICT_TRANS_TABLES'",
             "charset": "utf8mb4",
@@ -139,32 +107,9 @@ AUTH_USER_MODEL = "users.User"
 
 LOGIN_URL = "login"
 
-LOGOUT_REDIRECT_URL = "login"
+# LOGOUT_REDIRECT_URL = "login"
 
 SESSION_COOKIE_AGE = 2592000
 
-CSRF_TRUSTED_ORIGINS = [
-    'http://93.183.80.15',
-    'https://93.183.80.15',
-    'https://mytables.duckdns.org',
-    'http://93.183.80.15',
-    'http://mytables.duckdns.org',
-    'http://localhost:8000',
-    'http://127.0.0.1:8000',
-]
-
-SECURE_SSL_REDIRECT = True
-SESSION_COOKIE_SECURE = True
-CSRF_COOKIE_SECURE = True
-
-
-USE_X_FORWARDED_HOST = True
-SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
-STATICFILES_STORAGE = 'django.contrib.staticfiles.storage.ManifestStaticFilesStorage'
-
-SECURE_BROWSER_XSS_FILTER = True
-SECURE_CONTENT_TYPE_NOSNIFF = True
-X_FRAME_OPTIONS = 'DENY'
-
-
-SECURE_CROSS_ORIGIN_OPENER_POLICY = None
+# витая пата, комутатор, симка, 
+# ип телеметрия

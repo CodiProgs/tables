@@ -3,6 +3,7 @@ from decimal import Decimal
 import math
 from django.db import models, transaction
 from django.db.models import F
+from django.utils import timezone
 
 
 class Client(models.Model):
@@ -185,6 +186,12 @@ class Transaction(models.Model):
         blank=True
     )
 
+    fully_paid_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name="Дата полной оплаты и погашения долгов"
+    )
+
     modified_by_accountant = models.BooleanField(default=False, verbose_name="Изменено бухгалтером")
     viewed_by_admin = models.BooleanField(default=False, verbose_name="Просмотрено администратором")
 
@@ -266,6 +273,21 @@ class Transaction(models.Model):
         Долг инвестора = прибыль - возвращено инвестору
         """
         return self.profit - self.returned_to_investor
+
+    def save(self, *args, **kwargs):
+        all_debts_closed = (
+            (self.paid_amount or 0) >= (self.amount or 0)
+            and (self.bonus_debt or 0) == 0
+            and (self.client_debt or 0) == 0
+            and (self.investor_debt or 0) == 0
+            and (self.supplier_debt or 0) == 0
+        )
+        if all_debts_closed:
+            if not self.fully_paid_at:
+                self.fully_paid_at = timezone.now()
+        else:
+            self.fully_paid_at = None
+        super().save(*args, **kwargs)
 
 class AccountType(models.Model):
     name = models.CharField(max_length=100, verbose_name="Тип счета")
