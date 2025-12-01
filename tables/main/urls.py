@@ -97,4 +97,5 @@ urlpatterns = [
 	path("balance_items/<str:type>/<int:pk>/", views.balance_item_detail, name="balance_item_detail"),
     
 	path('investor_debt_problems/', views.investor_debt_problems, name='investor_debt_problems'),
+    path('bonus_cash_needed/', views.bonus_cash_needed, name='bonus_cash_needed'),
 ]

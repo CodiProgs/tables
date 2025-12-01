@@ -3010,6 +3010,17 @@ def settle_supplier_debt(request, pk: int):
 
                 if amount_value > Decimal(str(trans.bonus_debt or 0)):
                     return JsonResponse({"status": "error", "message": "Сумма не может превышать долг по бонусам"}, status=400)
+                
+                cash_account = Account.objects.filter(name__iexact="Наличные").first()
+                if not cash_account:
+                    return JsonResponse({"status": "error", "message": 'Счет "Наличные" не найден'}, status=400)
+
+                if Decimal(str(cash_account.balance or 0)) < amount_value:
+                    return JsonResponse({"status": "error", "message": "Недостаточно средств на счете 'Наличные'"}, status=400)
+
+                cash_account.balance = F('balance') - amount_value
+                cash_account.save(update_fields=['balance'])
+                cash_account.refresh_from_db(fields=['balance'])
 
                 trans.returned_bonus = Decimal(str(trans.returned_bonus or 0)) + amount_value
                 trans.save()
@@ -5751,4 +5762,28 @@ def investor_debt_problems(request):
         "problem_transactions": problem_transactions,
         "problem_cashflows": problem_cashflows,
         "has_problems": bool(problem_transactions or problem_cashflows),
+    })
+
+@forbid_supplier
+@login_required
+@require_GET
+def bonus_cash_needed(request):
+    """
+    Показывает сумму, которую нужно было бы снять со счета 'Наличные' для всех погашенных бонусов,
+    если раньше не снимали.
+    """
+    # Сумма всех возвращённых бонусов по транзакциям с paid_amount > 0
+    total_returned_bonus = (
+        Transaction.objects.filter(paid_amount__gt=0)
+        .aggregate(total=models.Sum('returned_bonus'))['total'] or 0
+    )
+    # Сумма всех движений по бонусам, реально снятых с 'Наличные'
+    # (ищем CashFlow с нужным purpose, если такие создавались, иначе 0)
+    # Если не создавались отдельные CashFlow для бонусов, то считаем, что снято 0
+    # Можно доработать, если есть отдельный PaymentPurpose для бонусов
+
+    # Сколько всего нужно было снять (фактически возвращено бонусов)
+    # Можно добавить детализацию по клиентам, если нужно
+    return JsonResponse({
+        "total_cash_needed_for_bonuses": float(total_returned_bonus)
     })
