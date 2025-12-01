@@ -95,4 +95,6 @@ urlpatterns = [
     path("balance_items/edit/<int:pk>/", views.edit_balance_item, name="edit_balance_item"),
     path("balance_items/delete/<int:pk>/", views.delete_balance_item, name="delete_balance_item"),
 	path("balance_items/<str:type>/<int:pk>/", views.balance_item_detail, name="balance_item_detail"),
+    
+	path('investor_debt_problems/', views.investor_debt_problems, name='investor_debt_problems'),
 ]

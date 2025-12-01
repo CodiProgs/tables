@@ -5704,3 +5704,51 @@ def money_logs_types(request):
     ]
     return JsonResponse(types, safe=False)
 
+
+
+@forbid_supplier
+@login_required
+@require_GET
+def investor_debt_problems(request):
+    transactionsInvestors = [
+        t for t in Transaction.objects.filter(paid_amount__gt=0)
+        if getattr(t, 'bonus_debt', 0) == 0
+        and getattr(t, 'client_debt', 0) == 0
+        and getattr(t, 'profit', 0) > 0
+    ]
+    problem_transactions = [
+        {
+            "id": t.id,
+            "created_at": timezone.localtime(t.created_at).strftime("%d.%m.%Y %H:%M") if t.created_at else "",
+            "client": str(t.client) if t.client else "",
+            "amount": float(getattr(t, 'amount', 0)),
+            "profit": float(getattr(t, 'profit', 0)),
+            "returned_to_investor": float(getattr(t, 'returned_to_investor', 0)),
+            "debt": float(getattr(t, 'profit', 0)) - float(getattr(t, 'returned_to_investor', 0)),
+        }
+        for t in transactionsInvestors
+        if float(getattr(t, 'profit', 0)) - float(getattr(t, 'returned_to_investor', 0)) < 0
+    ]
+
+    cashflows = CashFlow.objects.filter(
+        purpose__operation_type=PaymentPurpose.INCOME
+    ).exclude(purpose__name__in=["Оплата", "Внесение инвестора"])
+
+    problem_cashflows = [
+        {
+            "id": cf.id,
+            "created_at": timezone.localtime(cf.created_at).strftime("%d.%m.%Y %H:%M") if cf.created_at else "",
+            "purpose": cf.purpose.name if cf.purpose else "",
+            "amount": float(cf.amount),
+            "returned_to_investor": float(cf.returned_to_investor or 0),
+            "debt": float(cf.amount) - float(cf.returned_to_investor or 0),
+        }
+        for cf in cashflows
+        if float(cf.amount) - float(cf.returned_to_investor or 0) < 0
+    ]
+
+    return JsonResponse({
+        "problem_transactions": problem_transactions,
+        "problem_cashflows": problem_cashflows,
+        "has_problems": bool(problem_transactions or problem_cashflows),
+    })
