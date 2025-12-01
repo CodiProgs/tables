@@ -98,4 +98,5 @@ urlpatterns = [
     
 	path('investor_debt_problems/', views.investor_debt_problems, name='investor_debt_problems'),
     path('bonus_cash_needed/', views.bonus_cash_needed, name='bonus_cash_needed'),
+	path('profit_by_month/', views.profit_by_month, name='profit_by_month'),
 ]

@@ -5768,22 +5768,40 @@ def investor_debt_problems(request):
 @login_required
 @require_GET
 def bonus_cash_needed(request):
-    """
-    Показывает сумму, которую нужно было бы снять со счета 'Наличные' для всех погашенных бонусов,
-    если раньше не снимали.
-    """
-    # Сумма всех возвращённых бонусов по транзакциям с paid_amount > 0
     total_returned_bonus = (
         Transaction.objects.filter(paid_amount__gt=0)
         .aggregate(total=models.Sum('returned_bonus'))['total'] or 0
     )
-    # Сумма всех движений по бонусам, реально снятых с 'Наличные'
-    # (ищем CashFlow с нужным purpose, если такие создавались, иначе 0)
-    # Если не создавались отдельные CashFlow для бонусов, то считаем, что снято 0
-    # Можно доработать, если есть отдельный PaymentPurpose для бонусов
-
-    # Сколько всего нужно было снять (фактически возвращено бонусов)
-    # Можно добавить детализацию по клиентам, если нужно
     return JsonResponse({
         "total_cash_needed_for_bonuses": float(total_returned_bonus)
+    })
+
+@forbid_supplier
+@login_required
+@require_GET
+def profit_by_month(request):
+    try:
+        month = int(request.GET.get("month", 0))
+        year = int(request.GET.get("year", datetime.now().year))
+        if not (1 <= month <= 12):
+            return JsonResponse({"status": "error", "message": "Некорректный месяц"}, status=400)
+    except Exception:
+        return JsonResponse({"status": "error", "message": "Некорректный месяц"}, status=400)
+
+    from calendar import monthrange
+    from django.utils import timezone
+
+    first_day = timezone.make_aware(datetime(year, month, 1, 0, 0, 0))
+    last_day = timezone.make_aware(datetime(year, month, monthrange(year, month)[1], 23, 59, 59))
+
+    transactions = Transaction.objects.filter(
+        created_at__range=(first_day, last_day),
+        paid_amount__gt=0
+    )
+    total_profit = sum(float(t.profit or 0) for t in transactions)
+
+    return JsonResponse({
+        "year": year,
+        "month": month,
+        "total_profit": total_profit
     })
