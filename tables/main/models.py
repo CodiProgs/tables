@@ -189,7 +189,7 @@ class Transaction(models.Model):
     fully_paid_at = models.DateTimeField(
         null=True,
         blank=True,
-        verbose_name="Дата полной оплаты и погашения долгов"
+        verbose_name="Дата закрытия"
     )
 
     modified_by_accountant = models.BooleanField(default=False, verbose_name="Изменено бухгалтером")
