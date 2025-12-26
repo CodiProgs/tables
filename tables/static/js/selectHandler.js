@@ -8,7 +8,10 @@ export default class SelectHandler {
 				const dropdown = select.querySelector('.select__dropdown')
 
 				if (dropdown) {
-					dropdown.replaceChildren(...this.createSelectOptions(data, multiple))
+					const search = this.createSearchInput()
+					const options = this.createSelectOptions(data, multiple)
+					dropdown.replaceChildren(search, ...options)
+					this.attachSearchHandler(dropdown)
 					this.attachOptionHandlers(select, multiple)
 				}
 			}
@@ -24,9 +27,10 @@ export default class SelectHandler {
 
 					const dropdown = select.querySelector('.select__dropdown')
 					if (dropdown) {
-						dropdown.replaceChildren(
-							...this.createSelectOptions(data, multiple)
-						)
+						const search = this.createSearchInput()
+						const options = this.createSelectOptions(data, multiple)
+						dropdown.replaceChildren(search, ...options)
+						this.attachSearchHandler(dropdown)
 						this.attachOptionHandlers(select, multiple)
 					}
 				}
@@ -43,7 +47,9 @@ export default class SelectHandler {
 		const multiple = select.dataset.multiple === 'true'
 		const options = this.createSelectOptions(data, multiple)
 
-		dropdown.replaceChildren(...options)
+		const search = this.createSearchInput()
+		dropdown.replaceChildren(search, ...options)
+		this.attachSearchHandler(dropdown)
 		this.attachOptionHandlers(select, multiple)
 
 		const input = select.querySelector('.select__input')
@@ -77,6 +83,33 @@ export default class SelectHandler {
 		})
 	}
 
+	static createSearchInput() {
+		const wrapper = document.createElement('div')
+		wrapper.className = 'select__search-wrapper'
+		const input = document.createElement('input')
+		input.className = 'select__search'
+		input.type = 'search'
+		input.placeholder = 'Поиск...'
+		input.autocomplete = 'off'
+		wrapper.appendChild(input)
+		return wrapper
+	}
+
+	static attachSearchHandler(dropdown) {
+		if (!dropdown) return
+		const wrapper = dropdown.querySelector('.select__search-wrapper')
+		if (!wrapper) return
+		const search = wrapper.querySelector('.select__search')
+		if (!search) return
+		search.addEventListener('input', e => {
+			const q = (e.target.value || '').toLowerCase().trim()
+			dropdown.querySelectorAll('.select__option').forEach(opt => {
+				opt.style.display =
+					q === '' || opt.textContent.toLowerCase().includes(q) ? '' : 'none'
+			})
+		})
+	}
+
 	static async fetchSelectOptions(url) {
 		const loader = createLoader()
 		document.body.appendChild(loader)
@@ -103,7 +136,10 @@ export default class SelectHandler {
 		const data = await this.fetchSelectOptions(url)
 		const multiple = select.dataset.multiple === 'true'
 
-		dropdown.replaceChildren(...this.createSelectOptions(data, multiple))
+		const search = this.createSearchInput()
+		const options = this.createSelectOptions(data, multiple)
+		dropdown.replaceChildren(search, ...options)
+		this.attachSearchHandler(dropdown)
 		this.attachOptionHandlers(select, multiple)
 	}
 
@@ -139,6 +175,11 @@ export default class SelectHandler {
 			}
 
 			select.classList.toggle('active')
+			// при открытии фокус на поле поиска
+			if (select.classList.contains('active')) {
+				const search = dropdown.querySelector('.select__search')
+				if (search) search.focus()
+			}
 		}
 
 		control.addEventListener('click', toggleSelect)
@@ -172,10 +213,10 @@ export default class SelectHandler {
 					const checkbox = option.querySelector('.select__checkbox')
 					if (selectedValues.includes(value)) {
 						selectedValues = selectedValues.filter(v => v !== value)
-						checkbox.innerHTML = ''
+						if (checkbox) checkbox.innerHTML = ''
 					} else {
 						selectedValues.push(value)
-						checkbox.innerHTML = '✔️'
+						if (checkbox) checkbox.innerHTML = '✔️'
 					}
 					select.querySelectorAll('.select__option').forEach(opt => {
 						const cb = opt.querySelector('.select__checkbox')

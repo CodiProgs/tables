@@ -5632,7 +5632,6 @@ const handleDebtors = async () => {
 			const typeInput = document.getElementById('type')
 			if (typeInput) {
 				if (table) {
-					console.log('Table ID:', table.id)
 					if (table.id === 'summary-bonus') {
 						typeInput.value = 'bonus'
 					} else if (table.id === 'summary-remaining') {

@@ -1139,3 +1139,32 @@ textarea::placeholder {
 	display: flex;
 	flex-direction: column;
 }
+
+.select__search-wrapper {
+	padding: 4px 6px;
+	border-bottom: 1px solid var(--color-table-border);
+	background: var(--color-background-window);
+	position: sticky;
+	top: 0;
+	z-index: 2;
+}
+
+.select__search {
+	width: 100%;
+	box-sizing: border-box;
+	padding: 4px 6px;
+	border: 1px solid var(--color-border-window);
+	border-radius: 2px;
+	font-size: 11px;
+	background: #fff;
+	outline: none;
+}
+
+.select__search:focus {
+	border-color: var(--color-primary);
+	box-shadow: 0 0 0 4px rgba(43, 87, 154, 0.06);
+}
+
+.select__search-wrapper + .select__option {
+	padding-top: 6px;
+}
