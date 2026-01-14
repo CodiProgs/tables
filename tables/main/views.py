@@ -2965,6 +2965,31 @@ def settle_supplier_debt(request, pk: int):
                     cash_account.save(update_fields=['balance'])
                     cash_account.refresh_from_db(fields=['balance'])
 
+                try:
+                    supplier_for_record = None
+                    if branch_transactions:
+                        supplier_for_record = branch_transactions[0].supplier
+
+                    collection_purpose = PaymentPurpose.objects.filter(name="Возврат от поставщиков").first()
+                    if not collection_purpose:
+                        collection_purpose = PaymentPurpose.objects.create(
+                            name="Возврат от поставщиков",
+                            operation_type=PaymentPurpose.EXPENSE
+                        )
+                    if cash_account:
+                        CashFlow.objects.create(
+                            account=cash_account,
+                            supplier=supplier_for_record,
+                            amount=amount_value,
+                            purpose=collection_purpose,
+                            comment=f"Возврат от поставщиков: перевод на счет 'Наличные'",
+                            created_by=request.user,
+                            created_at=timezone.now()
+                        )
+                except Exception as e:
+                    import logging
+                    logging.exception("Ошибка при создании CashFlow для инкассации филиала: %s", e)
+
                 user = request.user
 
                 supplier_for_record = None
@@ -3021,6 +3046,26 @@ def settle_supplier_debt(request, pk: int):
                 cash_account.balance = F('balance') - amount_value
                 cash_account.save(update_fields=['balance'])
                 cash_account.refresh_from_db(fields=['balance'])
+
+                try:
+                    bonus_purpose = PaymentPurpose.objects.filter(name="Выдача бонусов").first()
+                    if not bonus_purpose:
+                        bonus_purpose = PaymentPurpose.objects.create(
+                            name="Выдача бонусов",
+                            operation_type=PaymentPurpose.EXPENSE
+                        )
+                    CashFlow.objects.create(
+                        account=cash_account,
+                        amount=-int(float(amount_value)),
+                        purpose=bonus_purpose,
+                        comment=comment or (f"Выдача бонусов клиенту {trans.client}" if trans and getattr(trans, "client", None) else "Выдача бонусов"),
+                        created_by=request.user,
+                        created_at=timezone.now()
+                    )
+                except Exception as e:
+                    import logging
+                    logging.exception("Ошибка при создании CashFlow для выдачи бонусов: %s", e)
+
 
                 trans.returned_bonus = Decimal(str(trans.returned_bonus or 0)) + amount_value
                 trans.save()
@@ -3097,6 +3142,25 @@ def settle_supplier_debt(request, pk: int):
                 cash_account.balance = F('balance') - amount_value
                 cash_account.save(update_fields=['balance'])
                 cash_account.refresh_from_db(fields=['balance'])
+
+                try:
+                    purpose = PaymentPurpose.objects.filter(name="Погашение долга клиента").first()
+                    if not purpose:
+                        purpose = PaymentPurpose.objects.create(
+                            name="Погашение долга клиента",
+                            operation_type=PaymentPurpose.EXPENSE
+                        )
+                    CashFlow.objects.create(
+                        account=cash_account,
+                        amount=-int(float(amount_value)),
+                        purpose=purpose,
+                        comment=comment or (f"Выдача клиенту {trans.client}" if trans and getattr(trans, "client", None) else "Выдача клиенту"),
+                        created_by=request.user,
+                        created_at=timezone.now()
+                    )
+                except Exception as e:
+                    import logging
+                    logging.exception("Ошибка при создании CashFlow для выдачи клиенту: %s", e)
 
                 trans.returned_to_client = Decimal(str(trans.returned_to_client or 0)) + amount_value
                 trans.save()
@@ -3695,7 +3759,7 @@ def debtor_details(request):
             ]
             fields = [
                 {"name": "created_at", "verbose_name": "Дата", "is_date": True},
-                {"name": "client", "verbose_name": "Клиент"},
+                {"name": "client", "verbose_name": "Клиент", "is_relation": True},
                 {"name": "amount", "verbose_name": "Сумма сделки", "is_amount": True},
                 {"name": "client_debt_paid", "verbose_name": "Выдать", "is_amount": True},
             ]
@@ -4718,7 +4782,8 @@ def money_logs_list(request):
         LEFT JOIN {user_table} u ON u.id = io.created_by_id
     """
 
-    union_sql = f"({select_cf}) UNION ALL ({select_dr}) UNION ALL ({select_cdr}) UNION ALL ({select_io})"
+    # union_sql = f"({select_cf}) UNION ALL ({select_dr}) UNION ALL ({select_cdr}) UNION ALL ({select_io})"
+    union_sql = f"({select_cf}) UNION ALL ({select_io})"
 
     count_sql = f"SELECT COUNT(*) FROM ({union_sql}) AS combined"
     with connection.cursor() as cur:

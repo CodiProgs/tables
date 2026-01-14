@@ -4832,6 +4832,241 @@ const handleDebtors = async () => {
 						TableManager.init()
 						TableManager.attachGlobalCellClickHandler()
 
+						if (value === 'Выдачи клиентам') {
+							const summaryTable = document.getElementById('summary-remaining')
+							TableManager.createColumnsForTable(summaryTable.id, [
+								{ name: 'created_at' },
+								{ name: 'client', url: '/clients/list/' },
+								{ name: 'amount' },
+								{ name: 'client_debt_paid' },
+							])
+
+							TableManager.calculateTableSummary(summaryTable.id, [
+								'amount',
+								'client_debt_paid',
+							])
+
+							setTimeout(() => {
+								try {
+									if (!summaryTable) return
+
+									const ths = Array.from(
+										summaryTable.querySelectorAll('thead th')
+									)
+									const idx = name =>
+										ths.findIndex(th => th.dataset.name === name)
+
+									const clientIdx = idx('client')
+									if (clientIdx === -1) return
+
+									const thead = summaryTable.querySelector('thead')
+									if (!thead) return
+									const headerRows = Array.from(thead.querySelectorAll('tr'))
+									if (headerRows.length < 1) return
+									const filterRow = headerRows[headerRows.length - 1]
+									const clientFilterTd = filterRow.children[clientIdx]
+									if (!clientFilterTd) return
+
+									const selectEl = clientFilterTd.querySelector('.select')
+									const clientInput =
+										selectEl?.querySelector('.select__input') || null
+									const clearBtn =
+										selectEl?.querySelector('.select__clear') || null
+
+									const doCalc = () => {
+										try {
+											TableManager.calculateTableSummary(summaryTable.id, [
+												'amount',
+												'client_debt_paid',
+											])
+										} catch (e) {
+											console.error(
+												'Ошибка при вычислении summary-remaining:',
+												e
+											)
+										}
+									}
+
+									if (clientInput) {
+										clientInput.addEventListener('change', function () {
+											setTimeout(doCalc, 20)
+										})
+
+										if (clientInput.value) {
+											setTimeout(doCalc, 20)
+										}
+									}
+
+									if (clearBtn) {
+										clearBtn.addEventListener('click', function () {
+											setTimeout(doCalc, 50)
+										})
+									}
+								} catch (e) {
+									console.error(
+										'Ошибка настройки пересчёта summary-remaining:',
+										e
+									)
+								}
+							}, 50)
+
+							// setTimeout(() => {
+							// 	try {
+							// 		if (!summaryTable) return
+							// 		const tbody = summaryTable.querySelector('tbody')
+							// 		if (!tbody) return
+
+							// 		if (!summaryTable.dataset.originalHtml) {
+							// 			summaryTable.dataset.originalHtml = tbody.innerHTML
+							// 		}
+
+							// 		const ths = Array.from(
+							// 			summaryTable.querySelectorAll('thead th')
+							// 		)
+							// 		const idx = name =>
+							// 			ths.findIndex(th => th.dataset.name === name)
+
+							// 		const clientIdx = idx('client')
+							// 		const amountIdx = idx('amount')
+							// 		const paidIdx = idx('client_debt_paid')
+
+							// 		if (clientIdx === -1 || amountIdx === -1 || paidIdx === -1)
+							// 			return
+
+							// 		const thead = summaryTable.querySelector('thead')
+							// 		if (!thead) return
+							// 		const headerRows = Array.from(thead.querySelectorAll('tr'))
+							// 		if (headerRows.length < 1) return
+							// 		const filterRow = headerRows[headerRows.length - 1]
+							// 		const clientFilterTd = filterRow.children[clientIdx]
+							// 		if (!clientFilterTd) return
+
+							// 		const selectEl = clientFilterTd.querySelector('.select')
+							// 		const clientInput =
+							// 			selectEl?.querySelector('.select__input') || null
+							// 		const clientTextEl =
+							// 			selectEl?.querySelector('.select__text') || null
+							// 		const clearBtn =
+							// 			selectEl?.querySelector('.select__clear') || null
+
+							// 		const parseNum = txt => {
+							// 			if (!txt) return 0
+							// 			const v = txt
+							// 				.toString()
+							// 				.replace(/\s/g, '')
+							// 				.replace('р.', '')
+							// 				.replace('р', '')
+							// 				.replace(',', '.')
+							// 			const n = Number(v)
+							// 			return isNaN(n) ? 0 : n
+							// 		}
+
+							// 		const restoreOriginal = () => {
+							// 			if (summaryTable.dataset.originalHtml) {
+							// 				tbody.innerHTML = summaryTable.dataset.originalHtml
+							// 				try {
+							// 					TableManager.formatCurrencyValues(summaryTable.id)
+							// 					TableManager.initTable &&
+							// 						TableManager.initTable(summaryTable.id)
+							// 				} catch (e) {}
+							// 			}
+							// 		}
+
+							// 		const aggregateForClient = () => {
+							// 			const clientName = (clientTextEl?.textContent || '').trim()
+							// 			if (!clientInput || !clientInput.value || !clientName)
+							// 				return
+
+							// 			restoreOriginal()
+
+							// 			const rows = Array.from(
+							// 				tbody.querySelectorAll(
+							// 					'tr:not(.table__row--summary):not(.table__row--empty)'
+							// 				)
+							// 			)
+
+							// 			const matched = rows.filter(row => {
+							// 				const cells = row.querySelectorAll('td')
+							// 				const cellText = (
+							// 					cells[clientIdx]?.textContent || ''
+							// 				).trim()
+							// 				return cellText === clientName
+							// 			})
+
+							// 			if (matched.length === 0) return
+
+							// 			let totalAmount = 0
+							// 			let totalPaid = 0
+
+							// 			matched.forEach(r => {
+							// 				const cells = r.querySelectorAll('td')
+							// 				totalAmount += parseNum(cells[amountIdx]?.textContent)
+							// 				totalPaid += parseNum(cells[paidIdx]?.textContent)
+							// 			})
+
+							// 			matched.forEach(r => r.remove())
+
+							// 			const tr = document.createElement('tr')
+							// 			tr.className = 'table__row'
+
+							// 			ths.forEach((th, i) => {
+							// 				const td = document.createElement('td')
+							// 				td.className = 'table__cell'
+							// 				if (th.classList.contains('hidden')) {
+							// 					td.classList.add('hidden')
+							// 				}
+							// 				if (ths[i].dataset.name === 'created_at') {
+							// 					td.textContent = '-'
+							// 				} else if (ths[i].dataset.name === 'client') {
+							// 					td.textContent = clientName
+							// 				} else if (ths[i].dataset.name === 'amount') {
+							// 					td.textContent = formatAmount(totalAmount)
+							// 				} else if (ths[i].dataset.name === 'client_debt_paid') {
+							// 					td.textContent = formatAmount(totalPaid)
+							// 				} else {
+							// 					td.textContent = ''
+							// 				}
+							// 				tr.appendChild(td)
+							// 			})
+
+							// 			const summaryRow = tbody.querySelector(
+							// 				'.table__row--summary'
+							// 			)
+							// 			if (summaryRow) {
+							// 				tbody.insertBefore(tr, summaryRow)
+							// 			} else {
+							// 				tbody.appendChild(tr)
+							// 			}
+
+							// 			try {
+							// 				TableManager.formatCurrencyValues(summaryTable.id)
+							// 			} catch (e) {}
+							// 		}
+
+							// 		if (clientInput) {
+							// 			clientInput.addEventListener('change', function () {
+							// 				if (!this.value) {
+							// 					restoreOriginal()
+							// 				} else {
+							// 					aggregateForClient()
+							// 				}
+							// 			})
+							// 		}
+
+							// 		if (clearBtn) {
+							// 			clearBtn.addEventListener('click', function () {
+							// 				restoreOriginal()
+							// 			})
+							// 		}
+							// 	} catch (e) {
+							// 		console.error(
+							// 			'Ошибка установки обработчиков для summary-remaining:',
+							// 			e
+							// 		)
+							// 	}
+							// }, 50)
+						}
+
 						const table = details.querySelector('table')
 
 						if (table && table.id.startsWith('branch-transactions-')) {
