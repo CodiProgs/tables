@@ -1168,3 +1168,8 @@ textarea::placeholder {
 .select__search-wrapper + .select__option {
 	padding-top: 6px;
 }
+
+.dt-summary {
+	padding: 6px 0;
+	font-weight: 700;
+}

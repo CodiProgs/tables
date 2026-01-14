@@ -4926,6 +4926,57 @@ const handleDebtors = async () => {
 										e
 									)
 								}
+
+								const updateDTSummary = () => {
+									const table = document.getElementById('summary-remaining')
+									if (!table) return
+
+									const headers = Array.from(table.querySelectorAll('thead th'))
+									const clientIndex = headers.findIndex(
+										th => th.dataset.name === 'client'
+									)
+									const debtIndex = headers.findIndex(
+										th => th.dataset.name === 'client_debt_paid'
+									)
+
+									if (clientIndex === -1 || debtIndex === -1) return
+
+									const tableRows = Array.from(
+										table.querySelectorAll('tbody tr:not(.table__row--summary)')
+									)
+									let total = 0
+
+									tableRows.forEach(row => {
+										const cells = row.querySelectorAll('td')
+										const clientCell = cells[clientIndex]
+										const debtCell = cells[debtIndex]
+
+										if (
+											clientCell &&
+											debtCell &&
+											clientCell.textContent.trim() === 'ДТ'
+										) {
+											const valueText = debtCell.textContent
+												.replace(/\s*р\.$/, '')
+												.replace(/\s+/g, '')
+												.trim()
+											const value = parseFloat(valueText.replace(',', '.')) || 0
+
+											total += value
+										}
+									})
+
+									const div = document.createElement('div')
+									div.classList.add('dt-summary')
+									div.textContent = `ДТ ${total.toLocaleString('ru-RU')} р.`
+
+									const summaryContainer = document.getElementById('summary-2')
+									if (summaryContainer) {
+										summaryContainer.prepend(div)
+									}
+								}
+
+								updateDTSummary()
 							}, 50)
 
 							// setTimeout(() => {
