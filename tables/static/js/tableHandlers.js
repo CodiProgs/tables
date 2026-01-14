@@ -43,7 +43,7 @@ export function initTableHandlers(config) {
 						TableManager.createForm(formId, config.tableId),
 			  }),
 		onSuccess: result => {
-			TableManager.addTableRow(result, config.tableId)
+			TableManager.addTableRow(result, config.tableId, config.prependNewRow)
 
 			if (config.afterAddFunc) {
 				config.afterAddFunc(result)

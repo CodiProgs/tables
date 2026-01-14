@@ -1550,7 +1550,7 @@ export const TableManager = {
 		return await response.text()
 	},
 
-	async addTableRow(data, tableId) {
+	async addTableRow(data, tableId, prepend = false) {
 		const table = document.getElementById(tableId)
 		if (!table) return
 
@@ -1573,16 +1573,18 @@ export const TableManager = {
 			let newRow
 
 			if (summaryRow) {
+				// всегда вставляем перед summary
 				summaryRow.insertAdjacentHTML('beforebegin', data.html)
 				newRow = summaryRow.previousElementSibling
+			} else if (prepend && tableBody.firstElementChild) {
+				// вставка в начало
+				tableBody.firstElementChild.insertAdjacentHTML('beforebegin', data.html)
+				newRow = tableBody.firstElementChild
 			} else {
+				// вставка в конец (старое поведение)
 				tableBody.insertAdjacentHTML('beforeend', data.html)
 				newRow = tableBody.lastElementChild
 			}
-
-			document.querySelectorAll('.table__cell--selected').forEach(cell => {
-				cell.classList.remove('table__cell--selected')
-			})
 
 			newRow.classList.add('table__row--selected')
 			newRow

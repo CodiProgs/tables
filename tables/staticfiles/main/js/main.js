@@ -287,6 +287,19 @@ const setLastRowId = (id, tableId) => {
 	lastRow.setAttribute('data-id', id)
 }
 
+const setFirstRowId = (id, tableId) => {
+	const tableRows = Array.from(
+		document.querySelectorAll(`#${tableId} tbody tr:not(.table__row--summary)`)
+	)
+	if (tableRows.length === 0) {
+		console.error(`Таблица ${tableId} не содержит строк`)
+		return
+	}
+
+	const firstRow = tableRows[0]
+	firstRow.setAttribute('data-id', id)
+}
+
 const showChangedCells = (changedCells, tableId) => {
 	const headers = document.querySelectorAll(`#${tableId} thead th`)
 	const columnIndexes = {}
@@ -1233,9 +1246,13 @@ const setupSelectListener = () => {
 	})
 }
 
-const refreshData = (tableId, rowId = null) => {
+const refreshData = (tableId, rowId = null, prependNewRow = false) => {
 	if (rowId) {
-		setLastRowId(rowId, `${tableId}`)
+		if (prependNewRow) {
+			setFirstRowId(rowId, `${tableId}`)
+		} else {
+			setLastRowId(rowId, `${tableId}`)
+		}
 	}
 }
 
@@ -2462,13 +2479,14 @@ const cashflowConfig = createConfig(CASH_FLOW, {
 		}
 	},
 	afterAddFunc: result => {
-		refreshData(`${CASH_FLOW}-table`, result.id)
+		refreshData(`${CASH_FLOW}-table`, result.id, true)
 		colorizeAmounts(`${CASH_FLOW}-table`)
 	},
 	afterEditFunc: result => {
 		refreshData(`${CASH_FLOW}-table`)
 		colorizeAmounts(`${CASH_FLOW}-table`)
 	},
+	prependNewRow: true,
 	modalConfig: {
 		addModalUrl: '/components/main/add_cashflow/',
 		editModalUrl: '/components/main/add_cashflow/',
