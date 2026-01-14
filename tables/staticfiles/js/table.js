@@ -2041,6 +2041,7 @@ export const TableManager = {
 		return params.toString()
 	},
 
+	// ...existing code...
 	applyFilters(table, filters) {
 		const tbody = table.querySelector('tbody')
 
@@ -2050,22 +2051,41 @@ export const TableManager = {
 			let shouldShow = true
 
 			filters.forEach((filterValue, colIndex) => {
+				if (!shouldShow) return
+
 				const cell = row.querySelector(`td:nth-child(${colIndex + 1})`)
 				if (!cell) return
 
-				const cellText = this.normalizeString(cell.textContent)
-				const filterVal = this.normalizeString(filterValue.value)
+				const rawCellText = String(cell.textContent || '')
+				const rawFilter = String(filterValue.value || '')
+
+				const cellText = this.normalizeString(rawCellText)
+				const filterVal = this.normalizeString(rawFilter)
 
 				if (filterValue.type === 'select') {
 					shouldShow = shouldShow && cellText === filterVal
 				} else {
-					shouldShow = shouldShow && cellText.includes(filterVal)
+					const filterHasDigits = /\d/.test(filterVal)
+					if (filterHasDigits) {
+						const cleanCell = rawCellText
+							.replace(/[^\d.,-]/g, '')
+							.replace(/\s+/g, '')
+							.replace(/,/g, '.')
+						const cleanFilter = rawFilter
+							.replace(/[^\d.,-]/g, '')
+							.replace(/\s+/g, '')
+							.replace(/,/g, '.')
+						shouldShow = shouldShow && cleanCell.includes(cleanFilter)
+					} else {
+						shouldShow = shouldShow && cellText.includes(filterVal)
+					}
 				}
 			})
 
 			row.style.display = shouldShow ? '' : 'none'
 		})
 	},
+	// ...existing code...
 
 	destroyTables() {
 		this.tables.forEach(table => table.destroy())
