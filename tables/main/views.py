@@ -11,7 +11,7 @@ from django.core.paginator import Paginator
 import locale
 import json
 from decimal import Decimal
-from django.db.models import Sum, F
+from django.db.models import Sum, F, ExpressionWrapper, DecimalField, Value
 from collections import defaultdict
 from functools import wraps
 from django.core.exceptions import PermissionDenied
@@ -1535,27 +1535,95 @@ def cash_flow_create(request):
             else:
                 amount_value = abs(amount_value)
 
-            cashflow = CashFlow.objects.create(
-                account=account,
-                amount=amount_value,
-                purpose=purpose,
-                supplier=supplier,
-                comment=comment,
-                created_by=user,
-            )
+            cashflow = None
 
-            if supplier:
-                supplier_account, _ = SupplierAccount.objects.get_or_create(
-                    supplier=supplier,
-                    account=account,
-                    defaults={'balance': 0}
+            if purpose.name == "ДТ":
+                amount_value_decimal = Decimal(abs(amount_value))
+
+                if amount_value_decimal == 0:
+                    raise Exception("Сумма должна быть больше нуля")
+
+                trans = (
+                    Transaction.objects
+                    .filter(client__name="ДТ")
+                    .annotate(
+                        client_debt_paid_calc=ExpressionWrapper(
+                            (F("paid_amount") * (Value(100) - F("client_percentage")) / Value(100))
+                            - F("returned_to_client"),
+                            output_field=DecimalField(max_digits=10, decimal_places=2)
+                        )
+                    )
+                    .filter(client_debt_paid_calc__gte=amount_value_decimal)
+                    .order_by("client_debt_paid_calc") 
+                    .first()
                 )
-                supplier_account.balance = Decimal(supplier_account.balance or 0) + Decimal(amount_value)
-                supplier_account.save()
-            else:
-                account.balance = F('balance') + amount_value
-                account.save(update_fields=['balance'])
-                account.refresh_from_db(fields=['balance'])
+
+                if not trans:
+                    raise Exception("Нет транзакции клиента ДТ с достаточным долгом для списания")
+
+                cash_account = Account.objects.filter(name__iexact="Наличные").first()
+                if not cash_account:
+                    raise Exception('Счет "Наличные" не найден')
+
+                if Decimal(str(cash_account.balance or 0)) < amount_value_decimal:
+                    raise Exception("Недостаточно средств на счете 'Наличные'")
+
+                cash_account.balance = F('balance') - amount_value_decimal
+                cash_account.save(update_fields=['balance'])
+                cash_account.refresh_from_db(fields=['balance'])
+
+                repay_purpose, _ = PaymentPurpose.objects.get_or_create(
+                    name="Погашение долга клиента",
+                    defaults={"operation_type": PaymentPurpose.EXPENSE}
+                )
+
+                cashflow = CashFlow.objects.create(
+                    account=cash_account,
+                    amount=-int(amount_value_decimal),
+                    purpose=repay_purpose,
+                    comment=comment or f"Выдача клиенту {trans.client}",
+                    created_by=request.user,
+                    created_at=timezone.now()
+                )
+
+                trans.returned_to_client = Decimal(str(trans.returned_to_client or 0)) + amount_value_decimal
+                trans.save()
+
+                ClientDebtRepayment.objects.create(
+                    client=trans.client,
+                    amount=amount_value_decimal,
+                    comment=comment,
+                    created_by=request.user
+                )
+
+
+            if purpose.name != 'ДТ':
+                cashflow = CashFlow.objects.create(
+                    account=account,
+                    amount=amount_value,
+                    purpose=purpose,
+                    supplier=supplier,
+                    comment=comment,
+                    created_by=user,
+                )
+
+            if not cashflow:
+                raise Exception("Ошибка при создании записи движения денежных средств")
+
+            if purpose.name != "ДТ":
+                if supplier:
+                    supplier_account, _ = SupplierAccount.objects.get_or_create(
+                        supplier=supplier,
+                        account=account,
+                        defaults={'balance': 0}
+                    )
+                    supplier_account.balance = Decimal(supplier_account.balance or 0) + Decimal(amount_value)
+                    supplier_account.save()
+                else:
+                    account.balance = F('balance') + amount_value
+                    account.save(update_fields=['balance'])
+                    account.refresh_from_db(fields=['balance'])
+
 
             context = {
                 "item": cashflow,
