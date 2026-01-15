@@ -766,6 +766,22 @@ class ClientDebtRepayment(models.Model):
         verbose_name="Клиент",
         related_name="debt_repayments"
     )
+    transaction = models.ForeignKey(
+        Transaction,
+        on_delete=models.SET_NULL,
+        verbose_name="Связанная транзакция",
+        related_name="client_debt_repayments",
+        null=True,
+        blank=True
+    )
+    cash_flow = models.OneToOneField(
+        CashFlow,
+        on_delete=models.CASCADE,
+        verbose_name="Связанное движение ДС",
+        related_name="client_debt_repayment",
+        null=True,
+        blank=True
+    )
     amount = models.DecimalField(
         max_digits=12,
         decimal_places=2,

@@ -1593,7 +1593,9 @@ def cash_flow_create(request):
                     client=trans.client,
                     amount=amount_value_decimal,
                     comment=comment,
-                    created_by=request.user
+                    created_by=request.user,
+                    transaction=trans,
+                    cash_flow=cashflow
                 )
 
 
@@ -3211,6 +3213,8 @@ def settle_supplier_debt(request, pk: int):
                 cash_account.save(update_fields=['balance'])
                 cash_account.refresh_from_db(fields=['balance'])
 
+                cash_flow = None
+
                 try:
                     purpose = PaymentPurpose.objects.filter(name="Погашение долга клиента").first()
                     if not purpose:
@@ -3218,7 +3222,7 @@ def settle_supplier_debt(request, pk: int):
                             name="Погашение долга клиента",
                             operation_type=PaymentPurpose.EXPENSE
                         )
-                    CashFlow.objects.create(
+                    cash_flow = CashFlow.objects.create(
                         account=cash_account,
                         amount=-int(float(amount_value)),
                         purpose=purpose,
@@ -3239,7 +3243,9 @@ def settle_supplier_debt(request, pk: int):
                     client=trans.client,
                     amount=amount_value,
                     comment=comment,
-                    created_by=user
+                    created_by=user,
+                    transaction=trans,
+                    cash_flow=cash_flow
                 )
 
                 row = type("Row", (), {
