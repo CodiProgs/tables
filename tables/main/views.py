@@ -4745,8 +4745,6 @@ def money_logs(request):
 @forbid_supplier
 @login_required
 def money_logs_list(request):
-    from django.db import connection
-
     page_number = request.GET.get('page', 1)
     try:
         page_number = int(page_number)
@@ -4763,177 +4761,103 @@ def money_logs_list(request):
 
     offset = (page_number - 1) * per_page
 
-    cf_table = CashFlow._meta.db_table
-    dr_table = SupplierDebtRepayment._meta.db_table
-    cdr_table = ClientDebtRepayment._meta.db_table
-    io_table = InvestorDebtOperation._meta.db_table
-    acc_table = Account._meta.db_table
-    sup_table = Supplier._meta.db_table
-    cli_table = Client._meta.db_table
-    purp_table = PaymentPurpose._meta.db_table
-    inv_table = Investor._meta.db_table
-    user_table = User._meta.db_table
+    cash_flows = CashFlow.objects.select_related(
+        'account', 'supplier', 'purpose', 'created_by'
+    ).order_by('-created_at')
 
-    select_cf = f"""
-        SELECT
-            CONCAT('cf-', cf.id) AS id,
-            cf.created_at AS dt,
-            'cf' AS src,
-            NULL AS operation_type,
-            acc.name AS account_name,
-            sup.name AS supplier_name,
-            purp.name AS purpose_name,
-            NULL AS investor_name,
-            NULL AS client_name,
-            cf.amount AS amount,
-            COALESCE(cf.comment,'') AS comment,
-            COALESCE(u.username,'') AS created_by
-        FROM {cf_table} cf
-        LEFT JOIN {acc_table} acc ON acc.id = cf.account_id
-        LEFT JOIN {sup_table} sup ON sup.id = cf.supplier_id
-        LEFT JOIN {purp_table} purp ON purp.id = cf.purpose_id
-        LEFT JOIN {user_table} u ON u.id = cf.created_by_id
-        WHERE purp.name NOT IN ('Забор инвестора', 'Внесение инвестора')
-        AND NOT EXISTS (
-            SELECT 1 FROM {cdr_table} cdr WHERE cdr.cash_flow_id = cf.id
-        )
-    """
+    investor_ops = InvestorDebtOperation.objects.select_related(
+        'investor', 'created_by'
+    ).filter(operation_type='profit').order_by('-created_at')
 
-    select_dr = f"""
-        SELECT
-            CONCAT('dr-', dr.id) AS id,
-            dr.created_at AS dt,
-            'dr' AS src,
-            NULL AS operation_type,
-            NULL AS account_name,
-            sup.name AS supplier_name,
-            NULL AS purpose_name,
-            NULL AS investor_name,
-            NULL AS client_name,
-            dr.amount AS amount,
-            COALESCE(dr.comment,'') AS comment,
-            COALESCE(u.username,'') AS created_by
-        FROM {dr_table} dr
-        LEFT JOIN {sup_table} sup ON sup.id = dr.supplier_id
-        LEFT JOIN {user_table} u ON u.id = dr.created_by_id
-    """
+    combined_items = list(cash_flows) + list(investor_ops)
+    
+    combined_items.sort(key=lambda x: x.created_at, reverse=True)
 
-    select_cdr = f"""
-        SELECT
-            CONCAT('cdr-', cdr.id) AS id,
-            cdr.created_at AS dt,
-            'cdr' AS src,
-            NULL AS operation_type,
-            NULL AS account_name,
-            NULL AS supplier_name,
-            NULL AS purpose_name,
-            NULL AS investor_name,
-            cli.name AS client_name,
-            cdr.amount AS amount,
-            COALESCE(cdr.comment,'') AS comment,
-            COALESCE(u.username,'') AS created_by
-        FROM {cdr_table} cdr
-        LEFT JOIN {cli_table} cli ON cli.id = cdr.client_id
-        LEFT JOIN {user_table} u ON u.id = cdr.created_by_id
-    """
-
-    select_io = f"""
-        SELECT
-            CONCAT('io-', io.id) AS id,
-            io.created_at AS dt,
-            'io' AS src,
-            io.operation_type AS operation_type,
-            NULL AS account_name,
-            NULL AS supplier_name,
-            NULL AS purpose_name,
-            inv.name AS investor_name,
-            NULL AS client_name,
-            CASE 
-                WHEN io.operation_type = 'withdrawal' THEN -io.amount
-                ELSE io.amount
-            END AS amount,
-            '' AS comment,
-            COALESCE(u.username,'') AS created_by
-        FROM {io_table} io
-        LEFT JOIN {inv_table} inv ON inv.id = io.investor_id
-        LEFT JOIN {user_table} u ON u.id = io.created_by_id
-    """
-
-    union_sql = f"({select_cf}) UNION ALL ({select_dr}) UNION ALL ({select_cdr}) UNION ALL ({select_io})"
-
-    count_sql = f"SELECT COUNT(*) FROM ({union_sql}) AS combined"
-    with connection.cursor() as cur:
-        cur.execute(count_sql)
-        total_count = cur.fetchone()[0] or 0
-
+    total_count = len(combined_items)
     total_pages = max(1, (total_count + per_page - 1) // per_page)
 
-    page_sql = f"""
-        {union_sql}
-        ORDER BY dt DESC
-        LIMIT %s OFFSET %s
-    """
+    page_items = combined_items[offset:offset + per_page]
 
     rows = []
-    with connection.cursor() as cur:
-        cur.execute(page_sql, [per_page, offset])
-        cols = [c[0] for c in cur.description]
-        for r in cur.fetchall():
-            rowdict = dict(zip(cols, r))
-            if rowdict['src'] == 'cf':
-                parts = []
-                if rowdict.get('account_name'):
-                    parts.append(f"Счет: {rowdict['account_name']}")
-                if rowdict.get('supplier_name'):
-                    parts.append(f"Поставщик: {rowdict['supplier_name']}")
-                if rowdict.get('purpose_name'):
-                    parts.append(f"Назначение: {rowdict['purpose_name']}")
-                info = ", ".join(parts)
-                type_label = "Движение ДС"
-            elif rowdict['src'] == 'dr':
-                info = f"Поставщик: {rowdict.get('supplier_name') or ''}"
+    for item in page_items:
+        if isinstance(item, CashFlow):
+            cf = item
+            purpose_name = cf.purpose.name if cf.purpose else ""
+            
+            if purpose_name == "Погашение долга поставщика":
                 type_label = "Погашение долга поставщика"
-            elif rowdict['src'] == 'cdr':
-                info = f"Клиент: {rowdict.get('client_name') or ''}, Счет: Наличные"
+                info = f"Поставщик: {cf.supplier.name if cf.supplier else ''}, Счет: {cf.account.name if cf.account else ''}"
+            elif purpose_name == "Возврат от поставщиков":
+                type_label = "Погашение долга поставщика"
+                info = f"Поставщик: {cf.supplier.name if cf.supplier else ''}, Счет: {cf.account.name if cf.account else ''}"
+            elif purpose_name == "Погашение долга клиента":
                 type_label = "Погашение долга клиента"
-            else:
-                info = f"Инвестор: {rowdict.get('investor_name') or ''}"
-                op = rowdict.get('operation_type') or ""
-                operation_type_map = {
-                    'withdrawal': 'Забор',
-                    'deposit': 'Внесение',
-                    'profit': 'Прибыль',
-                }
-                op_display = operation_type_map.get(op, op)
-                type_label = f"Инвестор: {op_display}"
-                
-                if op == 'withdrawal':
-                    info += ", Счет: Наличные"
-
-            def ensure_aware(dt):
-                if not dt:
-                    return None
+                client_name = ""
                 try:
-                    if timezone.is_naive(dt):
-                        return timezone.make_aware(dt, timezone.get_current_timezone())
+                    cdr = ClientDebtRepayment.objects.filter(cash_flow=cf).first()
+                    if cdr and cdr.client:
+                        client_name = cdr.client.name
                 except Exception:
-                    try:
-                        return timezone.make_aware(dt)
-                    except Exception:
-                        return dt
-                return dt
-
-            dt_val = ensure_aware(rowdict.get('dt'))
+                    pass
+                info = f"Клиент: {client_name}, Счет: {cf.account.name if cf.account else ''}"
+            elif purpose_name in ["Забор инвестора", "Внесение инвестора"]:
+                operation_map = {
+                    'Забор инвестора': 'Забор',
+                    'Внесение инвестора': 'Внесение',
+                }
+                type_label = f"Инвестор: {operation_map.get(purpose_name, purpose_name)}"
+                info = f"Счет: {cf.account.name if cf.account else ''}"
+                if cf.supplier:
+                    info += f", Поставщик: {cf.supplier.name}"
+            elif purpose_name == "Выдача бонусов":
+                type_label = "Выдача бонусов"
+                parts = []
+                if cf.account:
+                    parts.append(f"Счет: {cf.account.name}")
+                info = ", ".join(parts)
+            elif purpose_name == "ДТ":
+                type_label = "Выдача клиенту ДТ"
+                parts = []
+                if cf.account:
+                    parts.append(f"Счет: {cf.account.name}")
+                info = ", ".join(parts)
+            else:
+                type_label = "Движение ДС"
+                parts = []
+                if cf.account:
+                    parts.append(f"Счет: {cf.account.name}")
+                if cf.supplier:
+                    parts.append(f"Поставщик: {cf.supplier.name}")
+                if purpose_name:
+                    parts.append(f"Назначение: {purpose_name}")
+                info = ", ".join(parts)
 
             obj = type("LogRow", (), {})()
-            obj.id = rowdict.get('id')
-            obj.dt = rowdict.get('dt')
-            obj.date = timezone.localtime(dt_val).strftime("%d.%m.%Y %H:%M") if dt_val else ""
+            obj.id = f"cf-{cf.id}"
+            obj.dt = cf.created_at
+            obj.date = timezone.localtime(cf.created_at).strftime("%d.%m.%Y %H:%M") if cf.created_at else ""
             obj.type = type_label
             obj.info = info
-            obj.amount = rowdict.get('amount')
-            obj.comment = rowdict.get('comment') or ""
-            obj.created_by = rowdict.get('created_by') or ""
+            obj.amount = cf.amount
+            obj.comment = cf.comment or ""
+            obj.created_by = cf.created_by.username if cf.created_by else ""
+
+            rows.append(obj)
+
+        elif isinstance(item, InvestorDebtOperation):
+            io = item
+            type_label = "Инвестор: Прибыль"
+            info = f"Инвестор: {io.investor.name if io.investor else ''}"
+
+            obj = type("LogRow", (), {})()
+            obj.id = f"io-{io.id}"
+            obj.dt = io.created_at
+            obj.date = timezone.localtime(io.created_at).strftime("%d.%m.%Y %H:%M") if io.created_at else ""
+            obj.type = type_label
+            obj.info = info
+            obj.amount = io.amount
+            obj.comment = ""
+            obj.created_by = io.created_by.username if io.created_by else ""
 
             rows.append(obj)
 
@@ -5887,8 +5811,6 @@ def money_logs_types(request):
         {"id": "io-profit", "name": "Инвестор: Прибыль"},
     ]
     return JsonResponse(types, safe=False)
-
-
 
 @forbid_supplier
 @login_required
