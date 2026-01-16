@@ -39,6 +39,11 @@ def forbid_supplier(view_func):
 
 def parse_datetime_string(dt_str):
     dt_str = dt_str.strip()
+    if "T" in dt_str:
+        try:
+            return timezone.make_aware(datetime.strptime(dt_str, "%Y-%m-%dT%H:%M"))
+        except ValueError:
+            pass
     if " " in dt_str:
         try:
             return timezone.make_aware(datetime.strptime(dt_str, "%d.%m.%Y %H:%M"))
@@ -1488,7 +1493,8 @@ def cash_flow_detail(request, pk: int):
     data['operation_type'] = cashflow.operation_type
     data['formatted_amount'] = cashflow.formatted_amount
 
-    data['created_at_formatted'] = timezone.localtime(cashflow.created_at).strftime("%d.%m.%Y %H:%M") if cashflow.created_at else ""
+    # data['created_at_formatted'] = timezone.localtime(cashflow.created_at).strftime("%d.%m.%Y %H:%M") if cashflow.created_at else ""
+    data['created_at_formatted'] = timezone.localtime(cashflow.created_at).strftime('%Y-%m-%dT%H:%M') if cashflow.created_at else ""
 
     return JsonResponse({"data": data})
 
@@ -1506,7 +1512,7 @@ def cash_flow_create(request):
             account_id = request.POST.get("account")
             comment = request.POST.get("comment", "")
 
-            if not all([amount, purpose_id, supplier_id, account_id]):
+            if not all([amount, purpose_id, (supplier_id or account_id == "0")]):
                 return JsonResponse(
                     {"status": "error", "message": "Все поля должны быть заполнены"},
                     status=400,
@@ -1526,8 +1532,19 @@ def cash_flow_create(request):
                 )
 
             purpose = get_object_or_404(PaymentPurpose, id=purpose_id)
-            supplier = get_object_or_404(Supplier, id=supplier_id)
-            account = get_object_or_404(Account, id=account_id)
+
+            if account_id == "0":
+                cash_account = Account.objects.filter(name__iexact="Наличные").first()
+                if not cash_account:
+                    return JsonResponse(
+                        {"status": "error", "message": 'Счет "Наличные" не найден'},
+                        status=400,
+                    )
+                account = cash_account
+                supplier = None
+            else:
+                account = get_object_or_404(Account, id=account_id)
+                supplier = get_object_or_404(Supplier, id=supplier_id)
 
             amount_value = int(float(amount))
             if purpose.operation_type == PaymentPurpose.EXPENSE:
@@ -1638,7 +1655,6 @@ def cash_flow_create(request):
     except Exception as e:
         return JsonResponse({"status": "error", "message": str(e)}, status=400)
 
-
 @forbid_supplier
 @login_required
 @require_http_methods(["POST"])
@@ -1663,7 +1679,7 @@ def cash_flow_edit(request, pk=None):
 
             user = request.user
 
-            if not all([new_supplier_id, new_amount, new_purpose_id, new_account_id]):
+            if not all([new_amount, new_purpose_id, (new_supplier_id not in (None, "", "null") or new_account_id == "0")]):
                 return JsonResponse({
                     "status": "error",
                     "message": "Все поля обязательны для заполнения",
@@ -1693,9 +1709,25 @@ def cash_flow_edit(request, pk=None):
             old_amount = Decimal(cashflow.amount or 0)
             old_purpose_id = cashflow.purpose_id
 
-            new_supplier = get_object_or_404(Supplier, id=new_supplier_id)
+            if new_account_id == "0":
+                cash_account = Account.objects.filter(name__iexact="Наличные").first()
+                if not cash_account:
+                    return JsonResponse(
+                        {"status": "error", "message": 'Счет "Наличные" не найден'},
+                        status=400,
+                    )
+                new_account = cash_account
+                new_supplier = None
+            else:
+                if new_account_id in (None, "", "null"):
+                    return JsonResponse({"status": "error", "message": "Счет не указан"}, status=400)
+                new_account = get_object_or_404(Account, id=new_account_id)
+                if new_supplier_id in (None, "", "null"):
+                    new_supplier = None
+                else:
+                    new_supplier = get_object_or_404(Supplier, id=new_supplier_id)
+
             new_purpose = get_object_or_404(PaymentPurpose, id=new_purpose_id)
-            new_account = get_object_or_404(Account, id=new_account_id)
 
             if cashflow.purpose.operation_type == PaymentPurpose.INCOME and old_purpose_id != int(new_purpose_id):
                 return JsonResponse({
@@ -1771,7 +1803,6 @@ def cash_flow_edit(request, pk=None):
             })
     except Exception as e:
         return JsonResponse({"status": "error", "message": str(e)}, status=400)
-
 
 @forbid_supplier
 @login_required
@@ -1857,8 +1888,8 @@ def account_list(request):
         {"id": acc.id, "name": acc.name} for acc in accounts.exclude(name="Наличные")
     ]
 
-    if cash_account and not is_collection:
-        account_data.append({"id": cash_account.id, "name": "Наличные"})
+    # if cash_account and not is_collection:
+    #     account_data.append({"id": cash_account.id, "name": "Наличные"})
 
     return JsonResponse(account_data, safe=False)
 

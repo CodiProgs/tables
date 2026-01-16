@@ -1832,6 +1832,7 @@ const setupSupplierAccountSelects = (isCollection = false) => {
 
 	let loadToken = 0
 	const loadAccountsForSupplier = async supplierId => {
+		supplierId = supplierId === 'null' ? '' : supplierId
 		const myToken = ++loadToken
 
 		SelectHandler.updateSelectOptions(accountSelect, [])
@@ -1916,6 +1917,7 @@ const setupMultipleSupplierAccountSelects = (pairs = []) => {
 
 		let loadToken = 0
 		const loadAccountsForSupplier = async supplierId => {
+			supplierId = supplierId === 'null' ? '' : supplierId
 			const myToken = ++loadToken
 
 			SelectHandler.updateSelectOptions(accountSelect, [])
@@ -2442,6 +2444,8 @@ const cashflowConfig = createConfig(CASH_FLOW, {
 		if (createdAtInput) {
 			createdAtInput.removeAttribute('hidden')
 		}
+
+		setupCashFlowAccountSelect()
 	},
 	addFunc: () => {
 		setupCurrencyInput('amount')
@@ -2477,6 +2481,8 @@ const cashflowConfig = createConfig(CASH_FLOW, {
 				})
 			}
 		}
+
+		setupCashFlowAccountSelect()
 	},
 	afterAddFunc: result => {
 		refreshData(`${CASH_FLOW}-table`, result.id, true)
@@ -2521,6 +2527,95 @@ const moneyTransfersConfig = createConfig(MONEY_TRANSFERS, {
 		editModalTitle: 'Редактировать сделку',
 	},
 })
+
+function setupCashFlowAccountSelect() {
+	const supplierInput = document.querySelector('#supplier')
+	const accountSelect = document.querySelector('#account')?.closest('.select')
+
+	if (!supplierInput || !accountSelect) return
+
+	const accountInput = accountSelect.querySelector('.select__input')
+	const accountText = accountSelect.querySelector('.select__text')
+	const accountDropdown = accountSelect.querySelector('.select__dropdown')
+
+	if (!accountDropdown || !accountInput) return
+
+	const clearAccountSelectionUI = () => {
+		if (accountInput) accountInput.value = ''
+		if (accountText) {
+			accountText.textContent = accountInput?.getAttribute('placeholder') || ''
+			accountText.classList.add('select__placeholder')
+		}
+		accountSelect.classList.remove('has-value')
+	}
+
+	const ensureCashOptionExists = () => {
+		const allOptions = accountDropdown.querySelectorAll('.select__option')
+		allOptions.forEach(opt => opt.remove())
+
+		const cashOption = document.createElement('div')
+		cashOption.className = 'select__option'
+		cashOption.tabIndex = 0
+		cashOption.dataset.value = '0'
+		cashOption.textContent = 'Наличные'
+		accountDropdown.appendChild(cashOption)
+
+		if (
+			typeof SelectHandler !== 'undefined' &&
+			SelectHandler.attachOptionHandlers
+		) {
+			SelectHandler.attachOptionHandlers(accountSelect)
+		}
+	}
+
+	const loadAccountsForSupplier = async supplierId => {
+		supplierId = supplierId === 'null' ? '' : supplierId
+		if (!supplierId) {
+			ensureCashOptionExists()
+			clearAccountSelectionUI()
+			return
+		}
+
+		const url = `/accounts/list/?supplier_id=${encodeURIComponent(supplierId)}`
+		const data = await SelectHandler.fetchSelectOptions(url)
+
+		SelectHandler.updateSelectOptions(accountSelect, data)
+
+		requestAnimationFrame(() => {
+			if (accountInput) {
+				const currentVal =
+					accountInput.value || accountInput.getAttribute('value')
+				SelectHandler.restoreSelectValue(accountSelect, currentVal)
+			}
+		})
+	}
+
+	supplierInput.addEventListener('change', async () => {
+		let sid = supplierInput.value
+		sid = sid === 'null' ? '' : sid
+		clearAccountSelectionUI()
+		await loadAccountsForSupplier(sid)
+	})
+
+	const supplierSelect = supplierInput.closest('.select')
+	const supplierClear = supplierSelect?.querySelector('.select__clear')
+	if (supplierClear) {
+		supplierClear.addEventListener('click', function () {
+			setTimeout(() => {
+				ensureCashOptionExists()
+				clearAccountSelectionUI()
+			}, 0)
+		})
+	}
+
+	let initialSupplierId = supplierInput?.value
+	initialSupplierId = initialSupplierId === 'null' ? '' : initialSupplierId
+	if (initialSupplierId) {
+		loadAccountsForSupplier(initialSupplierId)
+	} else {
+		ensureCashOptionExists()
+	}
+}
 
 const createFormHandler = (
 	submitUrl,
@@ -4978,162 +5073,6 @@ const handleDebtors = async () => {
 
 								updateDTSummary()
 							}, 50)
-
-							// setTimeout(() => {
-							// 	try {
-							// 		if (!summaryTable) return
-							// 		const tbody = summaryTable.querySelector('tbody')
-							// 		if (!tbody) return
-
-							// 		if (!summaryTable.dataset.originalHtml) {
-							// 			summaryTable.dataset.originalHtml = tbody.innerHTML
-							// 		}
-
-							// 		const ths = Array.from(
-							// 			summaryTable.querySelectorAll('thead th')
-							// 		)
-							// 		const idx = name =>
-							// 			ths.findIndex(th => th.dataset.name === name)
-
-							// 		const clientIdx = idx('client')
-							// 		const amountIdx = idx('amount')
-							// 		const paidIdx = idx('client_debt_paid')
-
-							// 		if (clientIdx === -1 || amountIdx === -1 || paidIdx === -1)
-							// 			return
-
-							// 		const thead = summaryTable.querySelector('thead')
-							// 		if (!thead) return
-							// 		const headerRows = Array.from(thead.querySelectorAll('tr'))
-							// 		if (headerRows.length < 1) return
-							// 		const filterRow = headerRows[headerRows.length - 1]
-							// 		const clientFilterTd = filterRow.children[clientIdx]
-							// 		if (!clientFilterTd) return
-
-							// 		const selectEl = clientFilterTd.querySelector('.select')
-							// 		const clientInput =
-							// 			selectEl?.querySelector('.select__input') || null
-							// 		const clientTextEl =
-							// 			selectEl?.querySelector('.select__text') || null
-							// 		const clearBtn =
-							// 			selectEl?.querySelector('.select__clear') || null
-
-							// 		const parseNum = txt => {
-							// 			if (!txt) return 0
-							// 			const v = txt
-							// 				.toString()
-							// 				.replace(/\s/g, '')
-							// 				.replace('р.', '')
-							// 				.replace('р', '')
-							// 				.replace(',', '.')
-							// 			const n = Number(v)
-							// 			return isNaN(n) ? 0 : n
-							// 		}
-
-							// 		const restoreOriginal = () => {
-							// 			if (summaryTable.dataset.originalHtml) {
-							// 				tbody.innerHTML = summaryTable.dataset.originalHtml
-							// 				try {
-							// 					TableManager.formatCurrencyValues(summaryTable.id)
-							// 					TableManager.initTable &&
-							// 						TableManager.initTable(summaryTable.id)
-							// 				} catch (e) {}
-							// 			}
-							// 		}
-
-							// 		const aggregateForClient = () => {
-							// 			const clientName = (clientTextEl?.textContent || '').trim()
-							// 			if (!clientInput || !clientInput.value || !clientName)
-							// 				return
-
-							// 			restoreOriginal()
-
-							// 			const rows = Array.from(
-							// 				tbody.querySelectorAll(
-							// 					'tr:not(.table__row--summary):not(.table__row--empty)'
-							// 				)
-							// 			)
-
-							// 			const matched = rows.filter(row => {
-							// 				const cells = row.querySelectorAll('td')
-							// 				const cellText = (
-							// 					cells[clientIdx]?.textContent || ''
-							// 				).trim()
-							// 				return cellText === clientName
-							// 			})
-
-							// 			if (matched.length === 0) return
-
-							// 			let totalAmount = 0
-							// 			let totalPaid = 0
-
-							// 			matched.forEach(r => {
-							// 				const cells = r.querySelectorAll('td')
-							// 				totalAmount += parseNum(cells[amountIdx]?.textContent)
-							// 				totalPaid += parseNum(cells[paidIdx]?.textContent)
-							// 			})
-
-							// 			matched.forEach(r => r.remove())
-
-							// 			const tr = document.createElement('tr')
-							// 			tr.className = 'table__row'
-
-							// 			ths.forEach((th, i) => {
-							// 				const td = document.createElement('td')
-							// 				td.className = 'table__cell'
-							// 				if (th.classList.contains('hidden')) {
-							// 					td.classList.add('hidden')
-							// 				}
-							// 				if (ths[i].dataset.name === 'created_at') {
-							// 					td.textContent = '-'
-							// 				} else if (ths[i].dataset.name === 'client') {
-							// 					td.textContent = clientName
-							// 				} else if (ths[i].dataset.name === 'amount') {
-							// 					td.textContent = formatAmount(totalAmount)
-							// 				} else if (ths[i].dataset.name === 'client_debt_paid') {
-							// 					td.textContent = formatAmount(totalPaid)
-							// 				} else {
-							// 					td.textContent = ''
-							// 				}
-							// 				tr.appendChild(td)
-							// 			})
-
-							// 			const summaryRow = tbody.querySelector(
-							// 				'.table__row--summary'
-							// 			)
-							// 			if (summaryRow) {
-							// 				tbody.insertBefore(tr, summaryRow)
-							// 			} else {
-							// 				tbody.appendChild(tr)
-							// 			}
-
-							// 			try {
-							// 				TableManager.formatCurrencyValues(summaryTable.id)
-							// 			} catch (e) {}
-							// 		}
-
-							// 		if (clientInput) {
-							// 			clientInput.addEventListener('change', function () {
-							// 				if (!this.value) {
-							// 					restoreOriginal()
-							// 				} else {
-							// 					aggregateForClient()
-							// 				}
-							// 			})
-							// 		}
-
-							// 		if (clearBtn) {
-							// 			clearBtn.addEventListener('click', function () {
-							// 				restoreOriginal()
-							// 			})
-							// 		}
-							// 	} catch (e) {
-							// 		console.error(
-							// 			'Ошибка установки обработчиков для summary-remaining:',
-							// 			e
-							// 		)
-							// 	}
-							// }, 50)
 						}
 
 						const table = details.querySelector('table')
@@ -6322,14 +6261,12 @@ const handleDebtors = async () => {
 				const accountInput = accountSelect.querySelector('.select__input')
 				const accountText = accountSelect.querySelector('.select__text')
 
-				// Функция для удаления "Наличные"
 				const removeCashOption = () => {
 					const cashOption = Array.from(
 						accountDropdown.querySelectorAll('.select__option')
 					).find(opt => opt.textContent.trim() === 'Наличные')
 
 					if (cashOption) {
-						// Если выбраны "Наличные", сбрасываем выбор
 						if (accountInput.value === cashOption.dataset.value) {
 							accountInput.value = ''
 							accountText.textContent =
@@ -6342,7 +6279,6 @@ const handleDebtors = async () => {
 					}
 				}
 
-				// Функция для добавления "Наличные"
 				const addCashOption = () => {
 					const existingCashOption = Array.from(
 						accountDropdown.querySelectorAll('.select__option')
@@ -6363,18 +6299,14 @@ const handleDebtors = async () => {
 					}
 				}
 
-				// Обработчик изменения поставщика
 				supplierInput.addEventListener('change', function () {
 					if (this.value) {
-						// Если выбран поставщик - убираем "Наличные"
 						removeCashOption()
 					} else {
-						// Если поставщик очищен - добавляем "Наличные"
 						addCashOption()
 					}
 				})
 
-				// Обработчик для кнопки очистки поставщика
 				const supplierSelect = supplierInput.closest('.select')
 				const supplierClearBtn = supplierSelect?.querySelector('.select__clear')
 
