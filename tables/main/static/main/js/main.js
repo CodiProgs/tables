@@ -6271,6 +6271,10 @@ const handleDebtors = async () => {
 			}
 
 			const supplierInput = document.getElementById('supplier')
+			const accountSelect = document
+				.getElementById('account')
+				?.closest('.select')
+
 			if (supplierInput) {
 				supplierInput.setAttribute('placeholder', 'Выберите поставщика')
 				supplierInput.value = ''
@@ -6284,6 +6288,102 @@ const handleDebtors = async () => {
 					) {
 						textSpan.textContent = 'Выберите поставщика'
 					}
+					select.classList.remove('has-value')
+					textSpan.classList.add('select__placeholder')
+				}
+			}
+
+			if (accountSelect) {
+				const accountDropdown = accountSelect.querySelector('.select__dropdown')
+
+				if (accountDropdown) {
+					const existingCashOption = Array.from(
+						accountDropdown.querySelectorAll('.select__option')
+					).find(opt => opt.textContent.trim() === 'Наличные')
+
+					if (!existingCashOption) {
+						const cashOption = document.createElement('div')
+						cashOption.className = 'select__option'
+						cashOption.tabIndex = 0
+						cashOption.dataset.value = '0'
+						cashOption.textContent = 'Наличные'
+
+						accountDropdown.appendChild(cashOption)
+
+						if (typeof SelectHandler !== 'undefined') {
+							SelectHandler.attachOptionHandlers(accountSelect)
+						}
+					}
+				}
+			}
+
+			if (supplierInput && accountSelect) {
+				const accountDropdown = accountSelect.querySelector('.select__dropdown')
+				const accountInput = accountSelect.querySelector('.select__input')
+				const accountText = accountSelect.querySelector('.select__text')
+
+				// Функция для удаления "Наличные"
+				const removeCashOption = () => {
+					const cashOption = Array.from(
+						accountDropdown.querySelectorAll('.select__option')
+					).find(opt => opt.textContent.trim() === 'Наличные')
+
+					if (cashOption) {
+						// Если выбраны "Наличные", сбрасываем выбор
+						if (accountInput.value === cashOption.dataset.value) {
+							accountInput.value = ''
+							accountText.textContent =
+								accountInput.getAttribute('placeholder') || 'Выберите счет'
+							accountText.classList.add('select__placeholder')
+							accountSelect.classList.remove('has-value')
+						}
+
+						cashOption.remove()
+					}
+				}
+
+				// Функция для добавления "Наличные"
+				const addCashOption = () => {
+					const existingCashOption = Array.from(
+						accountDropdown.querySelectorAll('.select__option')
+					).find(opt => opt.textContent.trim() === 'Наличные')
+
+					if (!existingCashOption) {
+						const cashOption = document.createElement('div')
+						cashOption.className = 'select__option'
+						cashOption.tabIndex = 0
+						cashOption.dataset.value = '3'
+						cashOption.textContent = 'Наличные'
+
+						accountDropdown.appendChild(cashOption)
+
+						if (typeof SelectHandler !== 'undefined') {
+							SelectHandler.attachOptionHandlers(accountSelect)
+						}
+					}
+				}
+
+				// Обработчик изменения поставщика
+				supplierInput.addEventListener('change', function () {
+					if (this.value) {
+						// Если выбран поставщик - убираем "Наличные"
+						removeCashOption()
+					} else {
+						// Если поставщик очищен - добавляем "Наличные"
+						addCashOption()
+					}
+				})
+
+				// Обработчик для кнопки очистки поставщика
+				const supplierSelect = supplierInput.closest('.select')
+				const supplierClearBtn = supplierSelect?.querySelector('.select__clear')
+
+				if (supplierClearBtn) {
+					supplierClearBtn.addEventListener('click', function () {
+						setTimeout(() => {
+							addCashOption()
+						}, 50)
+					})
 				}
 			}
 		})

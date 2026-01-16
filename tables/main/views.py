@@ -4793,7 +4793,10 @@ def money_logs_list(request):
         LEFT JOIN {sup_table} sup ON sup.id = cf.supplier_id
         LEFT JOIN {purp_table} purp ON purp.id = cf.purpose_id
         LEFT JOIN {user_table} u ON u.id = cf.created_by_id
-        WHERE purp.name != 'Забор инвестора'
+        WHERE purp.name NOT IN ('Забор инвестора', 'Внесение инвестора')
+        AND NOT EXISTS (
+            SELECT 1 FROM {cdr_table} cdr WHERE cdr.cash_flow_id = cf.id
+        )
     """
 
     select_dr = f"""
@@ -4856,8 +4859,7 @@ def money_logs_list(request):
         LEFT JOIN {user_table} u ON u.id = io.created_by_id
     """
 
-    # union_sql = f"({select_cf}) UNION ALL ({select_dr}) UNION ALL ({select_cdr}) UNION ALL ({select_io})"
-    union_sql = f"({select_cf}) UNION ALL ({select_io})"
+    union_sql = f"({select_cf}) UNION ALL ({select_dr}) UNION ALL ({select_cdr}) UNION ALL ({select_io})"
 
     count_sql = f"SELECT COUNT(*) FROM ({union_sql}) AS combined"
     with connection.cursor() as cur:
@@ -5173,7 +5175,6 @@ def clear_hidden_rows(request):
     HiddenRows.objects.filter(user=request.user, table=table).delete()
     return JsonResponse({"status": "success"})
 
-
 @forbid_supplier
 @login_required
 @require_http_methods(["POST"])
@@ -5197,6 +5198,7 @@ def investor_debt_operation(request, pk: int):
         return JsonResponse({"status": "error", "message": "Сумма должна быть больше нуля"}, status=400)
 
     investor = get_object_or_404(Investor, id=investor_id)
+    
     if str(account_id) == "0":
         account = Account.objects.filter(name__iexact="Наличные").first()
         if not account:
@@ -5204,45 +5206,78 @@ def investor_debt_operation(request, pk: int):
     else:
         account = get_object_or_404(Account, id=account_id)
 
-    user = request.user
+    is_cash_account = account.name and account.name.lower() == "наличные"
 
+    if supplier_id and is_cash_account:
+        return JsonResponse({"status": "error", "message": "Нельзя одновременно выбрать поставщика и счет 'Наличные'"}, status=400)
+
+    user = request.user
     operation_obj = None
 
     if operation_type == "contribution":
-        if not supplier_id:
-            return JsonResponse({"status": "error", "message": "Поставщик обязателен для внесения"}, status=400)
-        supplier = get_object_or_404(Supplier, id=supplier_id)
+        if not supplier_id and is_cash_account:
+            account.balance = F('balance') + amount_value
+            account.save(update_fields=['balance'])
+            account.refresh_from_db(fields=['balance'])
 
-        supplier_account, _ = SupplierAccount.objects.get_or_create(
-            supplier=supplier,
-            account=account,
-            defaults={'balance': Decimal(0)}
-        )
+            purpose = PaymentPurpose.objects.filter(name="Внесение инвестора").first()
+            if not purpose:
+                purpose = PaymentPurpose.objects.create(name="Внесение инвестора", operation_type=PaymentPurpose.INCOME)
+            
+            CashFlow.objects.create(
+                account=account,
+                supplier=None,
+                amount=amount_value,
+                purpose=purpose,
+                comment=f"Внесение инвестора {investor.name}",
+                created_by=user
+            )
 
-        supplier_account.balance = (supplier_account.balance or Decimal(0)) + amount_value
-        supplier_account.save()
+            investor.balance = (investor.balance or Decimal(0)) + amount_value
+            investor.save()
 
-        purpose = PaymentPurpose.objects.filter(name="Внесение инвестора").first()
-        if not purpose:
-            purpose = PaymentPurpose.objects.create(name="Внесение инвестора", operation_type=PaymentPurpose.INCOME)
-        CashFlow.objects.create(
-            account=account,
-            supplier=supplier,
-            amount=amount_value,
-            purpose=purpose,
-            comment=f"Внесение инвестора {investor.name}",
-            created_by=user
-        )
+            operation_obj = InvestorDebtOperation.objects.create(
+                investor=investor,
+                operation_type="deposit",
+                amount=amount_value,
+                created_by=user
+            )
+        elif supplier_id:
+            supplier = get_object_or_404(Supplier, id=supplier_id)
 
-        investor.balance = (investor.balance or Decimal(0)) + amount_value
-        investor.save()
+            supplier_account, _ = SupplierAccount.objects.get_or_create(
+                supplier=supplier,
+                account=account,
+                defaults={'balance': Decimal(0)}
+            )
 
-        operation_obj = InvestorDebtOperation.objects.create(
-            investor=investor,
-            operation_type="deposit",
-            amount=amount_value,
-            created_by=user
-        )
+            supplier_account.balance = (supplier_account.balance or Decimal(0)) + amount_value
+            supplier_account.save()
+
+            purpose = PaymentPurpose.objects.filter(name="Внесение инвестора").first()
+            if not purpose:
+                purpose = PaymentPurpose.objects.create(name="Внесение инвестора", operation_type=PaymentPurpose.INCOME)
+            
+            CashFlow.objects.create(
+                account=account,
+                supplier=supplier,
+                amount=amount_value,
+                purpose=purpose,
+                comment=f"Внесение инвестора {investor.name}",
+                created_by=user
+            )
+
+            investor.balance = (investor.balance or Decimal(0)) + amount_value
+            investor.save()
+
+            operation_obj = InvestorDebtOperation.objects.create(
+                investor=investor,
+                operation_type="deposit",
+                amount=amount_value,
+                created_by=user
+            )
+        else:
+            return JsonResponse({"status": "error", "message": "Для внесения необходимо указать поставщика или выбрать счет 'Наличные'"}, status=400)
 
     elif operation_type == "withdrawal":
         supplier = None
@@ -5328,7 +5363,6 @@ def investor_debt_operation(request, pk: int):
         "operation_id": operation_obj.id,
         "investor_id": investor.id,
     })
-
 
 @forbid_supplier
 @login_required
