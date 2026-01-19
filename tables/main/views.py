@@ -1555,65 +1555,78 @@ def cash_flow_create(request):
             cashflow = None
 
             if purpose.name == "ДТ":
-                amount_value_decimal = Decimal(abs(amount_value))
+                    amount_value_decimal = Decimal(abs(amount_value))
 
-                if amount_value_decimal == 0:
-                    raise Exception("Сумма должна быть больше нуля")
+                    if amount_value_decimal == 0:
+                        raise Exception("Сумма должна быть больше нуля")
 
-                trans = (
-                    Transaction.objects
-                    .filter(client__name="ДТ")
-                    .annotate(
-                        client_debt_paid_calc=ExpressionWrapper(
-                            (F("paid_amount") * (Value(100) - F("client_percentage")) / Value(100))
-                            - F("returned_to_client"),
-                            output_field=DecimalField(max_digits=10, decimal_places=2)
+                    trans = (
+                        Transaction.objects
+                        .filter(client__name="ДТ")
+                        .annotate(
+                            client_debt_paid_calc=ExpressionWrapper(
+                                (F("paid_amount") * (Value(100) - F("client_percentage")) / Value(100))
+                                - F("returned_to_client"),
+                                output_field=DecimalField(max_digits=10, decimal_places=2)
+                            )
                         )
+                        .filter(client_debt_paid_calc__gte=amount_value_decimal)
+                        .order_by("client_debt_paid_calc")
+                        .first()
                     )
-                    .filter(client_debt_paid_calc__gte=amount_value_decimal)
-                    .order_by("client_debt_paid_calc") 
-                    .first()
-                )
 
-                if not trans:
-                    raise Exception("Нет транзакции клиента ДТ с достаточным долгом для списания")
+                    if not trans:
+                        raise Exception("Нет транзакции клиента ДТ с достаточным долгом для списания")
 
-                cash_account = Account.objects.filter(name__iexact="Наличные").first()
-                if not cash_account:
-                    raise Exception('Счет "Наличные" не найден')
+                    if not account:
+                        raise Exception("Счет не указан")
 
-                if Decimal(str(cash_account.balance or 0)) < amount_value_decimal:
-                    raise Exception("Недостаточно средств на счете 'Наличные'")
+                    if supplier:
+                        supplier_account_obj, _ = SupplierAccount.objects.select_for_update().get_or_create(
+                            supplier=supplier,
+                            account=account,
+                            defaults={'balance': Decimal('0')}
+                        )
+                        if Decimal(str(supplier_account_obj.balance or 0)) < amount_value_decimal:
+                            raise Exception(f"Недостаточно средств на счете поставщика '{supplier.name}' / '{account.name}'")
 
-                cash_account.balance = F('balance') - amount_value_decimal
-                cash_account.save(update_fields=['balance'])
-                cash_account.refresh_from_db(fields=['balance'])
+                        supplier_account_obj.balance = Decimal(supplier_account_obj.balance or 0) - amount_value_decimal
+                        supplier_account_obj.save()
+                    else:
+                        account_db = Account.objects.select_for_update().get(id=account.id)
+                        if Decimal(str(account_db.balance or 0)) < amount_value_decimal:
+                            raise Exception(f"Недостаточно средств на счете '{account_db.name}'")
+                        Account.objects.filter(id=account.id).update(balance=F('balance') - amount_value_decimal)
+                        account.refresh_from_db(fields=['balance'])
 
-                repay_purpose, _ = PaymentPurpose.objects.get_or_create(
-                    name="Погашение долга клиента",
-                    defaults={"operation_type": PaymentPurpose.EXPENSE}
-                )
+                    appended_comment = (comment + ". " if comment else "") + f"Выдача клиенту {trans.client}"
 
-                cashflow = CashFlow.objects.create(
-                    account=cash_account,
-                    amount=-int(amount_value_decimal),
-                    purpose=repay_purpose,
-                    comment=comment or f"Выдача клиенту {trans.client}",
-                    created_by=request.user,
-                    created_at=timezone.now()
-                )
+                    repay_purpose, _ = PaymentPurpose.objects.get_or_create(
+                        name="Погашение долга клиента",
+                        defaults={"operation_type": PaymentPurpose.EXPENSE}
+                    )
 
-                trans.returned_to_client = Decimal(str(trans.returned_to_client or 0)) + amount_value_decimal
-                trans.save()
+                    cashflow = CashFlow.objects.create(
+                        account=account,
+                        supplier=supplier if supplier else None,
+                        amount=-int(amount_value_decimal),
+                        purpose=repay_purpose,
+                        comment=appended_comment,
+                        created_by=request.user,
+                        created_at=timezone.now()
+                    )
 
-                ClientDebtRepayment.objects.create(
-                    client=trans.client,
-                    amount=amount_value_decimal,
-                    comment=comment,
-                    created_by=request.user,
-                    transaction=trans,
-                    cash_flow=cashflow
-                )
+                    trans.returned_to_client = Decimal(str(trans.returned_to_client or 0)) + amount_value_decimal
+                    trans.save()
+
+                    ClientDebtRepayment.objects.create(
+                        client=trans.client,
+                        amount=amount_value_decimal,
+                        comment=appended_comment,
+                        created_by=request.user,
+                        transaction=trans,
+                        cash_flow=cashflow
+                    )
 
 
             if purpose.name != 'ДТ':
