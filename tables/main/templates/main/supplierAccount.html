@@ -65,6 +65,7 @@
         <div id="context-menu"
              class="dropdown-menu"
              data-is-admin="{{ is_admin|yesno:'true,false' }}">
+            {% if request.user.user_type.name != "Ассистент" %}
             <a class="dropdown-item context-action"
                 id="collection-button"
                 data-action="collection">Инкассация</a>
@@ -73,6 +74,7 @@
                    data-action="add">Перемещение ₽</a>
                 <div class="dropdown-divider">
             </div>
+            {% endif %}
         <a class="dropdown-item context-action"
                id="print-button"
                data-action="print">Печать</a>

@@ -34,7 +34,45 @@
                 {% block content %}
                 {% endblock content %}
             </main>
-            {% if not request.user.user_type.name == "Поставщик" and request.user.user_type.name != "Ассистент" and request.user.user_type.name != "Филиал" %}
+            {% if request.user.is_authenticated and request.user.user_type.name == "Ассистент" %}
+                <nav class="sidebar-nav">
+                    <ul class="nav-list">
+                        <li class="nav-item {% if request.path == '/' %}active{% endif %}">
+                            <a href="{% url 'main:index' %}">
+                                <img src="{% static 'images/nav/house.svg' %}"
+                                    alt="Главная"
+                                    class="icon"
+                                    data-hint="Главная"
+                                    height="12"
+                                    width="12">
+                                <span>Главная</span>
+                            </a>
+                        </li>
+                        <li class="nav-item {% if request.resolver_match.url_name == 'cash_flow' %}active{% endif %}">
+                            <a href="{% url 'main:cash_flow' %}">
+                                <img src="{% static 'images/nav/chart-line.svg' %}"
+                                    alt="ДДС"
+                                    class="icon"
+                                    data-hint="ДДС"
+                                    height="12"
+                                    width="12">
+                                <span>ДДС</span>
+                            </a>
+                        </li>
+                        <li class="nav-item {% if 'accounts' in request.path %}active{% endif %}">
+                            <a href="{% url 'main:supplier_accounts' %}">
+                                <img src="{% static 'images/nav/wallet.svg' %}"
+                                    alt="Остатки на счетах"
+                                    class="icon"
+                                    data-hint="Остатки на счетах"
+                                    height="12"
+                                    width="12">
+                                <span>Остатки на счетах</span>
+                            </a>
+                        </li>
+                    </ul>
+                </nav>
+            {% elif not request.user.user_type.name == "Поставщик" and request.user.user_type.name != "Ассистент" and request.user.user_type.name != "Филиал" %}
                 <nav class="sidebar-nav">
                     <ul class="nav-list">
                         <li class="nav-item {% if request.path == '/' %}active{% endif %}">
