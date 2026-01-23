@@ -40,7 +40,7 @@ const formatAmountString = value => {
 			.replace(/\s/g, '')
 			.replace('р.', '')
 			.replace('р', '')
-			.replace(',', '.')
+			.replace(',', '.'),
 	)
 	if (isNaN(num)) return value
 	let formatted = num.toLocaleString('ru-RU', {
@@ -230,7 +230,7 @@ const colorizeAmounts = tableId => {
 
 const setIds = (ids, tableId) => {
 	const tableRows = document.querySelectorAll(
-		`#${tableId} tbody tr:not(.table__row--summary)`
+		`#${tableId} tbody tr:not(.table__row--summary)`,
 	)
 	if (!tableRows || tableRows.length === 0 || !ids || ids.length === 0) {
 		return
@@ -250,7 +250,7 @@ const setColumnIds = (ids, tableId) => {
 
 	if (columnsToProcess !== ids.length) {
 		console.error(
-			`Количество столбцов (${columnsToProcess}) не совпадает с количеством ID (${ids.length})`
+			`Количество столбцов (${columnsToProcess}) не совпадает с количеством ID (${ids.length})`,
 		)
 		return
 	}
@@ -276,7 +276,7 @@ const setColumnIds = (ids, tableId) => {
 
 const setLastRowId = (id, tableId) => {
 	const tableRows = Array.from(
-		document.querySelectorAll(`#${tableId} tbody tr:not(.table__row--summary)`)
+		document.querySelectorAll(`#${tableId} tbody tr:not(.table__row--summary)`),
 	)
 	if (tableRows.length === 0) {
 		console.error(`Таблица ${tableId} не содержит строк`)
@@ -289,7 +289,7 @@ const setLastRowId = (id, tableId) => {
 
 const setFirstRowId = (id, tableId) => {
 	const tableRows = Array.from(
-		document.querySelectorAll(`#${tableId} tbody tr:not(.table__row--summary)`)
+		document.querySelectorAll(`#${tableId} tbody tr:not(.table__row--summary)`),
 	)
 	if (tableRows.length === 0) {
 		console.error(`Таблица ${tableId} не содержит строк`)
@@ -322,7 +322,7 @@ const showChangedCells = (changedCells, tableId) => {
 				columnIndexes.client_percentage !== undefined
 			) {
 				cells[columnIndexes.client_percentage].classList.add(
-					'table__cell--changed'
+					'table__cell--changed',
 				)
 			}
 			if (
@@ -330,7 +330,7 @@ const showChangedCells = (changedCells, tableId) => {
 				columnIndexes.supplier_percentage !== undefined
 			) {
 				cells[columnIndexes.supplier_percentage].classList.add(
-					'table__cell--changed'
+					'table__cell--changed',
 				)
 			}
 		}
@@ -359,7 +359,7 @@ const hideCompletedTransactions = debts => {
 	let manualHiddenIds = []
 	try {
 		manualHiddenIds = JSON.parse(
-			localStorage.getItem(`${TRANSACTION}-table-hidden-rows`) || '[]'
+			localStorage.getItem(`${TRANSACTION}-table-hidden-rows`) || '[]',
 		)
 	} catch (e) {}
 
@@ -428,7 +428,7 @@ const hideCompletedTransactions = debts => {
 
 	localStorage.setItem(
 		`${TRANSACTION}-table-hidden-rows`,
-		JSON.stringify(Array.from(hiddenIds))
+		JSON.stringify(Array.from(hiddenIds)),
 	)
 	localStorage.setItem(`${TRANSACTION}-table-show-all`, 'false')
 
@@ -438,7 +438,7 @@ const hideCompletedTransactions = debts => {
 
 const toggleTransactionVisibility = rowId => {
 	const row = document.querySelector(
-		`#${TRANSACTION}-table tr[data-id="${rowId}"]`
+		`#${TRANSACTION}-table tr[data-id="${rowId}"]`,
 	)
 	if (!row) return
 
@@ -452,7 +452,7 @@ const toggleAllTransactions = (show, debts) => {
 	if (!table) return
 
 	const rows = document.querySelectorAll(
-		`#${TRANSACTION}-table tbody tr:not(.table__row--summary)`
+		`#${TRANSACTION}-table tbody tr:not(.table__row--summary)`,
 	)
 
 	if (show) {
@@ -540,10 +540,10 @@ const toggleAllTransactions = (show, debts) => {
 
 const updateHiddenRowsCounter = () => {
 	const hiddenCount = document.querySelectorAll(
-		`#${TRANSACTION}-table .hidden-row`
+		`#${TRANSACTION}-table .hidden-row`,
 	).length
 	const totalCount = document.querySelectorAll(
-		`#${TRANSACTION}-table tbody tr:not(.table__row--summary)`
+		`#${TRANSACTION}-table tbody tr:not(.table__row--summary)`,
 	).length
 	const counterElement = document.getElementById('hidden-rows-counter')
 
@@ -649,7 +649,7 @@ const addMenuHandler = () => {
 			}
 
 			const row = e.target.closest(
-				'tbody tr:not(.table__row--summary):not(.table__row--empty)'
+				'tbody tr:not(.table__row--summary):not(.table__row--empty)',
 			)
 
 			const table = e.target.closest('table')
@@ -668,7 +668,10 @@ const addMenuHandler = () => {
 						table.id === 'investor-operations-table'
 					) {
 						settleDebtButton.style.display = 'none'
-					} else if (table.id === 'investors-table') {
+					} else if (
+						table.id === 'investors-table' ||
+						table.id === 'client-debt-repayments-table'
+					) {
 						settleDebtButton.style.display = 'none'
 						settleDebtButton.dataset.type = ''
 					} else {
@@ -721,11 +724,11 @@ const addMenuHandler = () => {
 
 				if (table.id === 'investors-table') {
 					const selectedCell = document.querySelector(
-						'td.table__cell--selected'
+						'td.table__cell--selected',
 					)
 					if (selectedCell) {
 						const cellIndex = Array.from(
-							selectedCell.parentNode.children
+							selectedCell.parentNode.children,
 						).indexOf(selectedCell)
 						const th = table.querySelectorAll('thead th')[cellIndex]
 						const colName = th ? th.dataset.name : null
@@ -782,7 +785,7 @@ const addMenuHandler = () => {
 				if (
 					h4 &&
 					['Оборудование', 'Кредит', 'Краткосрочные обязательства'].includes(
-						h4.textContent.trim()
+						h4.textContent.trim(),
 					)
 				) {
 					if (settleDebtButton) {
@@ -817,7 +820,7 @@ const addMenuHandler = () => {
 					touchTimer = null
 				}, LONG_PRESS_DELAY)
 			},
-			{ passive: true }
+			{ passive: true },
 		)
 
 		document.addEventListener(
@@ -828,7 +831,7 @@ const addMenuHandler = () => {
 					touchTimer = null
 				}
 			},
-			{ passive: true }
+			{ passive: true },
 		)
 
 		document.addEventListener(
@@ -839,7 +842,7 @@ const addMenuHandler = () => {
 					touchTimer = null
 				}
 			},
-			{ passive: true }
+			{ passive: true },
 		)
 
 		document.addEventListener('click', e => {
@@ -859,7 +862,7 @@ const markAsViewed = async (id, row) => {
 	try {
 		const response = await postData(
 			`${BASE_URL}${TRANSACTION}/${id}/mark-viewed/`,
-			{}
+			{},
 		)
 
 		row.classList.remove('table__row--blinking')
@@ -869,7 +872,7 @@ const markAsViewed = async (id, row) => {
 		}
 
 		const blinkingRows = document.querySelectorAll(
-			`#${TRANSACTION}-table .table__row--blinking`
+			`#${TRANSACTION}-table .table__row--blinking`,
 		)
 		if (blinkingRows.length === 0) {
 			const markAllBtn = document.getElementById('mark-all-read-btn')
@@ -883,17 +886,17 @@ const markAsViewed = async (id, row) => {
 
 function hideCompletedExchangeRows(fromCompleted = [], toCompleted = []) {
 	const fromRows = document.querySelectorAll(
-		'#from_us_exchange-table tbody tr:not(.table__row--summary)'
+		'#from_us_exchange-table tbody tr:not(.table__row--summary)',
 	)
 	const toRows = document.querySelectorAll(
-		'#to_us_exchange-table tbody tr:not(.table__row--summary)'
+		'#to_us_exchange-table tbody tr:not(.table__row--summary)',
 	)
 
 	const fromCompletedIds = (
 		Array.isArray(fromCompleted) ? fromCompleted : []
 	).map(String)
 	const toCompletedIds = (Array.isArray(toCompleted) ? toCompleted : []).map(
-		String
+		String,
 	)
 
 	fromRows.forEach(row => {
@@ -929,10 +932,10 @@ function toggleExchangeRowVisibility(rowId, tableId) {
 
 function toggleAllExchangeRows(show, tableId, completedIds = []) {
 	const rows = document.querySelectorAll(
-		`#${tableId} tbody tr:not(.table__row--summary)`
+		`#${tableId} tbody tr:not(.table__row--summary)`,
 	)
 	const completedStrIds = (Array.isArray(completedIds) ? completedIds : []).map(
-		String
+		String,
 	)
 	if (show) {
 		rows.forEach(row => row.classList.remove('hidden-row'))
@@ -969,8 +972,8 @@ const createExchangeFormHandler = action => {
 				action === 'add'
 					? 'Добавить обмен'
 					: action === 'edit'
-					? 'Редактировать обмен'
-					: 'Удалить обмен',
+						? 'Редактировать обмен'
+						: 'Удалить обмен',
 			...(mainConfig.modalConfig.context
 				? { context: mainConfig.modalConfig.context }
 				: {}),
@@ -986,13 +989,13 @@ const createExchangeFormHandler = action => {
 					result,
 					result.transfer_type === 'from_us'
 						? 'from_us_exchange-table'
-						: 'to_us_exchange-table'
+						: 'to_us_exchange-table',
 				)
 
 				const table = document.getElementById(tableId)
 				if (table) {
 					const rows = table.querySelectorAll(
-						'tbody tr:not(.table__row--summary)'
+						'tbody tr:not(.table__row--summary)',
 					)
 					if (rows.length > 0) {
 						const lastRow = rows[rows.length - 1]
@@ -1009,7 +1012,7 @@ const createExchangeFormHandler = action => {
 							result.old_transfer_type === 'from_us'
 								? 'from_us_exchange-table'
 								: 'to_us_exchange-table'
-						} tr[data-id="${result.id}"]`
+						} tr[data-id="${result.id}"]`,
 					)
 					if (row) row.remove()
 
@@ -1017,13 +1020,13 @@ const createExchangeFormHandler = action => {
 						result,
 						result.transfer_type === 'from_us'
 							? 'from_us_exchange-table'
-							: 'to_us_exchange-table'
+							: 'to_us_exchange-table',
 					)
 
 					const table = document.getElementById(tableId)
 					if (table) {
 						const rows = table.querySelectorAll(
-							'tbody tr:not(.table__row--summary)'
+							'tbody tr:not(.table__row--summary)',
 						)
 						if (rows.length > 0) {
 							const lastRow = rows[rows.length - 1]
@@ -1035,7 +1038,7 @@ const createExchangeFormHandler = action => {
 						result,
 						result.transfer_type === 'from_us'
 							? 'from_us_exchange-table'
-							: 'to_us_exchange-table'
+							: 'to_us_exchange-table',
 					)
 				}
 			}
@@ -1055,11 +1058,11 @@ const createExchangeFormHandler = action => {
 					: [0]
 
 			const filteredFrom = counted_from_us.filter(
-				id => !from_us_completed.includes(id)
+				id => !from_us_completed.includes(id),
 			)
 
 			const filteredTo = counted_to_us.filter(
-				id => !to_us_completed.includes(id)
+				id => !to_us_completed.includes(id),
 			)
 
 			TableManager.calculateTableSummary('from_us_exchange-table', ['amount'], {
@@ -1069,13 +1072,13 @@ const createExchangeFormHandler = action => {
 				ids: filteredTo,
 			})
 			highlightExchangeTotals(counted_from_us)
-		}
+		},
 	)
 }
 
 const markAllAsViewed = async () => {
 	const blinkingRows = document.querySelectorAll(
-		`#${TRANSACTION}-table .table__row--blinking`
+		`#${TRANSACTION}-table .table__row--blinking`,
 	)
 	if (blinkingRows.length === 0) return
 
@@ -1096,7 +1099,7 @@ const markAllAsViewed = async () => {
 
 		const response = await postData(
 			`${BASE_URL}${TRANSACTION}/mark-all-viewed/`,
-			{ ids }
+			{ ids },
 		)
 
 		if (response) {
@@ -1112,7 +1115,7 @@ const markAllAsViewed = async () => {
 			if (markAllBtn) markAllBtn.remove()
 		} else {
 			showError(
-				response.message || 'Ошибка при отметке транзакций как прочитанных'
+				response.message || 'Ошибка при отметке транзакций как прочитанных',
 			)
 		}
 	} catch (error) {
@@ -1148,7 +1151,7 @@ const highlightModifiedRows = async () => {
 
 		modifiedIds.forEach(id => {
 			const row = document.querySelector(
-				`#${TRANSACTION}-table tr[data-id="${id}"]`
+				`#${TRANSACTION}-table tr[data-id="${id}"]`,
 			)
 			if (row) {
 				row.classList.add('table__row--blinking')
@@ -1230,7 +1233,7 @@ const setupSelectListener = () => {
 				const optionValue = e.target.dataset.value
 				try {
 					const { data } = await fetchData(
-						`${BASE_URL}${SUPPLIERS}/${optionValue}/`
+						`${BASE_URL}${SUPPLIERS}/${optionValue}/`,
 					)
 					const percentageInput = document.getElementById('supplier_percentage')
 					if (percentageInput && data.cost_percentage !== undefined) {
@@ -1316,7 +1319,7 @@ const toggleAllDebtors = (show, tableId) => {
 	}
 
 	const rows = document.querySelectorAll(
-		`#${tableId} tbody tr:not(.table__row--summary)`
+		`#${tableId} tbody tr:not(.table__row--summary)`,
 	)
 
 	if (show) {
@@ -1356,10 +1359,10 @@ const toggleAllDebtors = (show, tableId) => {
 
 const updateHiddenDebtorsCounter = () => {
 	const hiddenCount = document.querySelectorAll(
-		`#debtors-table .hidden-row`
+		`#debtors-table .hidden-row`,
 	).length
 	const totalCount = document.querySelectorAll(
-		`#debtors-table tbody tr:not(.table__row--summary)`
+		`#debtors-table tbody tr:not(.table__row--summary)`,
 	).length
 	const counterElement = document.getElementById('hidden-rows-counter')
 
@@ -1395,7 +1398,7 @@ function highlightExchangeTotals(counted_from_us = []) {
 		const amountTh = fromTable.querySelector('th[data-name="amount"]')
 		if (summaryRow && amountTh) {
 			const amountIndex = Array.from(amountTh.parentNode.children).indexOf(
-				amountTh
+				amountTh,
 			)
 			const amountCell = summaryRow.querySelectorAll('td')[amountIndex]
 			if (amountCell) {
@@ -1405,7 +1408,7 @@ function highlightExchangeTotals(counted_from_us = []) {
 						.replace(/\s/g, '')
 						.replace('р.', '')
 						.replace('р', '')
-						.replace(',', '.')
+						.replace(',', '.'),
 				)
 			}
 		}
@@ -1416,7 +1419,7 @@ function highlightExchangeTotals(counted_from_us = []) {
 		const amountTh = toTable.querySelector('th[data-name="amount"]')
 		if (summaryRow && amountTh) {
 			const amountIndex = Array.from(amountTh.parentNode.children).indexOf(
-				amountTh
+				amountTh,
 			)
 			const amountCell = summaryRow.querySelectorAll('td')[amountIndex]
 			if (amountCell) {
@@ -1426,7 +1429,7 @@ function highlightExchangeTotals(counted_from_us = []) {
 						.replace(/\s/g, '')
 						.replace('р.', '')
 						.replace('р', '')
-						.replace(',', '.')
+						.replace(',', '.'),
 				)
 			}
 		}
@@ -1761,7 +1764,7 @@ function showChangedCellsRow(row, changedCells) {
 			columnIndexes.client_percentage !== undefined
 		) {
 			cells[columnIndexes.client_percentage].classList.add(
-				'table__cell--changed'
+				'table__cell--changed',
 			)
 		}
 		if (
@@ -1769,7 +1772,7 @@ function showChangedCellsRow(row, changedCells) {
 			columnIndexes.supplier_percentage !== undefined
 		) {
 			cells[columnIndexes.supplier_percentage].classList.add(
-				'table__cell--changed'
+				'table__cell--changed',
 			)
 		}
 	}
@@ -1818,7 +1821,7 @@ const setupSupplierAccountSelects = (isCollection = false) => {
 
 	const selectVtbAccount = () => {
 		const vtbOption = Array.from(
-			accountDropdown.querySelectorAll('.select__option')
+			accountDropdown.querySelectorAll('.select__option'),
 		).find(opt => opt.textContent.trim() === 'Р/с Втб')
 		if (vtbOption) {
 			accountInput.value = vtbOption.dataset.value
@@ -1839,7 +1842,7 @@ const setupSupplierAccountSelects = (isCollection = false) => {
 
 		if (!supplierId) return
 		const url = `/accounts/list/?supplier_id=${encodeURIComponent(
-			supplierId
+			supplierId,
 		)}&is_collection=${isCollection}`
 		const data = await SelectHandler.fetchSelectOptions(url)
 
@@ -1924,7 +1927,7 @@ const setupMultipleSupplierAccountSelects = (pairs = []) => {
 
 			if (!supplierId) return
 			const url = `/accounts/list/?supplier_id=${encodeURIComponent(
-				supplierId
+				supplierId,
 			)}`
 			const data = await SelectHandler.fetchSelectOptions(url)
 
@@ -1973,7 +1976,7 @@ function setupUserTypeBranchToggle() {
 	function toggleBranch() {
 		const value = userTypeInput.value
 		const selectedText = Array.from(
-			document.querySelectorAll('.select__option[data-value]')
+			document.querySelectorAll('.select__option[data-value]'),
 		)
 			.find(opt => opt.dataset.value === value)
 			?.textContent?.trim()
@@ -2034,7 +2037,7 @@ export class TablePaginator {
 
 		try {
 			const currentPageData = document.getElementById(
-				this.selectors.currentPageData
+				this.selectors.currentPageData,
 			)?.textContent
 			if (currentPageData) {
 				this.currentPage = JSON.parse(currentPageData)
@@ -2048,7 +2051,7 @@ export class TablePaginator {
 
 		try {
 			const totalPagesData = document.getElementById(
-				this.selectors.totalPagesData
+				this.selectors.totalPagesData,
 			)?.textContent
 
 			if (totalPagesData) {
@@ -2132,7 +2135,7 @@ export class TablePaginator {
 
 		try {
 			const res = await fetch(
-				`${this.baseUrl}${this.entityName}/list/?page=${page}`
+				`${this.baseUrl}${this.entityName}/list/?page=${page}`,
 			)
 			if (!res.ok) {
 				let errBody = { message: `HTTP error! status: ${res.status}` }
@@ -2159,7 +2162,7 @@ export class TablePaginator {
 				} catch (e) {
 					console.warn(
 						'Ошибка при применении клиентских фильтров после пагинации:',
-						e
+						e,
 					)
 				}
 
@@ -2424,7 +2427,7 @@ const cashflowConfig = createConfig(CASH_FLOW, {
 						options.forEach(option => {
 							option.classList.remove('text-red', 'text-green')
 							const typeObj = types.find(
-								t => String(t.id) === option.dataset.value
+								t => String(t.id) === option.dataset.value,
 							)
 
 							if (typeObj) {
@@ -2466,7 +2469,7 @@ const cashflowConfig = createConfig(CASH_FLOW, {
 						options.forEach(option => {
 							option.classList.remove('text-red', 'text-green')
 							const typeObj = types.find(
-								t => String(t.id) === option.dataset.value
+								t => String(t.id) === option.dataset.value,
 							)
 
 							if (typeObj) {
@@ -2624,7 +2627,7 @@ const createFormHandler = (
 	getUrl = [],
 	dataUrls,
 	modalConfig,
-	onSuccess
+	onSuccess,
 ) => {
 	return new DynamicFormHandler({
 		submitUrl: submitUrl,
@@ -2683,7 +2686,7 @@ const settleDebtAllFormHandler = createFormHandler(
 					tableOps.querySelector('tbody').appendChild(newRow)
 					TableManager.formatCurrencyValuesForRow(
 						'investor-operations-table',
-						newRow
+						newRow,
 					)
 				}
 			}
@@ -2694,18 +2697,18 @@ const settleDebtAllFormHandler = createFormHandler(
 			if (investorsTable) {
 				TableManager.updateTableRow(
 					{ html: result.html_investor_row, id: result.investor_id },
-					'investors-table'
+					'investors-table',
 				)
 				const investorRow = TableManager.getRowById(
 					result.investor_id,
-					'investors-table'
+					'investors-table',
 				)
 				TableManager.formatCurrencyValuesForRow('investors-table', investorRow)
 
 				TableManager.calculateTableSummary('investors-table', ['balance'])
 			}
 		}
-	}
+	},
 )
 
 const paymentFormHandler = createFormHandler(
@@ -2733,7 +2736,7 @@ const paymentFormHandler = createFormHandler(
 		if (result.debts) {
 			colorizeRemainingAmountByDebtsRow(row, result.debts)
 		}
-	}
+	},
 )
 
 const collectionFormHandler = createFormHandler(
@@ -2760,7 +2763,7 @@ const collectionFormHandler = createFormHandler(
 					cells[cells.length - 1].classList.add('total-column')
 				}
 				const headerCells = document.querySelectorAll(
-					'#suppliers-account-table thead th'
+					'#suppliers-account-table thead th',
 				)
 				cells.forEach((cell, index) => {
 					if (cell.textContent.trim() === 'Наличные') {
@@ -2781,7 +2784,7 @@ const collectionFormHandler = createFormHandler(
 			const table = document.getElementById('suppliers-account-table')
 			const tbody = table.querySelector('tbody')
 			const lastRow = tbody.querySelector(
-				'tr.total-row, tr.table__row--summary'
+				'tr.total-row, tr.table__row--summary',
 			)
 			if (lastRow) {
 				const newRow = document.createElement('tr')
@@ -2789,7 +2792,7 @@ const collectionFormHandler = createFormHandler(
 				const parser = new DOMParser()
 				const htmlDoc = parser.parseFromString(
 					`<table><tr>${result.total_html}</tr></table>`,
-					'text/html'
+					'text/html',
 				)
 				const parsedRow = htmlDoc.querySelector('tr.table__row')
 				if (parsedRow) {
@@ -2816,7 +2819,7 @@ const collectionFormHandler = createFormHandler(
 					tbody.replaceChild(newRow, lastRow)
 					TableManager.formatCurrencyValuesForRow(
 						`suppliers-account-table`,
-						newRow
+						newRow,
 					)
 				} else {
 					console.error('Не удалось распарсить HTML итоговой строки')
@@ -2830,18 +2833,18 @@ const collectionFormHandler = createFormHandler(
 		) {
 			const cashBalanceDisplay = document.getElementById('cash-balance-display')
 			const grandTotalWithCashDisplay = document.getElementById(
-				'grand-total-with-cash-display'
+				'grand-total-with-cash-display',
 			)
 			if (cashBalanceDisplay) {
 				cashBalanceDisplay.textContent = formatAmountString(result.cash_balance)
 			}
 			if (grandTotalWithCashDisplay) {
 				grandTotalWithCashDisplay.textContent = formatAmountString(
-					result.grand_total_with_cash
+					result.grand_total_with_cash,
 				)
 			}
 		}
-	}
+	},
 )
 
 const moneyTransfersFormHandler = createFormHandler(
@@ -2881,24 +2884,24 @@ const moneyTransfersFormHandler = createFormHandler(
 		) {
 			const cashBalanceDisplay = document.getElementById('cash-balance-display')
 			const grandTotalWithCashDisplay = document.getElementById(
-				'grand-total-with-cash-display'
+				'grand-total-with-cash-display',
 			)
 			if (cashBalanceDisplay) {
 				cashBalanceDisplay.textContent = formatAmountString(result.cash_balance)
 			}
 			if (grandTotalWithCashDisplay) {
 				grandTotalWithCashDisplay.textContent = formatAmountString(
-					result.grand_total_with_cash
+					result.grand_total_with_cash,
 				)
 			}
 		}
-	}
+	},
 )
 
 const updateBalanceSpans = data => {
 	try {
 		const headers = Array.from(
-			document.querySelectorAll('#balance-container .debtors-header')
+			document.querySelectorAll('#balance-container .debtors-header'),
 		)
 		if (headers.length >= 2) {
 			const assetsSpan = headers[0].querySelector('.debtors-total')
@@ -2911,12 +2914,12 @@ const updateBalanceSpans = data => {
 
 		const setItemTotalByTitle = (title, value) => {
 			const titleNodes = Array.from(
-				document.querySelectorAll('.debtors-office-list__title')
+				document.querySelectorAll('.debtors-office-list__title'),
 			)
 			const node = titleNodes.find(n => n.textContent.trim() === title)
 			if (node) {
 				const amountSpan = node.parentElement.querySelector(
-					'.debtors-office-list__amount'
+					'.debtors-office-list__amount',
 				)
 				if (amountSpan) amountSpan.textContent = formatAmount(value)
 			}
@@ -2974,7 +2977,7 @@ const balanceFormHandler = createFormHandler(
 		}
 
 		updateBalanceSpans(result)
-	}
+	},
 )
 
 const balanceEditFormHandler = createFormHandler(
@@ -2998,10 +3001,11 @@ const balanceEditFormHandler = createFormHandler(
 			result.type === 'inventory'
 				? 'inventory-table'
 				: result.type === 'credit'
-				? 'credits-table'
-				: result.type === 'short_term' || result.type === 'short_term_liability'
-				? 'short-term-table'
-				: null
+					? 'credits-table'
+					: result.type === 'short_term' ||
+						  result.type === 'short_term_liability'
+						? 'short-term-table'
+						: null
 
 		;['inventory-table', 'credits-table', 'short-term-table'].forEach(tid => {
 			if (tid === targetTable) return
@@ -3011,12 +3015,12 @@ const balanceEditFormHandler = createFormHandler(
 
 		if (targetTable) {
 			const existingRow = document.querySelector(
-				`#${targetTable} tr[data-id="${result.id}"]`
+				`#${targetTable} tr[data-id="${result.id}"]`,
 			)
 			if (existingRow) {
 				TableManager.updateTableRow(
 					{ html: result.html, id: result.id },
-					targetTable
+					targetTable,
 				)
 			} else {
 				TableManager.addTableRow({ html: result.html }, targetTable)
@@ -3027,7 +3031,7 @@ const balanceEditFormHandler = createFormHandler(
 		}
 
 		updateBalanceSpans(result)
-	}
+	},
 )
 
 function initBalanceAddButton() {
@@ -3054,8 +3058,8 @@ function initBalanceAddButton() {
 			(type === 'inventory'
 				? 'ТМЦ'
 				: type === 'credit'
-				? 'Кредит'
-				: 'Краткосрочное обязательство')
+					? 'Кредит'
+					: 'Краткосрочное обязательство')
 
 		await balanceFormHandler.init(0)
 
@@ -3118,7 +3122,7 @@ function initBalanceAddButton() {
 							(priceInput ? priceInput.value || 0 : 0)
 								.toString()
 								.replace(/\s/g, '')
-								.replace(',', '.')
+								.replace(',', '.'),
 						) || 0
 				}
 				const total = qty * priceVal
@@ -3224,7 +3228,7 @@ function initBalanceEditButton() {
 								(priceInput ? priceInput.value || 0 : 0)
 									.toString()
 									.replace(/\s/g, '')
-									.replace(',', '.')
+									.replace(',', '.'),
 							) || 0
 					}
 					const total = qty * priceVal
@@ -3328,7 +3332,7 @@ function initBalanceDeleteButton() {
 					const loaderEl = document.querySelector('.loader')
 					if (loaderEl) loaderEl.remove()
 				}
-			}
+			},
 		)
 	})
 }
@@ -3448,7 +3452,7 @@ const handleTransactions = async config => {
 			{ name: 'documents' },
 			{ name: 'fully_paid_at' },
 		],
-		['amount', 'profit']
+		['amount', 'profit'],
 	)
 
 	const paymentButton = document.getElementById('payment-button')
@@ -3557,14 +3561,14 @@ const handleProfitDistribution = async () => {
 	}
 
 	const profitDistributionButton = document.getElementById(
-		'profit_distribution-button'
+		'profit_distribution-button',
 	)
 	if (profitDistributionButton) {
 		profitDistributionButton.addEventListener('click', async function (e) {
 			e.preventDefault()
 
 			const transactionId = TableManager.getSelectedRowId(
-				'profit_distribution-table'
+				'profit_distribution-table',
 			)
 		})
 	}
@@ -3713,7 +3717,7 @@ const handleSupplierAccounts = async (is_init = true) => {
 					try {
 						refreshBtn.disabled = true
 						await moneyLogsPaginator.goToPage(
-							moneyLogsPaginator.currentPage || 1
+							moneyLogsPaginator.currentPage || 1,
 						)
 					} catch (e) {
 						console.error('Ошибка при обновлении money-logs:', e)
@@ -3736,14 +3740,14 @@ const handleSupplierAccounts = async (is_init = true) => {
 
 	const cashBalanceDisplay = document.getElementById('cash-balance-display')
 	const grandTotalWithCashDisplay = document.getElementById(
-		'grand-total-with-cash-display'
+		'grand-total-with-cash-display',
 	)
 
 	if (!cashBalanceDisplay && !grandTotalWithCashDisplay) {
 		try {
 			const cash_balance = document.getElementById('cash-balance')?.textContent
 			const grand_total_with_cash = document.getElementById(
-				'grand-total-with-cash'
+				'grand-total-with-cash',
 			)?.textContent
 			const table = document.getElementById('suppliers-account-table')
 			if (cash_balance && grand_total_with_cash && table) {
@@ -3831,7 +3835,7 @@ const handleCashFlow = async config => {
 			{ name: 'comment' },
 			{ name: 'created_by', url: '/users/list/' },
 		],
-		['profit']
+		['profit'],
 	)
 
 	const urlParams = new URLSearchParams(window.location.search)
@@ -3863,11 +3867,11 @@ const handleCashFlow = async config => {
 					select.classList.add('has-value')
 				} else if (dropdown && typeof SelectHandler !== 'undefined') {
 					SelectHandler.fetchSelectOptions(
-						'/payment_purposes/list/?all=True'
+						'/payment_purposes/list/?all=True',
 					).then(options => {
 						SelectHandler.updateSelectOptions(select, options)
 						const newOption = dropdown.querySelector(
-							`.select__option[data-value="${idPurpose}"]`
+							`.select__option[data-value="${idPurpose}"]`,
 						)
 						if (newOption && textSpan) {
 							textSpan.textContent = newOption.textContent
@@ -4025,7 +4029,7 @@ const handleReport = () => {
 	} catch (e) {
 		console.error(
 			'Error parsing money transfers IDs data for actions column:',
-			e
+			e,
 		)
 	}
 
@@ -4050,10 +4054,10 @@ const handleReport = () => {
 		if (detailButton) {
 			detailButton.addEventListener('click', function () {
 				const selectedRow = document.querySelector(
-					'#cash_flow_report-table tr.table__row--selected'
+					'#cash_flow_report-table tr.table__row--selected',
 				)
 				const selectedCell = document.querySelector(
-					'#cash_flow_report-table td.table__cell--selected'
+					'#cash_flow_report-table td.table__cell--selected',
 				)
 				let query = ''
 				if (selectedRow) {
@@ -4067,7 +4071,7 @@ const handleReport = () => {
 
 					if (selectedCell && !isTotalRow) {
 						const cellIndex = Array.from(
-							selectedCell.parentNode.children
+							selectedCell.parentNode.children,
 						).indexOf(selectedCell)
 						isLastCell = cellIndex === cells.length - 1
 						if (cellIndex > 0 && !isLastCell) {
@@ -4088,7 +4092,7 @@ const handleReport = () => {
 								'декабрь',
 							]
 							const monthIndex = months.findIndex(
-								m => m.toLowerCase() === monthName.toLowerCase()
+								m => m.toLowerCase() === monthName.toLowerCase(),
 							)
 							const year =
 								ths[cellIndex]?.dataset?.year || new Date().getFullYear()
@@ -4126,7 +4130,7 @@ const handleMoneyTransfers = async config => {
 	} catch (e) {
 		console.error(
 			'Error parsing money transfers IDs data for actions column:',
-			e
+			e,
 		)
 	}
 	initTableHandlers(config)
@@ -4159,11 +4163,11 @@ const handleExchange = () => {
 					: [0]
 
 			const filteredFrom = counted_from_us.filter(
-				id => !from_us_completed.includes(id)
+				id => !from_us_completed.includes(id),
 			)
 
 			const filteredTo = counted_to_us.filter(
-				id => !to_us_completed.includes(id)
+				id => !to_us_completed.includes(id),
 			)
 
 			TableManager.calculateTableSummary('from_us_exchange-table', ['amount'], {
@@ -4182,7 +4186,7 @@ const handleExchange = () => {
 	} catch (e) {
 		console.error(
 			'Error parsing money transfers IDs data for actions column:',
-			e
+			e,
 		)
 	}
 
@@ -4234,7 +4238,7 @@ const handleExchange = () => {
 	if (editButton) {
 		editButton.addEventListener('click', async function (e) {
 			const rowId = TableManager.getSelectedRowId(
-				editExchangeFormHandler.tableId
+				editExchangeFormHandler.tableId,
 			)
 
 			if (rowId) {
@@ -4266,7 +4270,7 @@ const handleExchange = () => {
 	if (deleteButton) {
 		deleteButton.addEventListener('click', async function (e) {
 			const rowId = TableManager.getSelectedRowId(
-				deleteExchangeFormHandler.tableId
+				deleteExchangeFormHandler.tableId,
 			)
 
 			if (rowId) {
@@ -4287,14 +4291,14 @@ const handleExchange = () => {
 						const result = await TableManager.sendDeleteRequest(
 							rowId,
 							deleteExchangeFormHandler.config.submitUrl,
-							deleteExchangeFormHandler.tableId
+							deleteExchangeFormHandler.tableId,
 						)
 
 						if (result && result.status === 'success') {
 							let counted_from_us =
 								result.transfer_type === 'from_us'
 									? Array.isArray(result?.counted_from_us) &&
-									  result.counted_from_us.length > 0
+										result.counted_from_us.length > 0
 										? result.counted_from_us
 										: [0]
 									: []
@@ -4307,7 +4311,7 @@ const handleExchange = () => {
 								{
 									ids:
 										result.transfer_type === 'from_us' ? counted_from_us : [],
-								}
+								},
 							)
 							let to_us_completed = result.to_us_completed || []
 							let from_us_completed = result.from_us_completed || []
@@ -4319,11 +4323,11 @@ const handleExchange = () => {
 									: [0]
 
 							const filteredFrom = counted_from_us.filter(
-								id => !from_us_completed.includes(id)
+								id => !from_us_completed.includes(id),
 							)
 
 							const filteredTo = counted_to_us.filter(
-								id => !to_us_completed.includes(id)
+								id => !to_us_completed.includes(id),
 							)
 
 							TableManager.calculateTableSummary(
@@ -4334,19 +4338,19 @@ const handleExchange = () => {
 										filteredFrom && filteredFrom.length > 0
 											? filteredFrom
 											: [0],
-								}
+								},
 							)
 							TableManager.calculateTableSummary(
 								'to_us_exchange-table',
 								['amount'],
 								{
 									ids: filteredTo,
-								}
+								},
 							)
 
 							highlightExchangeTotals(counted_from_us)
 						}
-					}
+					},
 				)
 			} else {
 				showError('Выберите строку для удаления!')
@@ -4386,7 +4390,7 @@ const handleExchange = () => {
 	}
 
 	const exchangeSummaryButton = document.getElementById(
-		'exchange-summary-button'
+		'exchange-summary-button',
 	)
 	if (exchangeSummaryButton) {
 		exchangeSummaryButton.addEventListener('click', async function () {
@@ -4408,10 +4412,10 @@ const handleExchange = () => {
 							return
 						}
 						const fromRows = document.querySelectorAll(
-							'#from_us_exchange-table tbody tr:not(.table__row--summary)'
+							'#from_us_exchange-table tbody tr:not(.table__row--summary)',
 						)
 						const toRows = document.querySelectorAll(
-							'#to_us_exchange-table tbody tr:not(.table__row--summary)'
+							'#to_us_exchange-table tbody tr:not(.table__row--summary)',
 						)
 						fromRows.forEach(row => row.classList.add('hidden-row'))
 						toRows.forEach(row => row.classList.add('hidden-row'))
@@ -4419,7 +4423,7 @@ const handleExchange = () => {
 					} catch (e) {
 						showError('Ошибка завершения переводов.')
 					}
-				}
+				},
 			)
 		})
 	}
@@ -4442,7 +4446,7 @@ function renderBalance(data) {
 					amount: i.amount ?? i.total ?? 0,
 					formatted: i.formatted_total ?? null,
 					table_html: i.table_html ?? i.html ?? null,
-			  }))
+				}))
 			: []
 
 	const inventory = mapItems(data?.current_assets?.inventory?.items)
@@ -4485,7 +4489,7 @@ function renderBalance(data) {
 							name: i.branch ?? i.name ?? i.title ?? '-',
 							amount: i.amount ?? i.total ?? 0,
 							formatted: i.formatted_total ?? null,
-					  }))
+						}))
 					: null
 
 				if (item.name === 'Нераспределенная прибыль') {
@@ -4498,7 +4502,7 @@ function renderBalance(data) {
 						item.amount ?? 0,
 						nestedItems,
 						'name',
-						opt
+						opt,
 					)
 				}
 
@@ -4518,7 +4522,7 @@ function renderBalance(data) {
 			'name',
 			{
 				formatted: data?.liabilities?.formatted_total,
-			}
+			},
 		)
 	}
 
@@ -4535,21 +4539,21 @@ function renderBalance(data) {
 									data?.current_assets?.inventory?.total ?? 0,
 									inventory,
 									'name',
-									inventoryOptions
+									inventoryOptions,
 								)}
                 ${renderGroup(
 									'Дебиторская задолженность',
 									data?.current_assets?.debtors?.total ?? 0,
 									debtors,
 									'name',
-									debtorsOptions
+									debtorsOptions,
 								)}
                 ${renderGroup(
 									'Денежные средства',
 									data?.current_assets?.cash?.total ?? 0,
 									cash,
 									'name',
-									cashOptions
+									cashOptions,
 								)}
             </ul>
 
@@ -4567,7 +4571,7 @@ function renderBalance(data) {
 										formatted:
 											data?.liabilities?.capital?.formatted ??
 											data?.capital?.formatted,
-									}
+									},
 								)}
             </ul>
         </div>
@@ -4579,10 +4583,10 @@ function renderSimple(title, total, options = {}) {
 		options.formatted !== undefined
 			? `<span class="debtors-office-list__amount">${options.formatted}</span>`
 			: total !== null && total !== undefined
-			? `<span class="debtors-office-list__amount">${formatAmount(
-					total
-			  )}</span>`
-			: ''
+				? `<span class="debtors-office-list__amount">${formatAmount(
+						total,
+					)}</span>`
+				: ''
 
 	return `
         <li class="debtors-office-list__item">
@@ -4605,7 +4609,7 @@ function renderGroup(title, total, items, nameKey = 'name', options = {}) {
                         <h4>${
 													i[nameKey] ?? i.name ?? '-'
 												}</h4> <span>${formatAmount(i.amount)}</span>
-                    </div>`
+                    </div>`,
 			)
 			.join('')
 	} else {
@@ -4623,10 +4627,10 @@ function renderGroup(title, total, items, nameKey = 'name', options = {}) {
 		options.formatted !== undefined
 			? `<span class="debtors-office-list__amount">${options.formatted}</span>`
 			: total !== null && total !== undefined
-			? `<span class="debtors-office-list__amount">${formatAmount(
-					total
-			  )}</span>`
-			: ''
+				? `<span class="debtors-office-list__amount">${formatAmount(
+						total,
+					)}</span>`
+				: ''
 
 	const loadedAttr =
 		options.html || options.table_html || (items && items.length > 0)
@@ -4730,8 +4734,8 @@ const handleDebtors = async () => {
 					try {
 						const response = await fetch(
 							`/suppliers/debtors/details/?type=${type}&value=${encodeURIComponent(
-								value
-							)}`
+								value,
+							)}`,
 						)
 
 						if (!response.ok) {
@@ -4773,7 +4777,7 @@ const handleDebtors = async () => {
 											) {
 												TableManager.calculateTableSummary(
 													data.transactions_table_id,
-													['supplier_debt']
+													['supplier_debt'],
 												)
 											}
 										}
@@ -4781,8 +4785,8 @@ const handleDebtors = async () => {
 										if (tableId === data.repayments_table_id) {
 											const rows = Array.from(
 												table.querySelectorAll(
-													'tbody tr:not(.table__row--summary)'
-												)
+													'tbody tr:not(.table__row--summary)',
+												),
 											)
 
 											if (rows.length > 10) {
@@ -4797,7 +4801,7 @@ const handleDebtors = async () => {
 											}
 										}
 									}
-								}
+								},
 							)
 						} else if (value === 'Инвесторам') {
 							details.innerHTML =
@@ -4814,15 +4818,15 @@ const handleDebtors = async () => {
 								</div>`
 
 							const operationsRow = details.querySelector(
-								'[data-target="investor-operations-details"]'
+								'[data-target="investor-operations-details"]',
 							)
 							const operationsDetails = details.querySelector(
-								'#investor-operations-details'
+								'#investor-operations-details',
 							)
 							if (operationsRow && operationsDetails) {
 								operationsRow.addEventListener('click', function () {
 									const btn = operationsRow.querySelector(
-										'.debtors-office-list__toggle'
+										'.debtors-office-list__toggle',
 									)
 									btn.classList.toggle('open')
 									const isOpen = operationsDetails.style.display !== 'none'
@@ -4871,7 +4875,7 @@ const handleDebtors = async () => {
 							}
 
 							const operationsTable = details.querySelector(
-								'#investor-operations-table'
+								'#investor-operations-table',
 							)
 							if (operationsTable) {
 								const tbody = operationsTable.querySelector('.table__body')
@@ -4922,6 +4926,149 @@ const handleDebtors = async () => {
 								repaymentContainer.innerHTML = data.html_client_debt_repayments
 								details.appendChild(repaymentContainer)
 
+								const paginationControls = document.createElement('div')
+								paginationControls.className =
+									'pagination-controls client-debt-pagination'
+								paginationControls.innerHTML = `
+                                    <button class="pagination-button" id="cdr-first-page" title="Первая страница" disabled>
+                                        <img src="/static/images/angle-double-left.svg" class="icon" height="12" width="12" alt="">
+                                    </button>
+                                    <button class="pagination-button" id="cdr-prev-page" title="Предыдущая страница" disabled>
+                                        <img src="/static/images/angle-left.svg" class="icon" height="12" width="12" alt="">
+                                    </button>
+                                    <div class="pagination-line"></div>
+                                    <div class="pagination-input-container">
+                                        <span>Страница</span>
+                                        <input type="text" id="cdr-current-page" class="pagination-input" value="0" disabled>
+                                        <span>из</span>
+                                        <span id="cdr-total-pages">0</span>
+                                    </div>
+                                    <div class="pagination-line"></div>
+                                    <button class="pagination-button" id="cdr-next-page" title="Следующая страница" disabled>
+                                        <img src="/static/images/angle-right.svg" class="icon" height="12" width="12" alt="">
+                                    </button>
+                                    <button class="pagination-button" id="cdr-last-page" title="Последняя страница" disabled>
+                                        <img src="/static/images/angle-double-right.svg" class="icon" height="12" width="12" alt="">
+                                    </button>
+                                `
+								details.appendChild(paginationControls)
+
+								const cdrFirstBtn =
+									paginationControls.querySelector('#cdr-first-page')
+								const cdrPrevBtn =
+									paginationControls.querySelector('#cdr-prev-page')
+								const cdrNextBtn =
+									paginationControls.querySelector('#cdr-next-page')
+								const cdrLastBtn =
+									paginationControls.querySelector('#cdr-last-page')
+								const cdrCurrentInput =
+									paginationControls.querySelector('#cdr-current-page')
+								const cdrTotalSpan =
+									paginationControls.querySelector('#cdr-total-pages')
+
+								const setPaginationState = (pageNum, totalPages) => {
+									pageNum = Number(pageNum) || 1
+									totalPages = Number(totalPages) || 1
+									cdrCurrentInput.value = pageNum
+									cdrCurrentInput.max = totalPages
+									cdrTotalSpan.textContent = totalPages
+									cdrCurrentInput.disabled = totalPages <= 1
+									cdrFirstBtn.disabled = pageNum <= 1
+									cdrPrevBtn.disabled = pageNum <= 1
+									cdrNextBtn.disabled = pageNum >= totalPages
+									cdrLastBtn.disabled = pageNum >= totalPages
+								}
+
+								if (
+									data.client_debt_repayments_page ||
+									data.client_debt_repayments_total_pages
+								) {
+									setPaginationState(
+										data.client_debt_repayments_page,
+										data.client_debt_repayments_total_pages,
+									)
+								} else {
+									setPaginationState(1, 1)
+								}
+
+								const loadCdrPage = async page => {
+									const loader = createLoader()
+									document.body.appendChild(loader)
+									try {
+										const url = `/suppliers/debtors/details/?type=${type}&value=${encodeURIComponent(
+											value,
+										)}&cdr_page=${encodeURIComponent(page)}`
+										const res = await fetch(url)
+										if (!res.ok) {
+											const err = await res.json().catch(() => ({}))
+											throw new Error(err.message || 'Ошибка загрузки страницы')
+										}
+										const nd = await res.json()
+
+										if (nd.html_client_debt_repayments) {
+											repaymentContainer.innerHTML =
+												nd.html_client_debt_repayments
+										}
+
+										let repTable = repaymentContainer.querySelector('table')
+										try {
+											if (
+												repTable &&
+												Array.isArray(nd.client_debt_repayment_ids)
+											) {
+												setIds(nd.client_debt_repayment_ids, repTable.id)
+											}
+										} catch (e) {}
+
+										setPaginationState(
+											nd.client_debt_repayments_page || page,
+											nd.client_debt_repayments_total_pages || 1,
+										)
+
+										TableManager.init()
+										if (
+											repTable &&
+											typeof TableManager.formatCurrencyValues === 'function'
+										) {
+											TableManager.formatCurrencyValues(repTable.id)
+										}
+									} catch (err) {
+										console.error('Ошибка при загрузке страницы выдач:', err)
+										showError(
+											err.message || 'Ошибка при загрузке истории выдач',
+										)
+									} finally {
+										loader.remove()
+									}
+								}
+
+								cdrFirstBtn.addEventListener('click', () => {
+									const p = 1
+									loadCdrPage(p)
+								})
+								cdrPrevBtn.addEventListener('click', () => {
+									const cur = Number(cdrCurrentInput.value) || 1
+									loadCdrPage(Math.max(1, cur - 1))
+								})
+								cdrNextBtn.addEventListener('click', () => {
+									const cur = Number(cdrCurrentInput.value) || 1
+									const max = Number(cdrTotalSpan.textContent) || 1
+									loadCdrPage(Math.min(max, cur + 1))
+								})
+								cdrLastBtn.addEventListener('click', () => {
+									const max = Number(cdrTotalSpan.textContent) || 1
+									loadCdrPage(max)
+								})
+
+								cdrCurrentInput.addEventListener('change', () => {
+									let target = parseInt(cdrCurrentInput.value, 10)
+									const max = Number(cdrTotalSpan.textContent) || 1
+									if (isNaN(target) || target < 1) target = 1
+									if (target > max) target = max
+									cdrCurrentInput.value = target
+									loadCdrPage(target)
+								})
+
 								const repaymentTable = repaymentContainer.querySelector('table')
 								if (repaymentTable) {
 									const tbody = repaymentTable.querySelector('.table__body')
@@ -4964,7 +5111,7 @@ const handleDebtors = async () => {
 									if (!summaryTable) return
 
 									const ths = Array.from(
-										summaryTable.querySelectorAll('thead th')
+										summaryTable.querySelectorAll('thead th'),
 									)
 									const idx = name =>
 										ths.findIndex(th => th.dataset.name === name)
@@ -4995,7 +5142,7 @@ const handleDebtors = async () => {
 										} catch (e) {
 											console.error(
 												'Ошибка при вычислении summary-remaining:',
-												e
+												e,
 											)
 										}
 									}
@@ -5018,7 +5165,7 @@ const handleDebtors = async () => {
 								} catch (e) {
 									console.error(
 										'Ошибка настройки пересчёта summary-remaining:',
-										e
+										e,
 									)
 								}
 
@@ -5028,16 +5175,18 @@ const handleDebtors = async () => {
 
 									const headers = Array.from(table.querySelectorAll('thead th'))
 									const clientIndex = headers.findIndex(
-										th => th.dataset.name === 'client'
+										th => th.dataset.name === 'client',
 									)
 									const debtIndex = headers.findIndex(
-										th => th.dataset.name === 'client_debt_paid'
+										th => th.dataset.name === 'client_debt_paid',
 									)
 
 									if (clientIndex === -1 || debtIndex === -1) return
 
 									const tableRows = Array.from(
-										table.querySelectorAll('tbody tr:not(.table__row--summary)')
+										table.querySelectorAll(
+											'tbody tr:not(.table__row--summary)',
+										),
 									)
 									let total = 0
 
@@ -5079,7 +5228,7 @@ const handleDebtors = async () => {
 
 						if (table && table.id.startsWith('branch-transactions-')) {
 							const summaryCells = table.querySelectorAll(
-								'td.table__cell--summary'
+								'td.table__cell--summary',
 							)
 							summaryCells.forEach(cell => {
 								if (cell.classList.contains('text-green')) {
@@ -5428,15 +5577,15 @@ const handleDebtors = async () => {
 									{ id: 'withdrawal', name: 'Забор' },
 								],
 							},
-					  ]
+						]
 					: table && table.id === 'summary-profit'
-					? [
-							{
-								id: 'investor_select',
-								url: `${BASE_URL}investors/list/`,
-							},
-					  ]
-					: [],
+						? [
+								{
+									id: 'investor_select',
+									url: `${BASE_URL}investors/list/`,
+								},
+							]
+						: [],
 				{
 					url:
 						type === 'investors' || type === 'initial' || type === 'balance'
@@ -5449,8 +5598,8 @@ const handleDebtors = async () => {
 					].includes(type)
 						? 'Изменение суммы'
 						: type === 'investors'
-						? 'Изменение суммы'
-						: 'Погашение долга',
+							? 'Изменение суммы'
+							: 'Погашение долга',
 					...(mainConfig.modalConfig.context
 						? { context: mainConfig.modalConfig.context }
 						: {}),
@@ -5468,7 +5617,7 @@ const handleDebtors = async () => {
 
 								if (result.html_client_debt_repayments) {
 									const repaymentTable = document.getElementById(
-										'client-debt-repayments-table'
+										'client-debt-repayments-table',
 									)
 									if (repaymentTable) {
 										const tbody = repaymentTable.querySelector('tbody')
@@ -5480,11 +5629,11 @@ const handleDebtors = async () => {
 
 											TableManager.addTableRow(
 												{ html: result.html_client_debt_repayments },
-												'client-debt-repayments-table'
+												'client-debt-repayments-table',
 											).then(row => {
 												TableManager.formatCurrencyValuesForRow(
 													'client-debt-repayments-table',
-													row
+													row,
 												)
 											})
 										}
@@ -5499,13 +5648,13 @@ const handleDebtors = async () => {
 									result.html_debt_repayments.forEach(html => {
 										TableManager.addTableRow(
 											{ html },
-											`branch-repayments-${result.branch}`
+											`branch-repayments-${result.branch}`,
 										)
 									})
 								} else if (result.html_debt_repayments) {
 									TableManager.addTableRow(
 										{ html: result.html_debt_repayments },
-										`branch-repayments-${result.branch}`
+										`branch-repayments-${result.branch}`,
 									)
 								}
 
@@ -5516,7 +5665,7 @@ const handleDebtors = async () => {
 											const id = result.changed_ids[idx]
 											TableManager.updateTableRow(
 												{ html: htmlRow, id },
-												tableId
+												tableId,
 											)
 
 											const row = TableManager.getRowById(id, tableId)
@@ -5526,7 +5675,7 @@ const handleDebtors = async () => {
 								}
 
 								const table = document.getElementById(
-									`branch-repayments-${result.branch}`
+									`branch-repayments-${result.branch}`,
 								)
 								if (table) {
 									table
@@ -5546,11 +5695,11 @@ const handleDebtors = async () => {
 
 								TableManager.addTableRow(
 									{ html: result.html_investor_debt_operation },
-									`investor-operations-table`
+									`investor-operations-table`,
 								)
 
 								const table_investors = document.getElementById(
-									`investor-operations-table`
+									`investor-operations-table`,
 								)
 								if (table_investors) {
 									table_investors
@@ -5564,7 +5713,7 @@ const handleDebtors = async () => {
 
 								TableManager.addTableRow(
 									{ html: result.html_investor_debt_operation },
-									`investor-operations-table`
+									`investor-operations-table`,
 								)
 
 								break
@@ -5573,11 +5722,11 @@ const handleDebtors = async () => {
 
 								TableManager.addTableRow(
 									{ html: result.html_investor_debt_operation },
-									`investor-operations-table`
+									`investor-operations-table`,
 								)
 
 								const table_profit = document.getElementById(
-									`investor-operations-table`
+									`investor-operations-table`,
 								)
 								if (table_profit) {
 									table_profit
@@ -5624,7 +5773,7 @@ const handleDebtors = async () => {
 							result.total_summary_debts !== undefined &&
 								result.total_summary_debts !== null
 								? 'summary-header'
-								: 'branch-debts-header'
+								: 'branch-debts-header',
 						)
 
 						if (
@@ -5635,7 +5784,7 @@ const handleDebtors = async () => {
 							const totalSpan = debtsHeader.querySelector('span.debtors-total')
 							if (totalSpan) {
 								let number = Number(
-									result.total_summary_debts || result.total_branch_debts || 0
+									result.total_summary_debts || result.total_branch_debts || 0,
 								)
 								if (!isNaN(number)) {
 									let formatted = number
@@ -5666,7 +5815,7 @@ const handleDebtors = async () => {
 							if (result.branch !== 'Филиал_1' && result.branch !== 'Наши_ИП') {
 								TableManager.calculateTableSummary(
 									`branch-transactions-${result.branch}`,
-									['supplier_debt']
+									['supplier_debt'],
 								)
 							}
 						} else if (
@@ -5693,7 +5842,7 @@ const handleDebtors = async () => {
 						if (table) {
 							if (table && table.id.startsWith('branch-transactions-')) {
 								const summaryCells = table.querySelectorAll(
-									'td.table__cell--summary'
+									'td.table__cell--summary',
 								)
 								summaryCells.forEach(cell => {
 									if (cell.classList.contains('text-green')) {
@@ -5713,7 +5862,7 @@ const handleDebtors = async () => {
 							typeof result.type === 'string'
 						) {
 							const branchSpans = Array.from(
-								document.querySelectorAll('.debtors-office-list__title')
+								document.querySelectorAll('.debtors-office-list__title'),
 							)
 							let branchKey = null
 							if (typeof result.branch === 'string') {
@@ -5743,11 +5892,11 @@ const handleDebtors = async () => {
 								const branchSpan = branchSpans.find(
 									span =>
 										span.textContent.trim() ===
-										branchKey.replace(/_/g, ' ').trim()
+										branchKey.replace(/_/g, ' ').trim(),
 								)
 								if (branchSpan) {
 									const amountSpan = branchSpan.parentElement.querySelector(
-										'.debtors-office-list__amount'
+										'.debtors-office-list__amount',
 									)
 									if (amountSpan) {
 										let debt = Number(result.total_debt)
@@ -5769,7 +5918,7 @@ const handleDebtors = async () => {
 												amountSpan.classList.add('text-green')
 
 												const selectedRow = document.querySelector(
-													'tr.table__row--selected'
+													'tr.table__row--selected',
 												)
 												if (selectedRow) {
 													selectedRow.classList.remove('table__row--selected')
@@ -5787,12 +5936,12 @@ const handleDebtors = async () => {
 
 						if (result.total_profit !== undefined) {
 							const investorSpan = Array.from(
-								document.querySelectorAll('.debtors-office-list__title')
+								document.querySelectorAll('.debtors-office-list__title'),
 							).find(span => span.textContent.trim() === 'Инвесторам')
 
 							if (investorSpan) {
 								const amountSpan = investorSpan.parentElement.querySelector(
-									'.debtors-office-list__amount'
+									'.debtors-office-list__amount',
 								)
 								if (amountSpan) {
 									let profit = Number(result.total_profit)
@@ -5833,7 +5982,7 @@ const handleDebtors = async () => {
 											.closest('.debtors-office-list__item')
 											.querySelector('.debtors-office-list__details')
 										const btn = row.querySelector(
-											'.debtors-office-list__toggle'
+											'.debtors-office-list__toggle',
 										)
 										btn.classList.toggle('open')
 										details.classList.toggle('open')
@@ -5841,7 +5990,7 @@ const handleDebtors = async () => {
 								})
 						}
 					}
-				}
+				},
 			)
 			await settleDebtFormHandler.init(currentRowId)
 
@@ -6004,7 +6153,7 @@ const handleDebtors = async () => {
 						const row = TableManager.getRowById(result.id, table.id)
 						TableManager.formatCurrencyValuesForRow(table.id, row)
 					}
-				}
+				},
 			)
 
 			await settleDebtFormHandler.init(currentRowId)
@@ -6082,11 +6231,11 @@ const handleDebtors = async () => {
 			if (result.html_investor && result.investor_id) {
 				TableManager.updateTableRow(
 					{ html: result.html_investor, id: result.investor_id },
-					'investors-table'
+					'investors-table',
 				)
 				const investorRow = TableManager.getRowById(
 					result.investor_id,
-					'investors-table'
+					'investors-table',
 				)
 				TableManager.formatCurrencyValuesForRow('investors-table', investorRow)
 				TableManager.calculateTableSummary('investors-table', ['balance'])
@@ -6101,12 +6250,12 @@ const handleDebtors = async () => {
 						tableOps.querySelector('tbody').appendChild(newRow)
 						TableManager.formatCurrencyValuesForRow(
 							'investor-operations-table',
-							newRow
+							newRow,
 						)
 					}
 				}
 			}
-		}
+		},
 	)
 
 	if (withdrawalButton) {
@@ -6141,7 +6290,7 @@ const handleDebtors = async () => {
 			if (!dropdown) return
 
 			const exists = Array.from(dropdown.children).some(
-				opt => opt.textContent.trim() === 'Наличные'
+				opt => opt.textContent.trim() === 'Наличные',
 			)
 			if (!exists) {
 				const cashOption = document.createElement('div')
@@ -6181,7 +6330,7 @@ const handleDebtors = async () => {
 			}
 
 			const investSelectsDiv = document.querySelector(
-				'.add-invest-operation__selects'
+				'.add-invest-operation__selects',
 			)
 			if (investSelectsDiv) {
 				investSelectsDiv.style.flexDirection = 'column-reverse'
@@ -6237,7 +6386,7 @@ const handleDebtors = async () => {
 
 				if (accountDropdown) {
 					const existingCashOption = Array.from(
-						accountDropdown.querySelectorAll('.select__option')
+						accountDropdown.querySelectorAll('.select__option'),
 					).find(opt => opt.textContent.trim() === 'Наличные')
 
 					if (!existingCashOption) {
@@ -6263,7 +6412,7 @@ const handleDebtors = async () => {
 
 				const removeCashOption = () => {
 					const cashOption = Array.from(
-						accountDropdown.querySelectorAll('.select__option')
+						accountDropdown.querySelectorAll('.select__option'),
 					).find(opt => opt.textContent.trim() === 'Наличные')
 
 					if (cashOption) {
@@ -6281,7 +6430,7 @@ const handleDebtors = async () => {
 
 				const addCashOption = () => {
 					const existingCashOption = Array.from(
-						accountDropdown.querySelectorAll('.select__option')
+						accountDropdown.querySelectorAll('.select__option'),
 					).find(opt => opt.textContent.trim() === 'Наличные')
 
 					if (!existingCashOption) {
@@ -6330,7 +6479,7 @@ document.addEventListener('DOMContentLoaded', function () {
 	if (globalHideAllBtn) {
 		globalHideAllBtn.addEventListener('click', function (e) {
 			const selectedCells = Array.from(
-				document.querySelectorAll('.table__cell--selected')
+				document.querySelectorAll('.table__cell--selected'),
 			)
 			if (selectedCells.length <= 1) {
 				return
@@ -6343,7 +6492,7 @@ document.addEventListener('DOMContentLoaded', function () {
 				selectedCells.map(cell => {
 					const tbl = cell.closest('table')
 					return tbl ? tbl.id : null
-				})
+				}),
 			)
 			if (tables.size !== 1) {
 				return
@@ -6389,7 +6538,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
 			tableClone
 				.querySelectorAll(
-					'input, textarea, select, .select, .context-menu, .mark-read-btn, .refresh-money-logs-btn, .hidden-rows-counter, .loader, .modal'
+					'input, textarea, select, .select, .context-menu, .mark-read-btn, .refresh-money-logs-btn, .hidden-rows-counter, .loader, .modal',
 				)
 				.forEach(el => el.remove())
 
@@ -6419,7 +6568,7 @@ document.addEventListener('DOMContentLoaded', function () {
 			visibleThList.forEach((th, index) => {
 				const type = th.dataset.columnType
 				const cells = tableClone.querySelectorAll(
-					`tr > *:nth-child(${index + 1})`
+					`tr > *:nth-child(${index + 1})`,
 				)
 				if (type === 'amount' || type === 'percent') {
 					cells.forEach(td => td.classList.add('no-truncate'))

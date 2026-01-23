@@ -3897,7 +3897,18 @@ def debtor_details(request):
                 {"id": table_id, "fields": fields, "data": data}
             )
 
-            client_debt_repayments = ClientDebtRepayment.objects.order_by('-created_at')[:10]
+            client_debt_qs = ClientDebtRepayment.objects.order_by('-created_at')
+            try:
+                per_page = int(request.GET.get('cdr_per_page', 25))
+                if per_page <= 0:
+                    per_page = 25
+            except Exception:
+                per_page = 25
+            page_number = request.GET.get('cdr_page', 1)
+            paginator = Paginator(client_debt_qs, per_page)
+            page = paginator.get_page(page_number)
+            client_debt_repayments = page.object_list
+
             repayment_fields = [
                 {"name": "created_at", "verbose_name": "Дата", "is_date": True},
                 {"name": "client", "verbose_name": "Клиент"},
@@ -3923,6 +3934,9 @@ def debtor_details(request):
                 "table_id": table_id,
                 "data_ids": data_ids,
                 "html_client_debt_repayments": html_client_debt_repayments,
+                "client_debt_repayments_page": page.number,
+                "client_debt_repayments_total_pages": paginator.num_pages,
+                "client_debt_repayment_ids": [r.id for r in client_debt_repayments],
             })
         elif value == "Бонусы":
             transactions = Transaction.objects.filter(paid_amount__gt=0)
