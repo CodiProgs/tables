@@ -1493,7 +1493,6 @@ def cash_flow_detail(request, pk: int):
     data['operation_type'] = cashflow.operation_type
     data['formatted_amount'] = cashflow.formatted_amount
 
-    # data['created_at_formatted'] = timezone.localtime(cashflow.created_at).strftime("%d.%m.%Y %H:%M") if cashflow.created_at else ""
     data['created_at_formatted'] = timezone.localtime(cashflow.created_at).strftime('%Y-%m-%dT%H:%M') if cashflow.created_at else ""
 
     return JsonResponse({"data": data})
@@ -1668,7 +1667,6 @@ def cash_flow_create(request):
     except Exception as e:
         return JsonResponse({"status": "error", "message": str(e)}, status=400)
 
-@forbid_supplier
 @login_required
 @require_http_methods(["POST"])
 def cash_flow_edit(request, pk=None):
@@ -1742,6 +1740,12 @@ def cash_flow_edit(request, pk=None):
 
             new_purpose = get_object_or_404(PaymentPurpose, id=new_purpose_id)
 
+            if (cashflow.purpose.name == "Перевод") != (new_purpose.name == "Перевод"):
+                return JsonResponse({
+                    "status": "error",
+                    "message": "Нельзя изменять тип операции на 'Перевод' или с 'Перевод'",
+                }, status=400)
+
             if cashflow.purpose.operation_type == PaymentPurpose.INCOME and old_purpose_id != int(new_purpose_id):
                 return JsonResponse({
                     "status": "error",
@@ -1753,7 +1757,37 @@ def cash_flow_edit(request, pk=None):
                     "message": "Цель должна быть с типом 'расход'",
                 }, status=400)
 
-            updated_amount = -abs(new_amount_value) if new_purpose.operation_type == PaymentPurpose.EXPENSE else abs(new_amount_value)
+            is_transfer = cashflow.purpose.name == "Перевод"
+            pair_cashflow = None
+            if is_transfer:
+                from datetime import timedelta
+                if cashflow.amount < 0:
+                    pair_comment_part = f"Получено от {cashflow.supplier.name if cashflow.supplier else ''} со счета {cashflow.account.name}"
+                    pair = CashFlow.objects.filter(
+                        purpose__name="Перевод",
+                        amount__gt=0,
+                        comment__icontains=pair_comment_part,
+                        created_at__range=(cashflow.created_at - timedelta(seconds=10), cashflow.created_at + timedelta(seconds=10))
+                    ).exclude(id=cashflow.id).first()
+                else:
+                    pair_comment_part = f"Перевод {cashflow.supplier.name if cashflow.supplier else ''} на счет {cashflow.account.name}"
+                    pair = CashFlow.objects.filter(
+                        purpose__name="Перевод",
+                        amount__lt=0,
+                        comment__icontains=pair_comment_part,
+                        created_at__range=(cashflow.created_at - timedelta(seconds=10), cashflow.created_at + timedelta(seconds=10))
+                    ).exclude(id=cashflow.id).first()
+                pair_cashflow = pair
+
+            if is_transfer:
+                if cashflow.amount < 0:
+                    updated_amount = -abs(new_amount_value)
+                    pair_updated_amount = abs(new_amount_value)
+                else:
+                    updated_amount = abs(new_amount_value)
+                    pair_updated_amount = -abs(new_amount_value)
+            else:
+                updated_amount = -abs(new_amount_value) if new_purpose.operation_type == PaymentPurpose.EXPENSE else abs(new_amount_value)
 
             old_account = get_object_or_404(Account, id=old_account_id)
             if old_supplier_id:
@@ -1774,6 +1808,27 @@ def cash_flow_edit(request, pk=None):
                 old_account.save(update_fields=['balance'])
                 old_account.refresh_from_db(fields=['balance'])
 
+            if pair_cashflow:
+                old_pair_account = pair_cashflow.account
+                old_pair_supplier = pair_cashflow.supplier
+                old_pair_amount = Decimal(pair_cashflow.amount or 0)
+                if old_pair_supplier:
+                    old_pair_supplier_account = SupplierAccount.objects.filter(
+                        supplier=old_pair_supplier,
+                        account=old_pair_account
+                    ).first()
+                    if old_pair_supplier_account:
+                        old_pair_supplier_account.balance = Decimal(old_pair_supplier_account.balance or 0) - Decimal(old_pair_amount)
+                        old_pair_supplier_account.save()
+                    else:
+                        old_pair_account.balance = F('balance') - old_pair_amount
+                        old_pair_account.save(update_fields=['balance'])
+                        old_pair_account.refresh_from_db(fields=['balance'])
+                else:
+                    old_pair_account.balance = F('balance') - old_pair_amount
+                    old_pair_account.save(update_fields=['balance'])
+                    old_pair_account.refresh_from_db(fields=['balance'])
+
             if new_supplier:
                 new_supplier_account, _ = SupplierAccount.objects.get_or_create(
                     supplier=new_supplier,
@@ -1787,6 +1842,49 @@ def cash_flow_edit(request, pk=None):
                 new_account.save(update_fields=['balance'])
                 new_account.refresh_from_db(fields=['balance'])
 
+            if pair_cashflow:
+                if pair_cashflow.supplier:
+                    pair_supplier_account = SupplierAccount.objects.filter(
+                        supplier=pair_cashflow.supplier,
+                        account=pair_cashflow.account
+                    ).first()
+                    if pair_supplier_account:
+                        pair_supplier_account.balance = Decimal(pair_supplier_account.balance or 0) + Decimal(pair_updated_amount)
+                        pair_supplier_account.save()
+                    else:
+                        pair_cashflow.account.balance = F('balance') + pair_updated_amount
+                        pair_cashflow.account.save(update_fields=['balance'])
+                        pair_cashflow.account.refresh_from_db(fields=['balance'])
+                else:
+                    pair_cashflow.account.balance = F('balance') + pair_updated_amount
+                    pair_cashflow.account.save(update_fields=['balance'])
+                    pair_cashflow.account.refresh_from_db(fields=['balance'])
+
+                if cashflow.amount < 0:
+                    pair_cashflow.comment = f"Получено от {new_supplier.name if new_supplier else ''} со счета {new_account.name}"
+                else:
+                    pair_cashflow.comment = f"Перевод {new_supplier.name if new_supplier else ''} на счет {new_account.name}"
+                pair_cashflow.amount = int(pair_updated_amount)
+                pair_cashflow.save()
+
+                from datetime import timedelta
+                mt = MoneyTransfer.objects.filter(
+                    created_at__range=(cashflow.created_at - timedelta(seconds=10), cashflow.created_at + timedelta(seconds=10))
+                ).first()
+                if mt:
+                    if cashflow.amount < 0:
+                        mt.source_account = new_account
+                        mt.source_supplier = new_supplier
+                        mt.destination_account = pair_cashflow.account
+                        mt.destination_supplier = pair_cashflow.supplier
+                    else:
+                        mt.destination_account = new_account
+                        mt.destination_supplier = new_supplier
+                        mt.source_account = pair_cashflow.account
+                        mt.source_supplier = pair_cashflow.supplier
+                    mt.amount = abs(new_amount_value)
+                    mt.save()
+
             if cashflow.purpose.name == "Оплата" and cashflow.transaction:
                 transaction_obj = cashflow.transaction
                 transaction_obj.paid_amount = int(transaction_obj.paid_amount or 0) - int(old_amount) + int(updated_amount)
@@ -1796,10 +1894,14 @@ def cash_flow_edit(request, pk=None):
             cashflow.supplier = new_supplier
             cashflow.amount = int(updated_amount)
             cashflow.purpose = new_purpose
-            cashflow.comment = comment
             cashflow.created_at = parse_datetime_string(created_at_str) if created_at_str else cashflow.created_at
             cashflow.created_by = user
+            cashflow.comment = comment
             cashflow.save()
+
+            if pair_cashflow:
+                pair_cashflow.amount = int(pair_updated_amount)
+                pair_cashflow.save()
 
             cashflow.refresh_from_db()
 
@@ -1808,16 +1910,26 @@ def cash_flow_edit(request, pk=None):
                 "fields": get_cash_flow_fields()
             }
 
-            return JsonResponse({
+            response_data = {
                 "html": render_to_string("components/table_row.html", context),
                 "id": cashflow.id,
                 "status": "success",
                 "message": "Движение средств успешно обновлено"
-            })
+            }
+
+            if pair_cashflow:
+                pair_context = {
+                    "item": pair_cashflow,
+                    "fields": get_cash_flow_fields()
+                }
+                response_data["pair_html"] = render_to_string("components/table_row.html", pair_context)
+                response_data["pair_id"] = pair_cashflow.id
+
+            return JsonResponse(response_data)
     except Exception as e:
         return JsonResponse({"status": "error", "message": str(e)}, status=400)
 
-@forbid_supplier
+
 @login_required
 @require_http_methods(["POST"])
 def cash_flow_delete(request, pk=None):
@@ -1838,6 +1950,46 @@ def cash_flow_delete(request, pk=None):
             transaction_obj = cashflow.transaction
 
             is_payment = purpose and purpose.name == "Оплата"
+
+            pair_id = None
+            is_transfer = purpose and purpose.name == "Перевод"
+            if is_transfer:
+                from datetime import timedelta
+                mt = MoneyTransfer.objects.filter(
+                    created_at__range=(cashflow.created_at - timedelta(seconds=10), cashflow.created_at + timedelta(seconds=10))
+                ).first()
+                if not mt:
+                    abs_amount = abs(cashflow.amount)
+                    if cashflow.amount < 0:
+                        mt = MoneyTransfer.objects.filter(
+                            source_account=cashflow.account,
+                            source_supplier=cashflow.supplier,
+                            amount=abs_amount
+                        ).first()
+                    else:
+                        mt = MoneyTransfer.objects.filter(
+                            destination_account=cashflow.account,
+                            destination_supplier=cashflow.supplier,
+                            amount=abs_amount
+                        ).first()
+                if mt:
+                    if (cashflow.account == mt.source_account and 
+                        cashflow.supplier == mt.source_supplier):
+                        pair = CashFlow.objects.filter(
+                            account=mt.destination_account,
+                            supplier=mt.destination_supplier,
+                            purpose__name="Перевод",
+                            amount__gt=0
+                        ).exclude(id=cashflow.id).first()
+                    else:
+                        pair = CashFlow.objects.filter(
+                            account=mt.source_account,
+                            supplier=mt.source_supplier,
+                            purpose__name="Перевод",
+                            amount__lt=0
+                        ).exclude(id=cashflow.id).first()
+                    if pair:
+                        pair_id = pair.id
 
             if supplier:
                 try:
@@ -1862,15 +2014,40 @@ def cash_flow_delete(request, pk=None):
                     transaction_obj.paid_amount -= payment_amount
                     transaction_obj.save()
 
+            if is_transfer:
+                if mt:
+                    mt.delete()
+                if pair:
+                    pair_account = pair.account
+                    pair_supplier = pair.supplier
+                    pair_amount = Decimal(pair.amount or 0)
+                    if pair_supplier:
+                        try:
+                            pair_supplier_account = SupplierAccount.objects.get(
+                                supplier=pair_supplier,
+                                account=pair_account
+                            )
+                            pair_supplier_account.balance = Decimal(pair_supplier_account.balance or 0) - pair_amount
+                            pair_supplier_account.save()
+                        except SupplierAccount.DoesNotExist:
+                            pair_account.balance = F('balance') - pair_amount
+                            pair_account.save(update_fields=['balance'])
+                            pair_account.refresh_from_db(fields=['balance'])
+                    else:
+                        pair_account.balance = F('balance') - pair_amount
+                        pair_account.save(update_fields=['balance'])
+                        pair_account.refresh_from_db(fields=['balance'])
+                    pair.delete()
+
             cashflow.delete()
 
             return JsonResponse({
                 "status": "success",
                 "message": f"Транзакция успешно удалена",
+                "pair_id": pair_id,
             })
     except Exception as e:
         return JsonResponse({"status": "error", "message": str(e)}, status=400)
-    
 
 @forbid_supplier
 @login_required
@@ -2521,6 +2698,7 @@ def money_transfer_create(request):
     except Exception as e:
         return JsonResponse({"status": "error", "message": str(e)}, status=400)
 
+
 @forbid_supplier
 @login_required
 @require_http_methods(["POST"])
@@ -2659,51 +2837,41 @@ def money_transfer_edit(request, pk: int):
             money_transfer.comment = comment
             money_transfer.save()
 
+            from datetime import timedelta
             transfer_purpose = PaymentPurpose.objects.filter(name="Перевод").first()
-            if not transfer_purpose:
-                transfer_purpose = PaymentPurpose.objects.create(
-                    name="Перевод",
-                    operation_type=PaymentPurpose.EXPENSE
-                )
+            if transfer_purpose:
+                if comment:
+                    comment_source = comment
+                    comment_destination = comment
+                else:
+                    comment_source = f"Перевод {new_destination_supplier.name} на счет {new_destination_account.name}"
+                    comment_destination = f"Получено от {new_source_supplier.name} со счета {new_source_account.name}"
 
-            CashFlow.objects.filter(
-                account=old_source_account,
-                supplier=old_source_supplier,
-                amount=-old_amount,
-                purpose=transfer_purpose,
-                comment__icontains=old_destination_supplier.name if old_destination_supplier else ""
-            ).delete()
-            CashFlow.objects.filter(
-                account=old_destination_account,
-                supplier=old_destination_supplier,
-                amount=old_amount,
-                purpose=transfer_purpose,
-                comment__icontains=old_source_supplier.name if old_source_supplier else ""
-            ).delete()
+                source_cf = CashFlow.objects.filter(
+                    account=old_source_account,
+                    supplier=old_source_supplier,
+                    purpose=transfer_purpose,
+                    created_at__range=(money_transfer.created_at - timedelta(seconds=10), money_transfer.created_at + timedelta(seconds=10))
+                ).first()
+                if source_cf:
+                    source_cf.account = new_source_account
+                    source_cf.supplier = new_source_supplier
+                    source_cf.amount = -amount_value
+                    source_cf.comment = comment_source
+                    source_cf.save()
 
-            if comment:
-                comment_source = comment
-                comment_destination = comment
-            else:
-                comment_source = f"Перевод {new_destination_supplier.name} на счет {new_destination_account.name}"
-                comment_destination = f"Получено от {new_source_supplier.name} со счета {new_source_account.name}"
-
-            CashFlow.objects.create(
-                account=new_source_account,
-                supplier=new_source_supplier,
-                amount=-amount_value,
-                purpose=transfer_purpose,
-                comment=comment_source,
-                created_by=request.user
-            )
-            CashFlow.objects.create(
-                account=new_destination_account,
-                supplier=new_destination_supplier,
-                amount=amount_value,
-                purpose=transfer_purpose,
-                comment=comment_destination,
-                created_by=request.user
-            )
+                dest_cf = CashFlow.objects.filter(
+                    account=old_destination_account,
+                    supplier=old_destination_supplier,
+                    purpose=transfer_purpose,
+                    created_at__range=(money_transfer.created_at - timedelta(seconds=10), money_transfer.created_at + timedelta(seconds=10))
+                ).first()
+                if dest_cf:
+                    dest_cf.account = new_destination_account
+                    dest_cf.supplier = new_destination_supplier
+                    dest_cf.amount = amount_value
+                    dest_cf.comment = comment_destination
+                    dest_cf.save()
 
             class MoneyTransferRow:
                 def __init__(self, source_account, destination_account, source_supplier, destination_supplier, amount):
@@ -2756,6 +2924,9 @@ def money_transfer_edit(request, pk: int):
             })
     except Exception as e:
         return JsonResponse({"status": "error", "message": str(e)}, status=400)
+
+
+
 
 @forbid_supplier
 @login_required
@@ -2820,6 +2991,16 @@ def money_transfer_delete(request, pk=None):
 
             transfer_type = money_transfer.transfer_type
             money_transfer.delete()
+
+            from datetime import timedelta
+            transfer_purpose = PaymentPurpose.objects.filter(name="Перевод").first()
+            if transfer_purpose:
+                CashFlow.objects.filter(
+                    account__in=[source_account, destination_account],
+                    supplier__in=[source_supplier, destination_supplier] if source_supplier and destination_supplier else [source_supplier or destination_supplier],
+                    purpose=transfer_purpose,
+                    created_at__range=(money_transfer.created_at - timedelta(seconds=10), money_transfer.created_at + timedelta(seconds=10))
+                ).delete()
 
             from_us_transfers = list(
                 MoneyTransfer.objects.filter(transfer_type="from_us").order_by('-is_counted')
