@@ -706,8 +706,8 @@ const addMenuHandler = () => {
 						const purposeCell = cells[purposeIndex]
 						if (
 							purposeCell &&
-							(purposeCell.textContent.trim() === 'Перевод' ||
-								purposeCell.textContent.trim() === 'Инкассация' ||
+							// (purposeCell.textContent.trim() === 'Перевод' ||
+							(purposeCell.textContent.trim() === 'Инкассация' ||
 								purposeCell.textContent.trim() === 'Погашение долга поставщика')
 						) {
 							e.preventDefault()
@@ -2492,8 +2492,20 @@ const cashflowConfig = createConfig(CASH_FLOW, {
 		colorizeAmounts(`${CASH_FLOW}-table`)
 	},
 	afterEditFunc: result => {
+		if (result.pair_html && result.pair_id) {
+			TableManager.updateTableRow(
+				{ html: result.pair_html, id: result.pair_id },
+				`${CASH_FLOW}-table`,
+			)
+		}
+
 		refreshData(`${CASH_FLOW}-table`)
 		colorizeAmounts(`${CASH_FLOW}-table`)
+	},
+	afterDeleteFunc: result => {
+		if (result.pair_id) {
+			TableManager.removeRow(result.pair_id, `${CASH_FLOW}-table`)
+		}
 	},
 	prependNewRow: true,
 	modalConfig: {
