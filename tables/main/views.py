@@ -1761,6 +1761,7 @@ def cash_flow_edit(request, pk=None):
             pair_cashflow = None
             if is_transfer:
                 from datetime import timedelta
+                # Сначала поиск парного по комментариям
                 if cashflow.amount < 0:
                     pair_comment_part = f"Получено от {cashflow.supplier.name if cashflow.supplier else ''} со счета {cashflow.account.name}"
                     pair = CashFlow.objects.filter(
@@ -1777,6 +1778,45 @@ def cash_flow_edit(request, pk=None):
                         comment__icontains=pair_comment_part,
                         created_at__range=(cashflow.created_at - timedelta(seconds=10), cashflow.created_at + timedelta(seconds=10))
                     ).exclude(id=cashflow.id).first()
+                
+                if not pair:
+                    # Fallback-поиск через MoneyTransfer
+                    mt = MoneyTransfer.objects.filter(
+                        created_at__range=(cashflow.created_at - timedelta(seconds=10), cashflow.created_at + timedelta(seconds=10))
+                    ).first()
+                    if not mt:
+                        abs_amount = abs(cashflow.amount)
+                        if cashflow.amount < 0:
+                            mt = MoneyTransfer.objects.filter(
+                                source_account=cashflow.account,
+                                source_supplier=cashflow.supplier,
+                                amount=abs_amount
+                            ).first()
+                        else:
+                            mt = MoneyTransfer.objects.filter(
+                                destination_account=cashflow.account,
+                                destination_supplier=cashflow.supplier,
+                                amount=abs_amount
+                            ).first()
+                    
+                    if mt:
+                        transfer_purpose = PaymentPurpose.objects.filter(name="Перевод").first()
+                        if transfer_purpose:
+                            if cashflow.amount < 0:
+                                pair = CashFlow.objects.filter(
+                                    account=mt.destination_account,
+                                    supplier=mt.destination_supplier,
+                                    purpose=transfer_purpose,
+                                    created_at__range=(mt.created_at - timedelta(seconds=10), mt.created_at + timedelta(seconds=10))
+                                ).exclude(id=cashflow.id).first()
+                            else:
+                                pair = CashFlow.objects.filter(
+                                    account=mt.source_account,
+                                    supplier=mt.source_supplier,
+                                    purpose=transfer_purpose,
+                                    created_at__range=(mt.created_at - timedelta(seconds=10), mt.created_at + timedelta(seconds=10))
+                                ).exclude(id=cashflow.id).first()
+                
                 pair_cashflow = pair
 
             if is_transfer:
@@ -1953,8 +1993,11 @@ def cash_flow_delete(request, pk=None):
 
             pair_id = None
             is_transfer = purpose and purpose.name == "Перевод"
+            pair = None
+            mt = None
             if is_transfer:
                 from datetime import timedelta
+                # Ищем MoneyTransfer для надежного удаления пары
                 mt = MoneyTransfer.objects.filter(
                     created_at__range=(cashflow.created_at - timedelta(seconds=10), cashflow.created_at + timedelta(seconds=10))
                 ).first()
@@ -1972,25 +2015,23 @@ def cash_flow_delete(request, pk=None):
                             destination_supplier=cashflow.supplier,
                             amount=abs_amount
                         ).first()
+                
                 if mt:
-                    if (cashflow.account == mt.source_account and 
-                        cashflow.supplier == mt.source_supplier):
-                        pair = CashFlow.objects.filter(
-                            account=mt.destination_account,
-                            supplier=mt.destination_supplier,
-                            purpose__name="Перевод",
-                            amount__gt=0
-                        ).exclude(id=cashflow.id).first()
-                    else:
-                        pair = CashFlow.objects.filter(
-                            account=mt.source_account,
-                            supplier=mt.source_supplier,
-                            purpose__name="Перевод",
-                            amount__lt=0
-                        ).exclude(id=cashflow.id).first()
-                    if pair:
-                        pair_id = pair.id
+                    # Удаляем все связанные CashFlow (кроме текущего) по счетам и времени
+                    transfer_purpose = PaymentPurpose.objects.filter(name="Перевод").first()
+                    if transfer_purpose:
+                        pair_cashflows = CashFlow.objects.filter(
+                            account__in=[mt.source_account, mt.destination_account],
+                            supplier__in=[mt.source_supplier, mt.destination_supplier] if mt.source_supplier and mt.destination_supplier else [mt.source_supplier or mt.destination_supplier],
+                            purpose=transfer_purpose,
+                            created_at__range=(mt.created_at - timedelta(seconds=10), mt.created_at + timedelta(seconds=10))
+                        ).exclude(id=cashflow.id)
+                        pair_ids = list(pair_cashflows.values_list('id', flat=True))
+                        pair_cashflows.delete()
+                        pair_id = pair_ids[0] if pair_ids else None  # Для совместимости, возвращаем ID первого удаленного
+                    mt.delete()
 
+            # Обновляем балансы для основного cashflow
             if supplier:
                 try:
                     supplier_account = SupplierAccount.objects.get(
@@ -2014,31 +2055,6 @@ def cash_flow_delete(request, pk=None):
                     transaction_obj.paid_amount -= payment_amount
                     transaction_obj.save()
 
-            if is_transfer:
-                if mt:
-                    mt.delete()
-                if pair:
-                    pair_account = pair.account
-                    pair_supplier = pair.supplier
-                    pair_amount = Decimal(pair.amount or 0)
-                    if pair_supplier:
-                        try:
-                            pair_supplier_account = SupplierAccount.objects.get(
-                                supplier=pair_supplier,
-                                account=pair_account
-                            )
-                            pair_supplier_account.balance = Decimal(pair_supplier_account.balance or 0) - pair_amount
-                            pair_supplier_account.save()
-                        except SupplierAccount.DoesNotExist:
-                            pair_account.balance = F('balance') - pair_amount
-                            pair_account.save(update_fields=['balance'])
-                            pair_account.refresh_from_db(fields=['balance'])
-                    else:
-                        pair_account.balance = F('balance') - pair_amount
-                        pair_account.save(update_fields=['balance'])
-                        pair_account.refresh_from_db(fields=['balance'])
-                    pair.delete()
-
             cashflow.delete()
 
             return JsonResponse({
@@ -2048,6 +2064,8 @@ def cash_flow_delete(request, pk=None):
             })
     except Exception as e:
         return JsonResponse({"status": "error", "message": str(e)}, status=400)
+
+
 
 @forbid_supplier
 @login_required
