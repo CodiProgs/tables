@@ -774,11 +774,11 @@ class ClientDebtRepayment(models.Model):
         null=True,
         blank=True
     )
-    cash_flow = models.OneToOneField(
+    cash_flow = models.ForeignKey(
         CashFlow,
         on_delete=models.CASCADE,
         verbose_name="Связанное движение ДС",
-        related_name="client_debt_repayment",
+        related_name="client_debt_repayments",
         null=True,
         blank=True
     )
