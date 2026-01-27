@@ -1576,9 +1576,6 @@ def cash_flow_create(request):
                 )
 
                 total_debt = sum(t.client_debt_paid_calc for t in dt_transactions)
-                print(f"Общий долг клиента ДТ: {total_debt}")
-                for trans in dt_transactions:
-                    print(f"Транзакция ID: {trans.id}, Оплачено: {trans.paid_amount}, Процент: {trans.client_percentage}, Возвращено клиенту: {trans.returned_to_client}, Вычисленный долг: {trans.client_debt_paid_calc}")
                 if total_debt < amount_value_decimal:
                     raise Exception("Общий долг клиента ДТ недостаточен для списания")
 
@@ -1625,9 +1622,8 @@ def cash_flow_create(request):
 
                     remaining -= repay_amount
 
-                # Создать один CashFlow с общей суммой погашения
                 repay_purpose, _ = PaymentPurpose.objects.get_or_create(
-                    name="Погашение долга клиента",
+                    name="ДТ",
                     defaults={"operation_type": PaymentPurpose.EXPENSE}
                 )
 
@@ -1641,7 +1637,6 @@ def cash_flow_create(request):
                     created_at=timezone.now()
                 )
 
-                # Сохранить все ClientDebtRepayment и связать с cashflow
                 for repayment in repayments:
                     repayment.cash_flow = cashflow
                     repayment.save()
@@ -1780,7 +1775,6 @@ def cash_flow_edit(request, pk=None):
             pair_cashflow = None
             if is_transfer:
                 from datetime import timedelta
-                # Сначала поиск парного по комментариям
                 if cashflow.amount < 0:
                     pair_comment_part = f"Получено от {cashflow.supplier.name if cashflow.supplier else ''} со счета {cashflow.account.name}"
                     pair = CashFlow.objects.filter(
@@ -1799,7 +1793,6 @@ def cash_flow_edit(request, pk=None):
                     ).exclude(id=cashflow.id).first()
                 
                 if not pair:
-                    # Fallback-поиск через MoneyTransfer
                     mt = MoneyTransfer.objects.filter(
                         created_at__range=(cashflow.created_at - timedelta(seconds=10), cashflow.created_at + timedelta(seconds=10))
                     ).first()
@@ -2016,7 +2009,6 @@ def cash_flow_delete(request, pk=None):
             mt = None
             if is_transfer:
                 from datetime import timedelta
-                # Ищем MoneyTransfer для надежного удаления пары
                 mt = MoneyTransfer.objects.filter(
                     created_at__range=(cashflow.created_at - timedelta(seconds=10), cashflow.created_at + timedelta(seconds=10))
                 ).first()
@@ -2036,7 +2028,6 @@ def cash_flow_delete(request, pk=None):
                         ).first()
                 
                 if mt:
-                    # Удаляем все связанные CashFlow (кроме текущего) по счетам и времени
                     transfer_purpose = PaymentPurpose.objects.filter(name="Перевод").first()
                     if transfer_purpose:
                         pair_cashflows = CashFlow.objects.filter(
@@ -2047,10 +2038,9 @@ def cash_flow_delete(request, pk=None):
                         ).exclude(id=cashflow.id)
                         pair_ids = list(pair_cashflows.values_list('id', flat=True))
                         pair_cashflows.delete()
-                        pair_id = pair_ids[0] if pair_ids else None  # Для совместимости, возвращаем ID первого удаленного
+                        pair_id = pair_ids[0] if pair_ids else None 
                     mt.delete()
 
-            # Обновляем балансы для основного cashflow
             if supplier:
                 try:
                     supplier_account = SupplierAccount.objects.get(
@@ -2114,9 +2104,6 @@ def account_list(request):
     account_data = [
         {"id": acc.id, "name": acc.name} for acc in accounts.exclude(name="Наличные")
     ]
-
-    # if cash_account and not is_collection:
-    #     account_data.append({"id": cash_account.id, "name": "Наличные"})
 
     return JsonResponse(account_data, safe=False)
 
