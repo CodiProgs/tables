@@ -1499,7 +1499,6 @@ def cash_flow_detail(request, pk: int):
 
     return JsonResponse({"data": data})
 
-
 @forbid_supplier
 @login_required
 @require_http_methods(["POST"])
@@ -1521,8 +1520,8 @@ def cash_flow_create(request):
                 )
 
             try:
-                amount_float = float(amount)
-                if amount_float <= 0:
+                amount_value = Decimal(amount)
+                if amount_value <= 0:
                     return JsonResponse(
                         {"status": "error", "message": "Сумма должна быть больше нуля"},
                         status=400,
@@ -1548,14 +1547,6 @@ def cash_flow_create(request):
                 account = get_object_or_404(Account, id=account_id)
                 supplier = get_object_or_404(Supplier, id=supplier_id)
 
-            amount_value = int(float(amount))
-            if purpose.operation_type == PaymentPurpose.EXPENSE:
-                amount_value = -abs(amount_value)
-            else:
-                amount_value = abs(amount_value)
-
-            cashflow = None
-
             if purpose.name == "ДТ":
                 amount_value_decimal = Decimal(abs(amount_value))
 
@@ -1575,11 +1566,8 @@ def cash_flow_create(request):
                     .order_by("created_at")
                 )
 
-                total_debt = sum(t.client_debt_paid_calc for t in dt_transactions)
-                if total_debt < amount_value_decimal:
-                    raise Exception("Общий долг клиента ДТ недостаточен для списания")
-
                 remaining = amount_value_decimal
+
                 repayments = []
                 appended_comment = (comment + ". " if comment else "") + f"Выдача клиенту ДТ"
 
@@ -1621,6 +1609,17 @@ def cash_flow_create(request):
                     ))
 
                     remaining -= repay_amount
+
+                if remaining > 0:
+                    last_transaction = (
+                        Transaction.objects
+                        .filter(client__name="ДТ")
+                        .order_by("-created_at")
+                        .first()
+                    )
+                    if last_transaction:
+                        last_transaction.returned_to_client = Decimal(str(last_transaction.returned_to_client or 0)) + remaining 
+                        last_transaction.save()
 
                 repay_purpose, _ = PaymentPurpose.objects.get_or_create(
                     name="ДТ",
@@ -1678,8 +1677,6 @@ def cash_flow_create(request):
             })
     except Exception as e:
         return JsonResponse({"status": "error", "message": str(e)}, status=400)
-
-
 
 @login_required
 @require_http_methods(["POST"])
