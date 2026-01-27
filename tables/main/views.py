@@ -3092,7 +3092,7 @@ def debtors(request):
 
     cashflows = CashFlow.objects.filter(
         purpose__operation_type=PaymentPurpose.INCOME
-    ).exclude(purpose__name__in=["Оплата", "Внесение инвестора"])
+    ).exclude(purpose__name__in=["Оплата", "Внесение инвестора", "Возврат от поставщиков"])
 
     total_profit = sum(float(t.profit - t.returned_to_investor) for t in transactionsInvestors) + sum(float(cf.amount - (cf.returned_to_investor or 0)) for cf in cashflows)
 
@@ -4173,7 +4173,7 @@ def debtor_details(request):
 
             cashflows = CashFlow.objects.filter(
                 purpose__operation_type=PaymentPurpose.INCOME,
-            ).exclude(purpose__name__in=["Оплата", "Внесение инвестора"])
+            ).exclude(purpose__name__in=["Оплата", "Внесение инвестора", "Возврат от поставщиков"])
 
             cashflows = [cf for cf in cashflows if (cf.amount - (cf.returned_to_investor or 0)) > 0]
 
