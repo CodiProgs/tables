@@ -2078,6 +2078,8 @@ def cash_flow_delete(request, pk=None):
 def account_list(request):
     supplier_id = request.GET.get('supplier_id')
     is_collection = request.GET.get('is_collection') == 'true'
+    include_cash = request.GET.get('include_cash') == 'true'  
+
     accounts = Account.objects.all()
     
     if supplier_id and is_collection:
@@ -2101,6 +2103,9 @@ def account_list(request):
     account_data = [
         {"id": acc.id, "name": acc.name} for acc in accounts.exclude(name="Наличные")
     ]
+
+    if include_cash and cash_account:
+        account_data.append({"id": cash_account.id, "name": cash_account.name})
 
     return JsonResponse(account_data, safe=False)
 

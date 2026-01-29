@@ -3840,7 +3840,7 @@ const handleCashFlow = async config => {
 		'cash_flow-table',
 		[
 			{ name: 'created_at' },
-			{ name: 'account', url: '/accounts/list/' },
+			{ name: 'account', url: '/accounts/list/?include_cash=true' },
 			{ name: 'supplier', url: '/suppliers/list/' },
 			{ name: 'formatted_amount' },
 			{ name: 'purpose', url: '/payment_purposes/list/?all=True' },
