@@ -24,7 +24,8 @@ from users.models import User, UserType, HiddenRows
 import math
 from django.db.models import F, ExpressionWrapper, IntegerField, Value
 from django.db.models.functions import Floor
-
+import logging
+logger = logging.getLogger(__name__)
 
 locale.setlocale(locale.LC_ALL, "ru_RU.UTF-8")
 locale.setlocale(locale.LC_TIME, "ru_RU.UTF-8")
@@ -1507,18 +1508,21 @@ def cash_flow_create(request):
         with transaction.atomic():
             user = request.user
 
+            # Получение данных из запроса
             amount = clean_currency(request.POST.get("amount"))
             purpose_id = request.POST.get("purpose")
             supplier_id = request.POST.get("supplier")
             account_id = request.POST.get("account")
             comment = request.POST.get("comment", "")
 
+            # Проверка обязательных полей
             if not all([amount, purpose_id, (supplier_id or account_id == "0")]):
                 return JsonResponse(
                     {"status": "error", "message": "Все поля должны быть заполнены"},
                     status=400,
                 )
 
+            # Проверка корректности суммы
             try:
                 amount_value = Decimal(amount)
                 if amount_value <= 0:
@@ -1532,8 +1536,10 @@ def cash_flow_create(request):
                     status=400,
                 )
 
+            # Получение цели платежа
             purpose = get_object_or_404(PaymentPurpose, id=purpose_id)
 
+            # Определение счета и поставщика
             if account_id == "0":
                 cash_account = Account.objects.filter(name__iexact="Наличные").first()
                 if not cash_account:
@@ -1545,14 +1551,15 @@ def cash_flow_create(request):
                 supplier = None
             else:
                 account = get_object_or_404(Account, id=account_id)
-                supplier = get_object_or_404(Supplier, id=supplier_id)
+                supplier = get_object_or_404(Supplier, id=supplier_id) if supplier_id else None
 
+            # Логика для ДТ
             if purpose.name == "ДТ":
                 amount_value_decimal = Decimal(abs(amount_value))
-
                 if amount_value_decimal == 0:
                     raise Exception("Сумма должна быть больше нуля")
 
+                # Поиск транзакций
                 dt_transactions = (
                     Transaction.objects
                     .filter(client__name="ДТ")
@@ -1562,24 +1569,37 @@ def cash_flow_create(request):
                             output_field=IntegerField()
                         )
                     )
-                    .filter(client_debt_paid_calc__gt=0)
                     .order_by("created_at")
                 )
 
-                remaining = amount_value_decimal
+                # Фильтрация транзакций
+                positive_debts = dt_transactions.filter(client_debt_paid_calc__gt=0)
+                negative_debts = dt_transactions.filter(client_debt_paid_calc__lt=0)
+                zero_debt = (
+                    Transaction.objects
+                    .filter(client__name="ДТ")
+                    .annotate(
+                        client_debt_paid_calc=ExpressionWrapper(
+                            Floor(F("paid_amount") * (100 - F("client_percentage")) / 100) - F("returned_to_client"),
+                            output_field=IntegerField()
+                        )
+                    )
+                    .filter(client_debt_paid_calc=0)
+                    .first()
+                )
 
+                remaining = amount_value_decimal
                 repayments = []
                 appended_comment = (comment + ". " if comment else "") + f"Выдача клиенту ДТ"
 
-                for trans in dt_transactions:
+                # Погашение положительных долгов
+                for trans in positive_debts:
                     if remaining <= 0:
                         break
                     debt = trans.client_debt_paid_calc
                     repay_amount = min(debt, remaining)
 
-                    if not account:
-                        raise Exception("Счет не указан")
-
+                    # Списание средств
                     if supplier:
                         supplier_account_obj, _ = SupplierAccount.objects.select_for_update().get_or_create(
                             supplier=supplier,
@@ -1597,6 +1617,7 @@ def cash_flow_create(request):
                         Account.objects.filter(id=account.id).update(balance=F('balance') - repay_amount)
                         account.refresh_from_db(fields=['balance'])
 
+                    # Обновление долга
                     trans.returned_to_client = Decimal(str(trans.returned_to_client or 0)) + repay_amount
                     trans.save()
 
@@ -1610,17 +1631,46 @@ def cash_flow_create(request):
 
                     remaining -= repay_amount
 
+                # Если осталась сумма, добавляем к отрицательным долгам или долгу 0
                 if remaining > 0:
-                    last_transaction = (
-                        Transaction.objects
-                        .filter(client__name="ДТ")
-                        .order_by("-created_at")
-                        .first()
-                    )
-                    if last_transaction:
-                        last_transaction.returned_to_client = Decimal(str(last_transaction.returned_to_client or 0)) + remaining 
-                        last_transaction.save()
+                    target_trans = negative_debts.first() or zero_debt
+                    if target_trans:
+                        debt = target_trans.client_debt_paid_calc
+                        repay_amount = remaining
 
+                        # Списание средств
+                        if supplier:
+                            supplier_account_obj, _ = SupplierAccount.objects.select_for_update().get_or_create(
+                                supplier=supplier,
+                                account=account,
+                                defaults={'balance': Decimal('0')}
+                            )
+                            if Decimal(str(supplier_account_obj.balance or 0)) < repay_amount:
+                                raise Exception(f"Недостаточно средств на счете поставщика '{supplier.name}' / '{account.name}'")
+                            supplier_account_obj.balance = Decimal(supplier_account_obj.balance or 0) - repay_amount
+                            supplier_account_obj.save()
+                        else:
+                            account_db = Account.objects.select_for_update().get(id=account.id)
+                            if Decimal(str(account_db.balance or 0)) < repay_amount:
+                                raise Exception(f"Недостаточно средств на счете '{account_db.name}'")
+                            Account.objects.filter(id=account.id).update(balance=F('balance') - repay_amount)
+                            account.refresh_from_db(fields=['balance'])
+
+                        # Обновление долга
+                        target_trans.returned_to_client = Decimal(str(target_trans.returned_to_client or 0)) + repay_amount
+                        target_trans.save()
+
+                        repayments.append(ClientDebtRepayment(
+                            client=target_trans.client,
+                            amount=repay_amount,
+                            comment=appended_comment,
+                            created_by=request.user,
+                            transaction=target_trans
+                        ))
+
+                        remaining = 0
+
+                # Создание записи CashFlow
                 repay_purpose, _ = PaymentPurpose.objects.get_or_create(
                     name="ДТ",
                     defaults={"operation_type": PaymentPurpose.EXPENSE}
@@ -1640,11 +1690,12 @@ def cash_flow_create(request):
                     repayment.cash_flow = cashflow
                     repayment.save()
 
-            if purpose.name != 'ДТ':
+            # Обработка других целей
+            else:
                 if purpose.operation_type == PaymentPurpose.EXPENSE:
-                    amount_value = -abs(amount_value)  
+                    amount_value = -abs(amount_value)
                 elif purpose.operation_type == PaymentPurpose.INCOME:
-                    amount_value = abs(amount_value)  
+                    amount_value = abs(amount_value)
 
                 cashflow = CashFlow.objects.create(
                     account=account,
@@ -1658,30 +1709,19 @@ def cash_flow_create(request):
             if not cashflow:
                 raise Exception("Ошибка при создании записи движения денежных средств")
 
-            if purpose.name != "ДТ":
-                if supplier:
-                    supplier_account, _ = SupplierAccount.objects.get_or_create(
-                        supplier=supplier,
-                        account=account,
-                        defaults={'balance': 0}
-                    )
-                    supplier_account.balance = Decimal(supplier_account.balance or 0) + Decimal(amount_value)
-                    supplier_account.save()
-                else:
-                    account.balance = F('balance') + amount_value
-                    account.save(update_fields=['balance'])
-                    account.refresh_from_db(fields=['balance'])
-
             context = {
                 "item": cashflow,
                 "fields": get_cash_flow_fields()
             }
+
             return JsonResponse({
                 "html": render_to_string("components/table_row.html", context),
                 "id": cashflow.id,
             })
     except Exception as e:
         return JsonResponse({"status": "error", "message": str(e)}, status=400)
+
+
 
 @login_required
 @require_http_methods(["POST"])
