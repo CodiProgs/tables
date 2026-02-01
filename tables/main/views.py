@@ -1641,6 +1641,11 @@ def cash_flow_create(request):
                     repayment.save()
 
             if purpose.name != 'ДТ':
+                if purpose.operation_type == PaymentPurpose.EXPENSE:
+                    amount_value = -abs(amount_value)  
+                elif purpose.operation_type == PaymentPurpose.INCOME:
+                    amount_value = abs(amount_value)  
+
                 cashflow = CashFlow.objects.create(
                     account=account,
                     amount=amount_value,
