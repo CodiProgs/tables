@@ -1697,6 +1697,39 @@ def cash_flow_create(request):
                 elif purpose.operation_type == PaymentPurpose.INCOME:
                     amount_value = abs(amount_value)
 
+                # Обновление балансов для других целей
+                if purpose.operation_type == PaymentPurpose.EXPENSE:
+                    amount_to_deduct = abs(amount_value)
+                    if supplier:
+                        supplier_account_obj, _ = SupplierAccount.objects.select_for_update().get_or_create(
+                            supplier=supplier,
+                            account=account,
+                            defaults={'balance': Decimal('0')}
+                        )
+                        if Decimal(str(supplier_account_obj.balance or 0)) < amount_to_deduct:
+                            raise Exception(f"Недостаточно средств на счете поставщика '{supplier.name}' / '{account.name}'")
+                        supplier_account_obj.balance = Decimal(supplier_account_obj.balance or 0) - amount_to_deduct
+                        supplier_account_obj.save()
+                    else:
+                        account_db = Account.objects.select_for_update().get(id=account.id)
+                        if Decimal(str(account_db.balance or 0)) < amount_to_deduct:
+                            raise Exception(f"Недостаточно средств на счете '{account_db.name}'")
+                        Account.objects.filter(id=account.id).update(balance=F('balance') - amount_to_deduct)
+                        account.refresh_from_db(fields=['balance'])
+                elif purpose.operation_type == PaymentPurpose.INCOME:
+                    amount_to_add = amount_value
+                    if supplier:
+                        supplier_account_obj, _ = SupplierAccount.objects.select_for_update().get_or_create(
+                            supplier=supplier,
+                            account=account,
+                            defaults={'balance': Decimal('0')}
+                        )
+                        supplier_account_obj.balance = Decimal(supplier_account_obj.balance or 0) + amount_to_add
+                        supplier_account_obj.save()
+                    else:
+                        Account.objects.filter(id=account.id).update(balance=F('balance') + amount_to_add)
+                        account.refresh_from_db(fields=['balance'])
+
                 cashflow = CashFlow.objects.create(
                     account=account,
                     amount=amount_value,
@@ -1720,7 +1753,6 @@ def cash_flow_create(request):
             })
     except Exception as e:
         return JsonResponse({"status": "error", "message": str(e)}, status=400)
-
 
 
 @login_required
