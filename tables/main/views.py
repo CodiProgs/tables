@@ -4012,10 +4012,10 @@ def debtor_detail(request, type, pk):
                 t for t in Transaction.objects.filter(paid_amount__gt=0)
                 if getattr(t, 'bonus_debt', 0) == 0
                 and getattr(t, 'client_debt', 0) == 0
-                and t.amount == t.paid_amount
+                and getattr(t, 'profit', 0) > 0
+                and (getattr(t, 'profit', 0) - getattr(t, 'returned_to_investor', 0)) > 0
             ]
-
-            total_investor_debt = sum(float(getattr(t, 'investor_debt', 0) or 0) for t in transactions)
+            total_investor_debt = sum(float(getattr(t, 'profit', 0) - getattr(t, 'returned_to_investor', 0)) for t in transactions)
 
             cashflows = CashFlow.objects.filter(
                 purpose__operation_type=PaymentPurpose.INCOME
@@ -4258,7 +4258,7 @@ def debtor_details(request):
 
             cashflows = CashFlow.objects.filter(
                 purpose__operation_type=PaymentPurpose.INCOME,
-            ).exclude(purpose__name__in=["Оплата", "Внесение инвестора", "Возврат от поставщиков", "Возврат от поставщиков"])
+            ).exclude(purpose__name__in=["Оплата", "Внесение инвестора", "Возврат от поставщиков"])
 
             cashflows = [cf for cf in cashflows if (cf.amount - (cf.returned_to_investor or 0)) > 0]
 
