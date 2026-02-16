@@ -2186,11 +2186,12 @@ def account_list(request):
 
     return JsonResponse(account_data, safe=False)
 
-
 @forbid_supplier
 @login_required
 def payment_purpose_list(request):
     show_all = request.GET.get("all") == "True" or request.GET.get("all") == "true"
+    user_is_admin = request.user.username == "admin"  # Проверка имени пользователя
+
     if show_all:
         payment_purpose_data = [
             {"id": acc.id, "name": acc.name}
@@ -2199,10 +2200,25 @@ def payment_purpose_list(request):
     else:
         payment_purpose_data = [
             {"id": acc.id, "name": acc.name}
-            for acc in PaymentPurpose.objects.all().exclude(name="Оплата").exclude(name="Перевод").exclude(name="Инкассация").exclude(name="Погашение долга поставщика").exclude(name="Забор инвестора").exclude(name="Внесение инвестора").order_by('operation_type', 'name')
+            for acc in PaymentPurpose.objects.all()
+            .exclude(name="Оплата")
+            .exclude(name="Перевод")
+            .exclude(name="Инкассация")
+            .exclude(name="Погашение долга поставщика")
+            .exclude(name="Забор инвестора")
+            .exclude(name="Внесение инвестора")
+            .order_by('operation_type', 'name')
         ]
-    return JsonResponse(payment_purpose_data, safe=False)
 
+    # Добавляем назначения "Корректировка баланса" только для admin
+    if user_is_admin:
+        correction_purposes = [
+            {"id": acc.id, "name": acc.name}
+            for acc in PaymentPurpose.objects.filter(name="Корректировка баланса")
+        ]
+        payment_purpose_data.extend(correction_purposes)
+
+    return JsonResponse(payment_purpose_data, safe=False)
 
 @forbid_supplier
 @login_required

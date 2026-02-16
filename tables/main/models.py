@@ -434,7 +434,7 @@ class CashFlow(models.Model):
         return self.purpose.operation_type if self.purpose else None
 
     def __str__(self):
-        return f"{self.purpose}: {self.amount} р. ({self.account})"
+        return f"{self.purpose}: {self.amount} р. ({self.account}), id: {self.id}"
     
     class Meta:
         verbose_name = "Движение ДС"
