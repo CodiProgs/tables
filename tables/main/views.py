@@ -2190,17 +2190,17 @@ def account_list(request):
 @login_required
 def payment_purpose_list(request):
     show_all = request.GET.get("all") == "True" or request.GET.get("all") == "true"
-    user_is_admin = request.user.username == "admin"  # Проверка имени пользователя
+    user_is_admin = request.user.username == "admin" or request.user.username == "Admin"
 
     if show_all:
         payment_purpose_data = [
             {"id": acc.id, "name": acc.name}
-            for acc in PaymentPurpose.objects.all().order_by('operation_type', 'name')
+            for acc in PaymentPurpose.objects.exclude(name="Корректировка баланса").order_by('operation_type', 'name')
         ]
     else:
         payment_purpose_data = [
             {"id": acc.id, "name": acc.name}
-            for acc in PaymentPurpose.objects.all()
+            for acc in PaymentPurpose.objects.exclude(name="Корректировка баланса")
             .exclude(name="Оплата")
             .exclude(name="Перевод")
             .exclude(name="Инкассация")
@@ -2210,7 +2210,6 @@ def payment_purpose_list(request):
             .order_by('operation_type', 'name')
         ]
 
-    # Добавляем назначения "Корректировка баланса" только для admin
     if user_is_admin:
         correction_purposes = [
             {"id": acc.id, "name": acc.name}
