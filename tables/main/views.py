@@ -6266,3 +6266,49 @@ def profit_by_month(request):
         "month": month,
         "total_profit": total_profit
     })
+
+
+@forbid_supplier
+@login_required
+def supplier_income_report(request):
+    from django.db.models import Sum, Case, When, DecimalField
+    from datetime import datetime
+
+    current_year = datetime.now().year
+
+    income_data = (
+        Supplier.objects.annotate(
+            total_income=Sum(
+                Case(
+                    When(
+                        cash_flows__created_at__year=current_year,
+                        then='cash_flows__amount'
+                    ),
+                    default=0,
+                    output_field=DecimalField()
+                )
+            )
+        )
+        .values('name', 'total_income')
+        .order_by('-total_income')
+    )
+
+    rows = []
+    for item in income_data:
+        rows.append({
+            'supplier_name': item['name'],
+            'total_income': item['total_income'] or 0
+        })
+
+    fields = [
+        {"name": "supplier_name", "verbose_name": "Поставщик"},
+        {"name": "total_income", "verbose_name": "Сумма доходов", "is_amount": True}
+    ]
+
+    context = {
+        "fields": fields,
+        "data": rows,
+        "year": current_year,
+    }
+
+    return render(request, "main/supplier_income_report.html", context)

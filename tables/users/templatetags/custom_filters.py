@@ -10,12 +10,19 @@ locale.setlocale(locale.LC_TIME, "ru_RU.UTF-8")
 register = template.Library()
 
 
+# @register.filter
+# def get_attr(obj, attr):
+#     try:
+#         return getattr(obj, attr, None)
+#     except AttributeError:
+#         return None
+
 @register.filter
 def get_attr(obj, attr):
-    try:
+    if isinstance(obj, dict):
+        return obj.get(attr)
+    else:
         return getattr(obj, attr, None)
-    except AttributeError:
-        return None
 
 
 @register.filter
