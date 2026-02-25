@@ -24,7 +24,7 @@ const CookieUtils = {
 		const expires = new Date()
 		expires.setTime(expires.getTime() + days * 24 * 60 * 60 * 1000)
 		document.cookie = `${name}=${encodeURIComponent(
-			JSON.stringify(value)
+			JSON.stringify(value),
 		)};expires=${expires.toUTCString()};path=/`
 	},
 
@@ -37,7 +37,7 @@ const CookieUtils = {
 			if (c.indexOf(nameEQ) === 0) {
 				try {
 					return JSON.parse(
-						decodeURIComponent(c.substring(nameEQ.length, c.length))
+						decodeURIComponent(c.substring(nameEQ.length, c.length)),
 					)
 				} catch (e) {
 					console.error('Error parsing cookie value:', e)
@@ -76,11 +76,11 @@ class ColumnSizeCalculator {
 		}
 
 		const visibleHeaders = this.headerCells.filter(
-			header => !header.classList.contains('hidden')
+			header => !header.classList.contains('hidden'),
 		)
 
 		let computedWidths = Array.from(
-			this.tableElement.querySelector('colgroup').children
+			this.tableElement.querySelector('colgroup').children,
 		).map((col, index) => this.calculateColumnWidth(col, index, visibleHeaders))
 
 		const container = this.tableElement.parentElement
@@ -111,7 +111,7 @@ class ColumnSizeCalculator {
 		})
 
 		const flexibleColumns = visibleHeaders.filter(
-			header => !fixedColumns.includes(header)
+			header => !fixedColumns.includes(header),
 		)
 
 		const totalFlexWidth = flexibleColumns.reduce((sum, header) => {
@@ -144,7 +144,7 @@ class ColumnSizeCalculator {
 
 		if (widthDiff !== 0) {
 			const lastFlexIndex = this.headerCells.indexOf(
-				flexibleColumns[flexibleColumns.length - 1]
+				flexibleColumns[flexibleColumns.length - 1],
 			)
 			computedWidths[lastFlexIndex] += widthDiff
 		}
@@ -154,7 +154,7 @@ class ColumnSizeCalculator {
 		widths.forEach((width, index) => {
 			if (width > 0) {
 				const cells = this.tableElement.querySelectorAll(
-					`td:nth-child(${index + 1})`
+					`td:nth-child(${index + 1})`,
 				)
 				cells.forEach(cell => {
 					cell.style.maxWidth = `${width}px`
@@ -233,7 +233,7 @@ class ResizeHandler {
 	createResizeLine() {
 		this.resizeLineElement = DOM_HELPER.createElement(
 			'div',
-			'table__resize-line'
+			'table__resize-line',
 		)
 
 		const tableRect = this.table.tableElement.getBoundingClientRect()
@@ -289,7 +289,7 @@ class ResizeHandler {
 		const deltaX = clientX - this.initialX
 		this.newWidth = Math.max(
 			this.initialWidth + deltaX,
-			this.table.minColumnWidth
+			this.table.minColumnWidth,
 		)
 	}
 
@@ -303,7 +303,7 @@ class ResizeHandler {
 
 	applyFinalWidth() {
 		const columnIndex = Array.from(this.table.columnGroup.children).indexOf(
-			this.resizedColumn
+			this.resizedColumn,
 		)
 
 		DOM_HELPER.applyStyles(this.resizedColumn, {
@@ -320,7 +320,7 @@ class ResizeHandler {
 		}
 
 		const cells = this.table.tableElement.querySelectorAll(
-			`td:nth-child(${columnIndex + 1})`
+			`td:nth-child(${columnIndex + 1})`,
 		)
 		cells.forEach(cell => {
 			DOM_HELPER.applyStyles(cell, {
@@ -434,7 +434,7 @@ class DropdownManager {
 				this.sortSubmenu = sortSubmenu
 
 				const columnIndex = this.table.headerCells.indexOf(
-					this.currentToggleButton.closest('th')
+					this.currentToggleButton.closest('th'),
 				)
 
 				ascSort.addEventListener('click', () => {
@@ -521,7 +521,7 @@ class DropdownManager {
 		}
 		return new DOMParser().parseFromString(
 			this.constructor.dropdownContentCache,
-			'text/html'
+			'text/html',
 		).body.firstElementChild
 	}
 
@@ -618,8 +618,8 @@ class ColumnVisibilityController {
 			DOM_HELPER.toggleElementClass(
 				element,
 				'hidden',
-				!element.classList.contains('hidden')
-			)
+				!element.classList.contains('hidden'),
+			),
 		)
 
 		this.updateColumnState(index)
@@ -637,7 +637,7 @@ class ColumnVisibilityController {
 			this.table.columnWidths[index] = 0
 		} else if (!isHidden && this.table.columnWidths[index] === 0) {
 			const savedWidth = parseInt(
-				this.table.columnGroup.children[index].dataset.savedWidth || '0'
+				this.table.columnGroup.children[index].dataset.savedWidth || '0',
 			)
 			this.table.columnWidths[index] =
 				savedWidth > 0 ? savedWidth : this.table.minColumnWidth
@@ -706,7 +706,7 @@ class ResizableTable {
 			const columnData = {
 				widths: this.columnWidths,
 				hidden: Array.from(this.columnGroup.children).map(col =>
-					col.classList.contains('hidden')
+					col.classList.contains('hidden'),
 				),
 			}
 
@@ -765,7 +765,7 @@ class ResizableTable {
 			this.columnWidths.length !== this.headerCells.length
 		) {
 			console.warn(
-				`Количество сохраненных ширин (${this.columnWidths.length}) не соответствует количеству столбцов (${this.headerCells.length}). Будут вычислены новые значения.`
+				`Количество сохраненных ширин (${this.columnWidths.length}) не соответствует количеству столбцов (${this.headerCells.length}). Будут вычислены новые значения.`,
 			)
 			this.columnWidths = []
 		}
@@ -773,7 +773,7 @@ class ResizableTable {
 		const calculator = new ColumnSizeCalculator(
 			this.tableElement,
 			this.headerCells,
-			this.columnWidths
+			this.columnWidths,
 		)
 
 		if (!this.columnWidths || this.columnWidths.length === 0) {
@@ -805,7 +805,7 @@ class ResizableTable {
 
 	addEventListeners() {
 		this.headerCells.forEach(header =>
-			this.resizeHandler.initializeResize(header)
+			this.resizeHandler.initializeResize(header),
 		)
 		this.addToggleButtons()
 	}
@@ -843,7 +843,7 @@ class ResizableTable {
 		const formElement = this.tableElement.nextElementSibling
 		if (formElement?.classList.contains('create-form')) {
 			const display = this.columnGroup.children[index].classList.contains(
-				'hidden'
+				'hidden',
 			)
 				? 'none'
 				: 'block'
@@ -853,17 +853,17 @@ class ResizableTable {
 
 	updateLastColumnHighlight() {
 		const visibleHeaders = this.headerCells.filter(
-			h => !h.classList.contains('hidden')
+			h => !h.classList.contains('hidden'),
 		)
 
 		this.headerCells.forEach(header =>
-			DOM_HELPER.toggleElementClass(header, 'table__cell-last', false)
+			DOM_HELPER.toggleElementClass(header, 'table__cell-last', false),
 		)
 
 		this.tableElement
 			.querySelectorAll('td')
 			.forEach(cell =>
-				DOM_HELPER.toggleElementClass(cell, 'table__cell-last', false)
+				DOM_HELPER.toggleElementClass(cell, 'table__cell-last', false),
 			)
 
 		if (visibleHeaders.length > 0) {
@@ -875,7 +875,7 @@ class ResizableTable {
 			this.tableElement
 				.querySelectorAll(`td:nth-child(${lastIndex + 1})`)
 				.forEach(cell =>
-					DOM_HELPER.toggleElementClass(cell, 'table__cell-last', true)
+					DOM_HELPER.toggleElementClass(cell, 'table__cell-last', true),
 				)
 		}
 	}
@@ -884,7 +884,7 @@ class ResizableTable {
 		const formBuilder = new FormBuilder(
 			this.tableElement,
 			this.columnWidths,
-			this.headerCells
+			this.headerCells,
 		)
 		await formBuilder.buildForm(formId, rowId, targetRow)
 	}
@@ -916,7 +916,7 @@ class ResizableTable {
 			this.tableElement.id,
 			columnIndex,
 			direction,
-			columnType
+			columnType,
 		)
 	}
 
@@ -1002,7 +1002,7 @@ export const TableManager = {
 		if (!tbody) return
 
 		const rows = Array.from(
-			tbody.querySelectorAll('tr:not(.table__row--summary)')
+			tbody.querySelectorAll('tr:not(.table__row--summary)'),
 		)
 		const summaryRow = tbody.querySelector('.table__row--summary')
 
@@ -1061,7 +1061,7 @@ export const TableManager = {
 					return
 				}
 			},
-			true
+			true,
 		)
 
 		document.addEventListener('click', event => {
@@ -1114,7 +1114,7 @@ export const TableManager = {
 						}, 0)
 					}
 				},
-				true
+				true,
 			)
 		}
 	},
@@ -1133,14 +1133,14 @@ export const TableManager = {
 
 		const sumDiv = document.querySelector('.table-sum-indicator')
 		const selectedCells = Array.from(
-			document.querySelectorAll('.table__cell--selected')
+			document.querySelectorAll('.table__cell--selected'),
 		)
 		const multiSelected = selectedCells.length > 1
 
 		if (isContextMenu && multiSelected) {
 			if (cell.classList.contains('table__cell--selected')) {
 				selectedCells.forEach(sc =>
-					sc.parentElement.classList.add('table__row--selected')
+					sc.parentElement.classList.add('table__row--selected'),
 				)
 			}
 			return
@@ -1151,7 +1151,7 @@ export const TableManager = {
 				cell.classList.remove('table__cell--selected')
 				const row = cell.parentElement
 				const selectedCellsInRow = row.querySelectorAll(
-					'.table__cell--selected'
+					'.table__cell--selected',
 				)
 				if (selectedCellsInRow.length === 0) {
 					row.classList.remove('table__row--selected')
@@ -1168,7 +1168,7 @@ export const TableManager = {
 			let allPercent = true
 
 			const currentSelected = document.querySelectorAll(
-				'.table__cell--selected'
+				'.table__cell--selected',
 			)
 			currentSelected.forEach(selectedCell => {
 				const text = selectedCell.textContent.trim()
@@ -1242,7 +1242,7 @@ export const TableManager = {
 			const visibleCell = Array.from(row.querySelectorAll('.table__cell')).find(
 				c =>
 					!c.classList.contains('hidden') &&
-					getComputedStyle(c).display !== 'none'
+					getComputedStyle(c).display !== 'none',
 			)
 			return !!visibleCell
 		})
@@ -1258,11 +1258,11 @@ export const TableManager = {
 			firstVisibleRow.classList.add('table__row--selected')
 
 			const firstCell = Array.from(
-				firstVisibleRow.querySelectorAll('.table__cell')
+				firstVisibleRow.querySelectorAll('.table__cell'),
 			).find(
 				c =>
 					!c.classList.contains('hidden') &&
-					getComputedStyle(c).display !== 'none'
+					getComputedStyle(c).display !== 'none',
 			)
 
 			if (firstCell) {
@@ -1291,14 +1291,14 @@ export const TableManager = {
 		const headers = Array.from(table.querySelectorAll('thead th'))
 		const amountColumnIndexes = headers
 			.map((header, index) =>
-				header.dataset.columnType === 'amount' ? index : -1
+				header.dataset.columnType === 'amount' ? index : -1,
 			)
 			.filter(index => index !== -1)
 
 		if (amountColumnIndexes.length !== 0) {
 			amountColumnIndexes.forEach(colIndex => {
 				const cells = table.querySelectorAll(
-					`tbody td:nth-child(${colIndex + 1})`
+					`tbody td:nth-child(${colIndex + 1})`,
 				)
 				cells.forEach(cell => {
 					if (cell.classList.contains('table__cell--summary')) return
@@ -1312,7 +1312,7 @@ export const TableManager = {
 					if (text && /^[\d\s,.-]+(\s?р\.)?$/.test(text)) {
 						const numText = text.replace(/\s?р\.$/, '').trim()
 						const number = parseFloat(
-							numText.replace(/\s/g, '').replace(',', '.')
+							numText.replace(/\s/g, '').replace(',', '.'),
 						)
 						if (!isNaN(number)) {
 							const hadSuffix = /\s?р\.$/.test(text)
@@ -1349,17 +1349,17 @@ export const TableManager = {
 
 		const percentColumnIndexes = headers
 			.map((header, index) =>
-				header.dataset.columnType === 'percent' ? index : -1
+				header.dataset.columnType === 'percent' ? index : -1,
 			)
 			.filter(index => index !== -1)
 
 		if (percentColumnIndexes.length !== 0) {
 			percentColumnIndexes.forEach(colIndex => {
 				const cells = table.querySelectorAll(
-					`tbody td:nth-child(${colIndex + 1})`
+					`tbody td:nth-child(${colIndex + 1})`,
 				)
 				const header = table.querySelector(
-					`thead th:nth-child(${colIndex + 1})`
+					`thead th:nth-child(${colIndex + 1})`,
 				)
 				cells.forEach(cell => {
 					if (cell.classList.contains('table__cell--summary')) return
@@ -1392,7 +1392,7 @@ export const TableManager = {
 
 		const amountColumnIndexes = headers
 			.map((header, index) =>
-				header.dataset.columnType === 'amount' ? index : -1
+				header.dataset.columnType === 'amount' ? index : -1,
 			)
 			.filter(index => index !== -1)
 
@@ -1406,7 +1406,7 @@ export const TableManager = {
 					if (text && /^[\d\s,.-]+(\s?р\.)?$/.test(text)) {
 						const numText = text.replace(/\s?р\.$/, '').trim()
 						const number = parseFloat(
-							numText.replace(/\s/g, '').replace(',', '.')
+							numText.replace(/\s/g, '').replace(',', '.'),
 						)
 						if (!isNaN(number)) {
 							const hadSuffix = /\s?р\.$/.test(text)
@@ -1442,7 +1442,7 @@ export const TableManager = {
 
 		const percentColumnIndexes = headers
 			.map((header, index) =>
-				header.dataset.columnType === 'percent' ? index : -1
+				header.dataset.columnType === 'percent' ? index : -1,
 			)
 			.filter(index => index !== -1)
 
@@ -1450,7 +1450,7 @@ export const TableManager = {
 			percentColumnIndexes.forEach(colIndex => {
 				const cell = row.querySelector(`td:nth-child(${colIndex + 1})`)
 				const header = table.querySelector(
-					`thead th:nth-child(${colIndex + 1})`
+					`thead th:nth-child(${colIndex + 1})`,
 				)
 
 				if (cell && !cell.classList.contains('table__cell--summary')) {
@@ -1614,13 +1614,13 @@ export const TableManager = {
 				updatedRow.setAttribute('data-id', data.id)
 
 				const allSelectedRows = document.querySelectorAll(
-					'.table__row--selected'
+					'.table__row--selected',
 				)
 				allSelectedRows.forEach(row => {
 					row.classList.remove('table__row--selected')
 					const selectedCells = row.querySelectorAll('.table__cell--selected')
 					selectedCells.forEach(cell =>
-						cell.classList.remove('table__cell--selected')
+						cell.classList.remove('table__cell--selected'),
 					)
 				})
 
@@ -1710,7 +1710,7 @@ export const TableManager = {
 				if (col.classList.contains('hidden')) acc.push(index)
 				return acc
 			},
-			[]
+			[],
 		)
 
 		const tableBody = document.querySelector(`#${tableId} .table__body`)
@@ -1732,7 +1732,7 @@ export const TableManager = {
 			})
 		} else {
 			console.error(
-				`Table body with id "${tableId}" not found in the provided HTML.`
+				`Table body with id "${tableId}" not found in the provided HTML.`,
 			)
 		}
 	},
@@ -1870,7 +1870,7 @@ export const TableManager = {
 			if (validSummaryOptions && validSummaryOptions.columns.length > 0) {
 				const columnNames = headerCells.map(header => header.dataset.name)
 				validSummaryOptions.columns = validSummaryOptions.columns.filter(
-					colName => columnNames.includes(colName)
+					colName => columnNames.includes(colName),
 				)
 			}
 		}
@@ -1895,7 +1895,7 @@ export const TableManager = {
 				const formBuilder = new FormBuilder(
 					table,
 					resizableTable.columnWidths,
-					headerCells
+					headerCells,
 				)
 
 				const inputElement = await formBuilder.createColumnInput(th, i)
@@ -2098,7 +2098,7 @@ export const TableManager = {
 	calculateTableSummary(
 		tableId,
 		columnsToSum,
-		options = { grouped: false, total: true, className: null, ids: null }
+		options = { grouped: false, total: true, className: null, ids: null },
 	) {
 		if (
 			!columnsToSum ||
@@ -2152,13 +2152,13 @@ export const TableManager = {
 					const summaryData = this.calculateSums(
 						filteredRows,
 						columnsToSum,
-						columnNames
+						columnNames,
 					)
 					const summaryRow = this.createSummaryRow(
 						headers,
 						columnNames,
 						summaryData,
-						'text-blue'
+						'text-blue',
 					)
 					const lastRow = filteredRows[filteredRows.length - 1]
 					this.applyColumnWidthsForRow(tableId, summaryRow)
@@ -2171,8 +2171,8 @@ export const TableManager = {
 		if (!options.grouped || options.total) {
 			let rows = Array.from(
 				tbody.querySelectorAll(
-					'tr:not(.table__row--summary):not(.table__group-row)'
-				)
+					'tr:not(.table__row--summary):not(.table__group-row)',
+				),
 			).filter(row => row.style.display !== 'none')
 
 			rows = filterRowsByIds(rows, options.ids)
@@ -2183,7 +2183,7 @@ export const TableManager = {
 					headers,
 					columnNames,
 					summaryData,
-					options.className
+					options.className,
 				)
 
 				this.applyColumnWidthsForRow(tableId, summaryRow)
@@ -2374,7 +2374,7 @@ document.addEventListener('DOMContentLoaded', function () {
 		if (itemsCount === 8) {
 			navList.style.gridTemplateColumns = 'repeat(4, minmax(0, 1fr))'
 		} else {
-			navList.style.gridTemplateColumns = 'repeat(5, minmax(0, 1fr))'
+			navList.style.gridTemplateColumns = 'repeat(6, minmax(0, 1fr))'
 		}
 	}
 
@@ -2424,11 +2424,11 @@ document.addEventListener('DOMContentLoaded', function () {
 		if (!table) return
 
 		const rows = Array.from(
-			table.querySelectorAll('.table__row:not(.hidden-row)')
+			table.querySelectorAll('.table__row:not(.hidden-row)'),
 		).filter(row => getComputedStyle(row).display !== 'none')
 		const currentRowIndex = rows.indexOf(row)
 		const currentCells = Array.from(
-			row.querySelectorAll('.table__cell:not(.hidden)')
+			row.querySelectorAll('.table__cell:not(.hidden)'),
 		).filter(cell => getComputedStyle(cell).display !== 'none')
 		const currentCellIndex = currentCells.indexOf(currentCell)
 
@@ -2457,7 +2457,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
 		const targetRow = rows[newRowIndex]
 		const targetCells = Array.from(
-			targetRow.querySelectorAll('.table__cell:not(.hidden)')
+			targetRow.querySelectorAll('.table__cell:not(.hidden)'),
 		).filter(cell => getComputedStyle(cell).display !== 'none')
 		const targetCell = targetCells[newCellIndex] || targetCells[0]
 
@@ -2468,7 +2468,7 @@ document.addEventListener('DOMContentLoaded', function () {
 					targetCell.classList.remove('table__cell--selected')
 					const row = targetCell.parentElement
 					const selectedCellsInRow = row.querySelectorAll(
-						'.table__cell--selected'
+						'.table__cell--selected',
 					)
 					if (selectedCellsInRow.length === 0) {
 						row.classList.remove('table__row--selected')
@@ -2483,7 +2483,7 @@ document.addEventListener('DOMContentLoaded', function () {
 				let allPercent = true
 
 				const currentSelected = document.querySelectorAll(
-					'.table__cell--selected'
+					'.table__cell--selected',
 				)
 				currentSelected.forEach(selectedCell => {
 					const text = selectedCell.textContent.trim()

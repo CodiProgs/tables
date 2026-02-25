@@ -135,7 +135,11 @@ input[type='file'] {
 }
 
 html {
-	font: 400 var(--font-size-default) / 1.5 Roboto, Helvetica, Arial, sans-serif;
+	font:
+		400 var(--font-size-default) / 1.5 Roboto,
+		Helvetica,
+		Arial,
+		sans-serif;
 }
 
 body {
@@ -555,7 +559,7 @@ textarea::placeholder {
 
 @media (max-width: 600px) {
 	.nav-list {
-		grid-template-columns: repeat(10, minmax(auto, 1fr)) !important;
+		grid-template-columns: repeat(11, minmax(auto, 1fr)) !important;
 		direction: rtl;
 	}
 	.nav-list > * {
@@ -636,7 +640,11 @@ textarea::placeholder {
 	gap: 12px;
 	min-width: 220px;
 	max-width: 400px;
-	transition: left 0.3s, right 0.3s, top 0.3s, transform 0.3s;
+	transition:
+		left 0.3s,
+		right 0.3s,
+		top 0.3s,
+		transform 0.3s;
 }
 .toast__icon {
 	margin-right: 8px;

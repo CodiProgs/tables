@@ -187,9 +187,17 @@
                                 <span>Обмен</span>
                             </a>
                         </li>
-                        {% comment %} <li class="nav-item {% if request.resolver_match.url_name == 'money_transfers' %}active{% endif %}">
-                            <a href="{% url 'main:money_transfers' %}">Перемещение ₽</a>
-                        </li> {% endcomment %}
+                        <li class="nav-item {% if request.resolver_match.url_name == 'supplier_income_report' %}active{% endif %}">
+                            <a href="{% url 'main:supplier_income_report' %}">
+                                <img src="{% static 'images/nav/statistics.svg' %}"
+                                    alt="Статистика"
+                                    class="icon"
+                                    data-hint="Статистика"
+                                    height="12"
+                                    width="12">
+                                <span>Статистика</span>
+                            </a>
+                        </li>
                         {% comment %} <li class="nav-item {% if request.resolver_match.url_name == 'profit_distribution' %}active{% endif %}">
                             <a href="{% url 'main:profit_distribution' %}">Распред. прибыли</a>
                         </li> {% endcomment %}

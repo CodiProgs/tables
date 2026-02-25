@@ -6302,7 +6302,7 @@ def supplier_income_report(request):
 
     fields = [
         {"name": "supplier_name", "verbose_name": "Поставщик"},
-        {"name": "total_income", "verbose_name": "Сумма доходов", "is_amount": True}
+        {"name": "total_income", "verbose_name": "Сумма поступлений", "is_amount": True}
     ]
 
     context = {
