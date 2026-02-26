@@ -2138,6 +2138,15 @@ def cash_flow_delete(request, pk=None):
                     transaction_obj.paid_amount -= payment_amount
                     transaction_obj.save()
 
+            elif purpose and purpose.name == "Погашение долга клиента":
+                client_debt_repayment = ClientDebtRepayment.objects.filter(cash_flow=cashflow).first()
+                if client_debt_repayment and client_debt_repayment.transaction:
+                    repayment_amount = abs(int(amount))
+                    transaction_obj = client_debt_repayment.transaction
+                    transaction_obj.returned_to_client -= repayment_amount
+                    transaction_obj.save()
+                ClientDebtRepayment.objects.filter(cash_flow=cashflow).delete()
+
             cashflow.delete()
 
             return JsonResponse({
@@ -2147,7 +2156,6 @@ def cash_flow_delete(request, pk=None):
             })
     except Exception as e:
         return JsonResponse({"status": "error", "message": str(e)}, status=400)
-
 
 
 @forbid_supplier
