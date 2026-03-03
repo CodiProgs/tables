@@ -6324,6 +6324,8 @@ def supplier_income_report(request):
 
 # ...existing code...
 
+# ...existing code...
+
 def calculate_february_balance(request):
     """
     Простой метод для расчета капитала на 28 февраля 2026 года.
@@ -6333,7 +6335,7 @@ def calculate_february_balance(request):
     from django.utils import timezone
     from datetime import datetime
     from decimal import Decimal
-    from django.db.models import Sum, Case, When
+    from django.db.models import Sum, Case, When, F, Value, DecimalField
     
     target_date = timezone.make_aware(datetime(2026, 2, 28, 23, 59, 59))
     
@@ -6395,9 +6397,9 @@ def calculate_february_balance(request):
     investors_total = Decimal(0)
     for investor in Investor.objects.all():
         post_date_ops = InvestorDebtOperation.objects.filter(investor=investor, created_at__gt=target_date).aggregate(
-            deposit=Sum(Case(When(operation_type='deposit', then='amount'), default=0)),
-            withdrawal=Sum(Case(When(operation_type='withdrawal', then='amount'), default=0)),
-            profit=Sum(Case(When(operation_type='profit', then='amount'), default=0))
+            deposit=Sum(Case(When(operation_type='deposit', then=F('amount')), default=Value(Decimal(0), output_field=DecimalField()), output_field=DecimalField())),
+            withdrawal=Sum(Case(When(operation_type='withdrawal', then=F('amount')), default=Value(Decimal(0), output_field=DecimalField()), output_field=DecimalField())),
+            profit=Sum(Case(When(operation_type='profit', then=F('amount')), default=Value(Decimal(0), output_field=DecimalField()), output_field=DecimalField()))
         )
         correction = (post_date_ops['deposit'] or 0) - (post_date_ops['withdrawal'] or 0) - (post_date_ops['profit'] or 0)
         investors_total += investor.balance - correction
