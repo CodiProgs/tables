@@ -6302,29 +6302,38 @@ def supplier_income_report(request):
             for month in months:
                 setattr(self, f"month_{month['num']}", 0)
 
-    # Получаем филиал "Наши ИП"
     try:
         our_branch = Branch.objects.get(name="Наши ИП")
     except Branch.DoesNotExist:
         our_branch = None
 
-    # Получаем всех поставщиков с филиалом "Наши ИП"
+    excluded_supplier_names = [
+        "Георгий ОБМЕН",
+        "ДИЗАЙНЕР ИП ОБМЕН",
+        "ДИЗАЙНЕР ООО ОБМЕН",
+        "ДТ обмен",
+        "Зорин",
+        "ИА ОБМЕН",
+        "Карты Китай",
+        "Кошевая",
+    ]
+
     suppliers = Supplier.objects.filter(
         branch=our_branch
-    ).order_by('name')
+    ).exclude(
+        name__in=excluded_supplier_names
+    ).order_by("name")
 
     rows_dict = {
         supplier.id: ReportRow(supplier.name, supplier.id)
         for supplier in suppliers
     }
 
-    # Получаем транзакции текущего года для этих поставщиков
     transactions = Transaction.objects.filter(
         supplier__in=suppliers,
         created_at__year=current_year
     )
 
-    # Заполняем данные по месяцам
     for transaction in transactions:
         month_num = transaction.created_at.month
         supplier_id = transaction.supplier_id
@@ -6337,7 +6346,6 @@ def supplier_income_report(request):
     rows = list(rows_dict.values())
     rows.sort(key=lambda x: x.supplier)
 
-    # Добавляем строку Итого
     total_row = ReportRow("ИТОГО", 0, True)
 
     for row in rows:
@@ -6356,7 +6364,6 @@ def supplier_income_report(request):
         formatted = locale.format_string("%.0f", abs(amount), grouping=True)
         return f"{formatted} р."
 
-    # Форматируем значения для отображения
     for row in rows:
         for month in months:
             month_attr = f"month_{month['num']}"
@@ -6390,3 +6397,123 @@ def supplier_income_report(request):
     }
 
     return render(request, "main/supplier_income_report.html", context)
+
+
+@forbid_supplier
+@login_required
+def supplier_cost_turnover_report(request):
+    from datetime import datetime
+
+    current_year = datetime.now().year
+
+    MONTHS_RU = [
+        "Январь", "Февраль", "Март", "Апрель", "Май", "Июнь",
+        "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"
+    ]
+    months = [{"num": i, "name": MONTHS_RU[i - 1]} for i in range(1, 13)]
+
+    class ReportRow:
+        def __init__(self, supplier_name, supplier_id, is_total=False):
+            self.supplier = supplier_name
+            self.supplier_id = supplier_id
+            self.is_total = is_total
+            self.total = 0
+            for month in months:
+                setattr(self, f"month_{month['num']}", 0)
+
+    try:
+        our_branch = Branch.objects.get(name="Наши ИП")
+    except Branch.DoesNotExist:
+        our_branch = None
+
+    # Те же исключения, что и в supplier_income_report
+    excluded_supplier_names = [
+        "Георгий ОБМЕН",
+        "ДИЗАЙНЕР ИП ОБМЕН",
+        "ДИЗАЙНЕР ООО ОБМЕН",
+        "ДТ обмен",
+        "Зорин",
+        "ИА ОБМЕН",
+        "Карты Китай",
+        "Кошевая",
+    ]
+
+    suppliers = (
+        Supplier.objects
+        .filter(branch=our_branch)
+        .exclude(name__in=excluded_supplier_names)
+        .order_by("name")
+    )
+
+    rows_dict = {
+        supplier.id: ReportRow(supplier.name, supplier.id)
+        for supplier in suppliers
+    }
+
+    transactions = Transaction.objects.filter(
+        supplier__in=suppliers,
+        created_at__year=current_year
+    )
+
+    for t in transactions:
+        supplier_id = t.supplier_id
+        month_num = t.created_at.month
+
+        if supplier_id not in rows_dict:
+            continue
+
+        paid_amount = Decimal(str(t.paid_amount or 0))
+        supplier_percentage = Decimal(str(t.supplier_percentage or 0))
+
+        # Себестоимость от оплаченной суммы, округление вниз до целых
+        supplier_cost = Decimal(math.floor((paid_amount * supplier_percentage) / Decimal("100")))
+
+        month_attr = f"month_{month_num}"
+        current_value = getattr(rows_dict[supplier_id], month_attr)
+        setattr(rows_dict[supplier_id], month_attr, current_value + supplier_cost)
+        rows_dict[supplier_id].total += supplier_cost
+
+    rows = list(rows_dict.values())
+    rows.sort(key=lambda x: x.supplier)
+
+    # Строка ИТОГО
+    total_row = ReportRow("ИТОГО", 0, True)
+    for row in rows:
+        for month in months:
+            month_attr = f"month_{month['num']}"
+            setattr(
+                total_row,
+                month_attr,
+                getattr(total_row, month_attr) + getattr(row, month_attr)
+            )
+        total_row.total += row.total
+
+    rows.append(total_row)
+
+    def format_amount_for_display(amount):
+        formatted = locale.format_string("%.0f", abs(amount), grouping=True)
+        return f"{formatted} р."
+
+    for row in rows:
+        for month in months:
+            month_attr = f"month_{month['num']}"
+            setattr(row, month_attr, format_amount_for_display(getattr(row, month_attr)))
+        row.total = format_amount_for_display(row.total)
+
+    fields = [{"name": "supplier", "verbose_name": "Поставщик"}]
+    for month in months:
+        fields.append({
+            "name": f"month_{month['num']}",
+            "verbose_name": month["name"],
+            "is_text": True
+        })
+    fields.append({"name": "total", "verbose_name": "Итого", "is_text": True})
+
+    context = {
+        "fields": fields,
+        "data": rows,
+        "year": current_year,
+        "data_ids": [row.supplier_id for row in rows],
+    }
+
+    return render(request, "main/supplier_cost_turnover_report.html", context)
