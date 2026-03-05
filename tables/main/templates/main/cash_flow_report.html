@@ -1,16 +1,8 @@
 {% extends "layout.html" %}
 {% load static %}
 {% block content %}
-    <div style="display: flex; gap: 20px; flex-wrap: wrap;">
-        <div class="page-table-container" id="cost_turnover-container">
-            {% include "components/table.html" with id="cost_turnover-table" fields=fields_cost data=data_cost %}
-        </div>
-        <div class="page-table-container" id="cash_flow_report-container">
-            {% include "components/table.html" with id="cash_flow_report-table" fields=fields data=data %}
-        </div>
-        <div class="page-table-container" id="cash_flow_summary-container">
-            {% include "components/table.html" with id="cash_flow_summary-table" fields=fields_summary data=data_summary %}
-        </div>
+    <div class="page-table-container" id="cash_flow_report-container">
+        {% include "components/table.html" with id="cash_flow_report-table" fields=fields data=data %}
     </div>
     <div id="context-menu" class="dropdown-menu">
         <a class="dropdown-item context-action"

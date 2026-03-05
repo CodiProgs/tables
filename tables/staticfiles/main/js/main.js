@@ -719,7 +719,12 @@ const addMenuHandler = () => {
 				}
 
 				if (table.id === 'cash_flow_report-table') {
-					if (detailButton) detailButton.style.display = 'block'
+					const selectedRow = document.querySelector(
+						'#cash_flow_report-table tr.table__row--selected',
+					)
+					const hasDataId = selectedRow && selectedRow.getAttribute('data-id')
+					if (detailButton)
+						detailButton.style.display = hasDataId ? 'block' : 'none'
 				}
 
 				if (table.id === 'investors-table') {
@@ -4029,20 +4034,68 @@ const handleCashFlow = async config => {
 	})
 }
 
+const setIdsSequentially = (ids, tableId) => {
+	if (!Array.isArray(ids) || ids.length === 0) return
+
+	const table = document.getElementById(tableId)
+	if (!table) return
+
+	const rows = Array.from(table.querySelectorAll('tbody tr'))
+
+	let firstTotalIndex = rows.findIndex(row => {
+		const firstCell = row.querySelector('td:first-child')
+		if (!firstCell) return false
+		const text = firstCell.textContent.trim().toUpperCase()
+		return (
+			text === 'ИТОГО' ||
+			text === 'ИТОГО' ||
+			row.classList.contains('total-row')
+		)
+	})
+
+	if (firstTotalIndex === -1) {
+		ids.forEach((id, index) => {
+			if (rows[index]) {
+				rows[index].setAttribute('data-id', id)
+			}
+		})
+		return
+	}
+
+	let emptyRowIndex = -1
+	for (let i = firstTotalIndex + 1; i < rows.length; i++) {
+		const firstCell = rows[i].querySelector('td:first-child')
+		if (!firstCell) continue
+		const text = firstCell.textContent.trim()
+		if (text === '' || rows[i].classList.contains('empty-row')) {
+			emptyRowIndex = i
+			break
+		}
+	}
+
+	const startIndex =
+		emptyRowIndex !== -1 ? emptyRowIndex + 1 : firstTotalIndex + 1
+
+	ids.forEach((id, index) => {
+		const rowIndex = startIndex + index
+		if (rows[rowIndex]) {
+			rows[rowIndex].setAttribute('data-id', id)
+		}
+	})
+}
+
 const handleReport = () => {
 	try {
 		const dataIdsData = document.getElementById('data-ids')?.textContent
 		if (dataIdsData) {
 			const dataIds = JSON.parse(dataIdsData)
-			setIds(dataIds, `cash_flow_report-table`)
+			console.log('Parsed data IDs for cash flow report:', dataIds)
+			setIdsSequentially(dataIds, 'cash_flow_report-table')
 		} else {
 			console.warn("Element with ID 'data-ids' not found or empty.")
 		}
 	} catch (e) {
-		console.error(
-			'Error parsing money transfers IDs data for actions column:',
-			e,
-		)
+		console.error('Error parsing data IDs for cash flow report:', e)
 	}
 
 	const table = document.getElementById('cash_flow_report-table')
@@ -4058,9 +4111,18 @@ const handleReport = () => {
 		})
 
 		const rows = table.querySelectorAll('tbody tr')
-		if (rows.length > 0) {
-			rows[rows.length - 1].classList.add('total-row')
-		}
+		rows.forEach(row => {
+			const firstCell = row.querySelector('td:first-child')
+			if (firstCell) {
+				const text = firstCell.textContent.trim().toUpperCase()
+				if (text === 'ИТОГО' || text === 'Итого') {
+					row.classList.add('total-row')
+				}
+				if (text === '') {
+					row.classList.add('empty-row')
+				}
+			}
+		})
 
 		const detailButton = document.getElementById('detail-button')
 		if (detailButton) {

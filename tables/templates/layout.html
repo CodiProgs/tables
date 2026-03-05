@@ -155,12 +155,12 @@
                         <li class="nav-item {% if request.resolver_match.url_name == 'cash_flow_report' %}active{% endif %}">
                             <a href="{% url 'main:cash_flow_report' %}">
                                 <img src="{% static 'images/nav/file-invoice-dollar.svg' %}"
-                                    alt="Отчет ДДС"
+                                    alt="Отчет себес"
                                     class="icon"
-                                    data-hint="Отчет ДДС"
+                                    data-hint="Отчет себес"
                                     height="12"
                                     width="12">
-                                <span>Отчет ДДС</span>
+                                <span>Отчет себес</span>
                             </a>
                         </li>
                         {% if request.user.is_authenticated and request.user.user_type.name == "Администратор" %}

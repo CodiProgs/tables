@@ -6544,12 +6544,19 @@ def cash_flow_report(request):
     ]
     months = [{"num": i, "name": MONTHS_RU[i - 1]} for i in range(1, 13)]
 
+    MONTHS_RU_COST = [
+        "Январь", "Февраль", "Март", "Апрель", "Май", "Июнь",
+        "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"
+    ]
+    months_cost = [{"num": i, "name": MONTHS_RU_COST[i - 1]} for i in range(1, 13)]
+
     class ReportRow:
-        def __init__(self, purpose_name, purpose_id, operation_type=None, is_total=False):
-            self.purpose = purpose_name
-            self.purpose_id = purpose_id
+        def __init__(self, name, row_id, operation_type=None, is_total=False, is_empty=False):
+            self.name = name
+            self.row_id = row_id
             self.operation_type = operation_type
             self.is_total = is_total
+            self.is_empty = is_empty
             self.total = Decimal("0")
             for month in months:
                 setattr(self, f"month_{month['num']}", Decimal("0"))
@@ -6575,9 +6582,9 @@ def cash_flow_report(request):
             rows_dict[purpose_id].total += amount
 
     rows = list(rows_dict.values())
-    rows.sort(key=lambda x: (x.operation_type != PaymentPurpose.INCOME, x.purpose))
+    rows.sort(key=lambda x: (x.operation_type != PaymentPurpose.INCOME, x.name))
 
-    total_row = ReportRow("ИТОГО", 0, None, True)
+    total_row = ReportRow("Итого", 0, None, True)
     for row in rows:
         for month in months:
             month_attr = f"month_{month['num']}"
@@ -6589,30 +6596,6 @@ def cash_flow_report(request):
         total_row.total += row.total
 
     rows.append(total_row)
-
-    fields = [{"name": "purpose", "verbose_name": "Назначение платежа"}]
-    for month in months:
-        fields.append({
-            "name": f"month_{month['num']}",
-            "verbose_name": month["name"],
-            "is_text": True
-        })
-    fields.append({"name": "total", "verbose_name": "Итого", "is_text": True})
-
-    MONTHS_RU_COST = [
-        "Январь", "Февраль", "Март", "Апрель", "Май", "Июнь",
-        "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"
-    ]
-    months_cost = [{"num": i, "name": MONTHS_RU_COST[i - 1]} for i in range(1, 13)]
-
-    class CostReportRow:
-        def __init__(self, supplier_name, supplier_id, is_total=False):
-            self.supplier = supplier_name
-            self.supplier_id = supplier_id
-            self.is_total = is_total
-            self.total = Decimal("0")
-            for month in months_cost:
-                setattr(self, f"month_{month['num']}", Decimal("0"))
 
     try:
         our_branch = Branch.objects.get(name="Наши ИП")
@@ -6638,7 +6621,7 @@ def cash_flow_report(request):
     )
 
     cost_rows_dict = {
-        supplier.id: CostReportRow(supplier.name, supplier.id)
+        supplier.id: ReportRow(supplier.name, supplier.id + 10000)
         for supplier in suppliers
     }
 
@@ -6664,9 +6647,9 @@ def cash_flow_report(request):
         cost_rows_dict[supplier_id].total += supplier_cost
 
     cost_rows = list(cost_rows_dict.values())
-    cost_rows.sort(key=lambda x: x.supplier)
+    cost_rows.sort(key=lambda x: x.name)
 
-    cost_total_row = CostReportRow("ИТОГО", 0, True)
+    cost_total_row = ReportRow("Итого", 20000, None, True)
     for row in cost_rows:
         for month in months_cost:
             month_attr = f"month_{month['num']}"
@@ -6679,26 +6662,10 @@ def cash_flow_report(request):
 
     cost_rows.append(cost_total_row)
 
-    fields_cost = [{"name": "supplier", "verbose_name": "Поставщик"}]
-    for month in months_cost:
-        fields_cost.append({
-            "name": f"month_{month['num']}",
-            "verbose_name": month["name"],
-            "is_text": True
-        })
-    fields_cost.append({"name": "total", "verbose_name": "Итого", "is_text": True})
-
-    class SummaryReportRow:
-        def __init__(self, title, row_id):
-            self.title = title
-            self.row_id = row_id
-            self.total = Decimal("0")
-            for month in months_cost:
-                setattr(self, f"month_{month['num']}", Decimal("0"))
-
-    summary_row_2nd_table = SummaryReportRow("Итог 1 таблицы", 1)
-    summary_row_1st_table = SummaryReportRow("Итог 2 таблицы", 2)
-    summary_row_total = SummaryReportRow("Итого", 3)
+    # === ТРЕТЬЯ ТАБЛИЦА: Сводная таблица ===
+    summary_row_2nd_table = ReportRow("Итог 1 таблицы", 30001)
+    summary_row_1st_table = ReportRow("Итог 2 таблицы", 30002)
+    summary_row_total = ReportRow("Итого", 30003, None, True)
 
     for month in months_cost:
         month_attr = f"month_{month['num']}"
@@ -6716,15 +6683,6 @@ def cash_flow_report(request):
     summary_row_total.total = summary_row_2nd_table.total + summary_row_1st_table.total
 
     data_summary = [summary_row_2nd_table, summary_row_1st_table, summary_row_total]
-
-    fields_summary = [{"name": "title", "verbose_name": "Показатель"}]
-    for month in months_cost:
-        fields_summary.append({
-            "name": f"month_{month['num']}",
-            "verbose_name": month["name"],
-            "is_text": True
-        })
-    fields_summary.append({"name": "total", "verbose_name": "Итого", "is_text": True})
 
     def format_amount_for_display(amount):
         value = Decimal(str(amount or 0))
@@ -6750,19 +6708,35 @@ def cash_flow_report(request):
             setattr(row, month_attr, format_amount_for_display(getattr(row, month_attr)))
         row.total = format_amount_for_display(row.total)
 
+    empty_row = ReportRow("", 0, None, False, True)
+    for month in months:
+        month_attr = f"month_{month['num']}"
+        setattr(empty_row, month_attr, "")
+    empty_row.total = ""
+
+    combined_data = []
+    combined_data.extend(cost_rows)
+    combined_data.append(empty_row)
+    combined_data.extend(rows)
+    combined_data.append(empty_row)
+    combined_data.extend(data_summary)
+
+    fields = [{"name": "name", "verbose_name": "Наименование"}]
+    for month in months:
+        fields.append({
+            "name": f"month_{month['num']}",
+            "verbose_name": month["name"],
+            "is_text": True
+        })
+    fields.append({"name": "total", "verbose_name": "Итого", "is_text": True})
+
+    data_ids = [row.row_id for row in rows if not row.is_total and row.row_id != 0]
+
     context = {
         "fields": fields,
-        "data": rows,
+        "data": combined_data,
         "year": current_year,
-        "data_ids": [row.purpose_id for row in rows],
-
-        "fields_cost": fields_cost,
-        "data_cost": cost_rows,
-        "data_cost_ids": [row.supplier_id for row in cost_rows],
-
-        "fields_summary": fields_summary,
-        "data_summary": data_summary,
-        "data_summary_ids": [row.row_id for row in data_summary],
+        "data_ids": data_ids,
     }
 
     return render(request, "main/cash_flow_report.html", context)
