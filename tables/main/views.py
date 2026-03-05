@@ -6279,44 +6279,114 @@ def profit_by_month(request):
 @forbid_supplier
 @login_required
 def supplier_income_report(request):
-    from django.db.models import Sum, Case, When, DecimalField
-    from datetime import datetime
+    from datetime import datetime, date
 
     current_year = datetime.now().year
 
-    income_data = (
-        Supplier.objects.annotate(
-            total_income=Sum(
-                Case(
-                    When(
-                        cash_flows__created_at__year=current_year,
-                        then='cash_flows__amount'
-                    ),
-                    default=0,
-                    output_field=DecimalField()
-                )
-            )
-        )
-        .values('name', 'total_income')
-        .order_by('-total_income')
+    MONTHS_RU = [
+        "Январь", "Февраль", "Март", "Апрель", "Май", "Июнь",
+        "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"
+    ]
+    months = [
+        {"num": i, "name": MONTHS_RU[i-1], "short": MONTHS_RU[i-1][:3].lower()}
+        for i in range(1, 13)
+    ]
+
+    class ReportRow:
+        def __init__(self, supplier_name, supplier_id, is_total=False):
+            self.supplier = supplier_name
+            self.supplier_id = supplier_id
+            self.is_total = is_total
+            self.total = 0
+
+            for month in months:
+                setattr(self, f"month_{month['num']}", 0)
+
+    # Получаем филиал "Наши ИП"
+    try:
+        our_branch = Branch.objects.get(name="Наши ИП")
+    except Branch.DoesNotExist:
+        our_branch = None
+
+    # Получаем всех поставщиков с филиалом "Наши ИП"
+    suppliers = Supplier.objects.filter(
+        branch=our_branch
+    ).order_by('name')
+
+    rows_dict = {
+        supplier.id: ReportRow(supplier.name, supplier.id)
+        for supplier in suppliers
+    }
+
+    # Получаем транзакции текущего года для этих поставщиков
+    transactions = Transaction.objects.filter(
+        supplier__in=suppliers,
+        created_at__year=current_year
     )
 
-    rows = []
-    for item in income_data:
-        rows.append({
-            'supplier_name': item['name'],
-            'total_income': item['total_income'] or 0
-        })
+    # Заполняем данные по месяцам
+    for transaction in transactions:
+        month_num = transaction.created_at.month
+        supplier_id = transaction.supplier_id
+
+        if supplier_id in rows_dict:
+            current_value = getattr(rows_dict[supplier_id], f"month_{month_num}")
+            setattr(rows_dict[supplier_id], f"month_{month_num}", current_value + transaction.amount)
+            rows_dict[supplier_id].total += transaction.amount
+
+    rows = list(rows_dict.values())
+    rows.sort(key=lambda x: x.supplier)
+
+    # Добавляем строку Итого
+    total_row = ReportRow("ИТОГО", 0, True)
+
+    for row in rows:
+        for month in months:
+            month_attr = f"month_{month['num']}"
+            total_month_value = getattr(total_row, month_attr)
+            row_month_value = getattr(row, month_attr)
+
+            setattr(total_row, month_attr, total_month_value + row_month_value)
+
+        total_row.total += row.total
+
+    rows.append(total_row)
+
+    def format_amount_for_display(amount):
+        formatted = locale.format_string("%.0f", abs(amount), grouping=True)
+        return f"{formatted} р."
+
+    # Форматируем значения для отображения
+    for row in rows:
+        for month in months:
+            month_attr = f"month_{month['num']}"
+            month_value = getattr(row, month_attr)
+            setattr(row, month_attr, format_amount_for_display(month_value))
+
+        row.total = format_amount_for_display(row.total)
 
     fields = [
-        {"name": "supplier_name", "verbose_name": "Поставщик"},
-        {"name": "total_income", "verbose_name": "Сумма поступлений", "is_amount": True}
+        {"name": "supplier", "verbose_name": "Поставщик"}
     ]
+
+    for month in months:
+        fields.append({
+            "name": f"month_{month['num']}",
+            "verbose_name": month['name'],
+            "is_text": True
+        })
+
+    fields.append({
+        "name": "total",
+        "verbose_name": "Итого",
+        "is_text": True
+    })
 
     context = {
         "fields": fields,
         "data": rows,
         "year": current_year,
+        "data_ids": [row.supplier_id for row in rows],
     }
 
     return render(request, "main/supplier_income_report.html", context)
