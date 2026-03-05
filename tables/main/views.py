@@ -6696,8 +6696,8 @@ def cash_flow_report(request):
             for month in months_cost:
                 setattr(self, f"month_{month['num']}", Decimal("0"))
 
-    summary_row_2nd_table = SummaryReportRow("Итог 2 таблицы", 1)
-    summary_row_1st_table = SummaryReportRow("Итог 1 таблицы", 2)
+    summary_row_2nd_table = SummaryReportRow("Итог 1 таблицы", 1)
+    summary_row_1st_table = SummaryReportRow("Итог 2 таблицы", 2)
     summary_row_total = SummaryReportRow("Итого", 3)
 
     for month in months_cost:
