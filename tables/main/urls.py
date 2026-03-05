@@ -101,5 +101,4 @@ urlpatterns = [
 	path('profit_by_month/', views.profit_by_month, name='profit_by_month'),
 
 	path("supplier-income-report/", views.supplier_income_report, name="supplier_income_report"),
-	path("supplier-cost-turnover-report/", views.supplier_cost_turnover_report, name="supplier_cost_turnover_report"),
 ]
