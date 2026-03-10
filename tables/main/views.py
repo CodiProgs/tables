@@ -3227,13 +3227,12 @@ def debtors(request):
     }
     return render(request, "main/debtors.html", context)
 
-
 @login_required
 def balance(request):
     user = request.user
     is_admin = hasattr(user, 'user_type') and user.user_type.name == 'Администратор'
-
-    is_supplier = hasattr(request.user, 'user_type') and request.user.user_type.name == 'Поставщик' or request.user.user_type.name == 'Филиал'
+    is_supplier = hasattr(user, 'user_type') and user.user_type.name in ['Поставщик', 'Филиал']
+    is_other_user = not is_admin and not is_supplier
 
     branches = list(Branch.objects.all().values('id', 'name'))
 
@@ -3267,7 +3266,6 @@ def balance(request):
 
     total_bonuses = sum(float(t.bonus_debt) for t in transactions)
     total_remaining = sum(float(t.client_debt_paid) for t in transactions)
-    total_profit = sum(float(t.profit) for t in transactions if float(t.paid_amount) - float(t.amount) == 0)
 
     transactionsInvestors = [
         t for t in Transaction.objects.filter(paid_amount__gt=0)
@@ -3294,16 +3292,18 @@ def balance(request):
         summary = []
 
     total_summary_debts = sum(item['amount'] for item in summary)
-    
+
     context = {
         "is_admin": is_admin,
         "is_supplier": is_supplier,
+        "is_other_user": is_other_user,
         "branch_debts": branch_debts_list,
         "summary": summary,
         "total_branch_debts": total_branch_debts,
         "total_summary_debts": total_summary_debts,
     }
     return render(request, "main/balance.html", context)
+
 
 @forbid_supplier
 @login_required

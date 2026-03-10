@@ -33,22 +33,25 @@
         </div>
         <div class="stats-container">
             {% if is_admin %}
-            <button id="refresh-stats-button" class="stats-refresh-button" title="Обновить статистику">
-                <img src="{% static 'images/arrows-rotate.svg' %}" alt="Обновить"
-                     height="16"
-                     width="16">
-            </button>
-            <h2 class="debtors-office-list__header debtors-office__header">Баланс</h2>
-            <div id="balance-container"></div>
-            <h2 class="debtors-office-list__header debtors-office__header debtors-office__header--top">Рентабельность капитала</h2>
-            <div class="charts-container">
-                <div class="chart-stats">
-                    <canvas id="statsChart"></canvas>
+                <button id="refresh-stats-button" class="stats-refresh-button" title="Обновить статистику">
+                    <img src="{% static 'images/arrows-rotate.svg' %}" alt="Обновить"
+                         height="16"
+                         width="16">
+                </button>
+                <h2 class="debtors-office-list__header debtors-office__header">Баланс</h2>
+                <div id="balance-container"></div>
+                <h2 class="debtors-office-list__header debtors-office__header debtors-office__header--top">Рентабельность капитала</h2>
+                <div class="charts-container">
+                    <div class="chart-stats">
+                        <canvas id="statsChart"></canvas>
+                    </div>
+                    <div class="chart-profit">
+                        <canvas id="profitChart"></canvas>
+                    </div>
                 </div>
-                <div class="chart-profit">
-                    <canvas id="profitChart"></canvas>
-                </div>
-            </div>
+            {% elif is_other_user %}
+                <h2 class="debtors-office-list__header debtors-office__header">Баланс</h2>
+                <div id="balance-container"></div>
             {% endif %}
         </div>
     </div>
