@@ -900,7 +900,7 @@ textarea::placeholder {
 #debtors-container .stats-container {
 	width: 50%;
 	max-height: 100%;
-	border: none;
+	/* border: none; */
 }
 
 #debtors-container .debtors-data,

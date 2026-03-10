@@ -3227,8 +3227,12 @@ def debtors(request):
     }
     return render(request, "main/debtors.html", context)
 
+
 @login_required
 def balance(request):
+    from datetime import datetime
+    from collections import defaultdict
+
     user = request.user
     is_admin = hasattr(user, 'user_type') and user.user_type.name == 'Администратор'
     is_supplier = hasattr(user, 'user_type') and user.user_type.name in ['Поставщик', 'Филиал']
@@ -3252,16 +3256,16 @@ def balance(request):
     branch_debts = defaultdict(float)
     for t in transactions:
         branch = t.supplier.branch if t.supplier and t.supplier.branch else None
-        if branch and branch.name != "Филиал 1" and branch.name != "Наши ИП":
+        if branch and branch.name not in ["Филиал 1", "Наши ИП"]:
             branch_debts[branch.name] += float(getattr(t, 'supplier_debt', 0))
 
     branch_debts_list = [
-        {"branch": branch['name'], "debt": branch_debts.get(branch['name'], 0)}
+        {"id": branch['id'], "branch": branch['name'], "debt": branch_debts.get(branch['name'], 0)}
         for branch in branches
     ]
 
     total_branch_debts = sum(
-        branch['debt'] for branch in branch_debts_list if branch['branch'] != "Филиал 1" and branch['branch'] != "Наши ИП"
+        branch['debt'] for branch in branch_debts_list if branch['branch'] not in ["Филиал 1", "Наши ИП"]
     )
 
     total_bonuses = sum(float(t.bonus_debt) for t in transactions)
@@ -3278,14 +3282,17 @@ def balance(request):
         purpose__operation_type=PaymentPurpose.INCOME
     ).exclude(purpose__name__in=["Оплата", "Внесение инвестора", "Возврат от поставщиков"])
 
-    total_profit = sum(float(t.profit - t.returned_to_investor) for t in transactionsInvestors) + sum(float(cf.amount - (cf.returned_to_investor or 0)) for cf in cashflows)
+    total_profit = sum(float(t.profit - t.returned_to_investor) for t in transactionsInvestors) + \
+                   sum(float(cf.amount - (cf.returned_to_investor or 0)) for cf in cashflows)
 
     summary = [
         {"name": "Бонусы", "amount": total_bonuses},
         {"name": "Выдачи клиентам", "amount": total_remaining},
     ]
 
-    if is_admin:
+    show_capital_profitability = not is_supplier
+
+    if is_admin or show_capital_profitability:
         summary.append({"name": "Инвесторам", "amount": total_profit})
 
     if is_supplier:
@@ -3293,17 +3300,44 @@ def balance(request):
 
     total_summary_debts = sum(item['amount'] for item in summary)
 
+    show_monthly_capital_table = is_other_user
+
+    # Месячные балансы — строки: месяцы, столбец: баланс
+    current_year = datetime.now().year
+    MONTHS_RU = [
+        "Январь", "Февраль", "Март", "Апрель", "Май", "Июнь",
+        "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"
+    ]
+    monthly_capitals = MonthlyCapital.objects.filter(year=current_year).order_by('month')
+    capitals_by_month = {mc.month: mc.capital for mc in monthly_capitals}
+
+    fields = [
+        {"name": "month", "verbose_name": "Месяц"},
+        {"name": "capital", "verbose_name": "Баланс", "is_amount": True}
+    ]
+    data = []
+    data_ids = []
+    for i in range(1, 13):
+        data.append({
+            "month": MONTHS_RU[i-1],
+            "capital": capitals_by_month.get(i, 0)
+        })
+        data_ids.append(i)
+
     context = {
+        "fields": fields,
+        "data": data,
+        "data_ids": data_ids,
         "is_admin": is_admin,
         "is_supplier": is_supplier,
         "is_other_user": is_other_user,
-        "branch_debts": branch_debts_list,
-        "summary": summary,
+        "show_capital_profitability": show_capital_profitability,
+        "show_monthly_capital_table": show_monthly_capital_table,
         "total_branch_debts": total_branch_debts,
         "total_summary_debts": total_summary_debts,
+        "summary": summary,
     }
     return render(request, "main/balance.html", context)
-
 
 @forbid_supplier
 @login_required
@@ -4482,7 +4516,7 @@ def company_balance_stats(request):
 
     safe_amount = SupplierAccount.objects.filter(
         supplier__visible_in_summary=True
-    ).aggregate(total=Sum("balance"))["total"] or Decimal(0)
+    ).exclude(account__name__iexact="Наличные").aggregate(total=Sum("balance"))["total"] or Decimal(0)
 
     cash_account = Account.objects.filter(name__iexact="Наличные").first()
     cash_balance = Decimal(cash_account.balance) if cash_account and cash_account.balance is not None else Decimal(0)

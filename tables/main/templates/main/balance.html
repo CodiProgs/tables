@@ -1,60 +1,77 @@
 {% extends "layout.html" %}
 {% load static %}
 {% block content %}
-    <div class="page-table-container" id="debtors-container">
-        <div id="context-menu" class="dropdown-menu">
-            <a class="dropdown-item context-action"
-               id="add-button"
-               data-action="add">Добавить</a>
-            <a class="dropdown-item context-action"
-               id="edit-button"
-               data-action="edit">Редактировать</a>
-            {% if request.user.is_authenticated and request.user.user_type.name == "Администратор" %}
-            <a class="dropdown-item context-action"
-               id="delete-button"
-               data-action="delete">Удалить</a>
-            {% endif %}
-            <div class="dropdown-divider">
-            </div>
-            <a class="dropdown-item context-action"
-               id="hide-button"
-               data-action="hide">Скрыть</a>
-            <a class="dropdown-item context-action"
-               id="hide-all-button"
-               data-action="hide-all">Скрыть все</a>
-            <a class="dropdown-item context-action"
-               id="show-all-button"
-               data-action="show-all">Показать все</a>
-               <div class="dropdown-divider">
-            </div>
+<div class="page-table-container" id="debtors-container">
+    <div id="context-menu" class="dropdown-menu">
         <a class="dropdown-item context-action"
-               id="print-button"
-               data-action="print">Печать</a>
-        </div>
-        <div class="stats-container">
-            {% if is_admin %}
-                <button id="refresh-stats-button" class="stats-refresh-button" title="Обновить статистику">
-                    <img src="{% static 'images/arrows-rotate.svg' %}" alt="Обновить"
-                         height="16"
-                         width="16">
-                </button>
-                <h2 class="debtors-office-list__header debtors-office__header">Баланс</h2>
-                <div id="balance-container"></div>
-                <h2 class="debtors-office-list__header debtors-office__header debtors-office__header--top">Рентабельность капитала</h2>
-                <div class="charts-container">
-                    <div class="chart-stats">
-                        <canvas id="statsChart"></canvas>
-                    </div>
-                    <div class="chart-profit">
-                        <canvas id="profitChart"></canvas>
-                    </div>
-                </div>
-            {% elif is_other_user %}
-                <h2 class="debtors-office-list__header debtors-office__header">Баланс</h2>
-                <div id="balance-container"></div>
-            {% endif %}
-        </div>
+           id="add-button"
+           data-action="add">Добавить</a>
+        <a class="dropdown-item context-action"
+           id="edit-button"
+           data-action="edit">Редактировать</a>
+        {% if request.user.is_authenticated and request.user.user_type.name == "Администратор" %}
+        <a class="dropdown-item context-action"
+           id="delete-button"
+           data-action="delete">Удалить</a>
+        {% endif %}
+        <div class="dropdown-divider"></div>
+        <a class="dropdown-item context-action"
+           id="hide-button"
+           data-action="hide">Скрыть</a>
+        <a class="dropdown-item context-action"
+           id="hide-all-button"
+           data-action="hide-all">Скрыть все</a>
+        <a class="dropdown-item context-action"
+           id="show-all-button"
+           data-action="show-all">Показать все</a>
+        <div class="dropdown-divider"></div>
+        <a class="dropdown-item context-action"
+           id="print-button"
+           data-action="print">Печать</a>
     </div>
+    <div class="stats-container">
+        {% if is_admin %}
+            <button id="refresh-stats-button" class="stats-refresh-button" title="Обновить статистику">
+                <img src="{% static 'images/arrows-rotate.svg' %}" alt="Обновить"
+                     height="16"
+                     width="16">
+            </button>
+            <h2 class="debtors-office-list__header debtors-office__header">Баланс</h2>
+            <div id="balance-container"></div>
+            {% if show_capital_profitability %}
+            <h2 class="debtors-office-list__header debtors-office__header debtors-office__header--top">Рентабельность капитала</h2>
+            <div class="charts-container">
+                <div class="chart-stats">
+                    <canvas id="statsChart"></canvas>
+                </div>
+                <div class="chart-profit">
+                    <canvas id="profitChart"></canvas>
+                </div>
+            </div>
+            {% endif %}
+        {% elif is_other_user %}
+            <h2 class="debtors-office-list__header debtors-office__header">Баланс</h2>
+            <div id="balance-container"></div>
+            {% if show_capital_profitability %}
+            <h2 class="debtors-office-list__header debtors-office__header debtors-office__header--top">Рентабельность капитала</h2>
+            <div class="charts-container">
+                <div class="chart-stats">
+                    <canvas id="statsChart"></canvas>
+                </div>
+                <div class="chart-profit">
+                    <canvas id="profitChart"></canvas>
+                </div>
+            </div>
+            {% endif %}
+
+        {% endif %}
+    </div>
+    <div style="min-height: 40%; width: 100%;">
+        {% if show_monthly_capital_table %}
+            {% include "components/table.html" with id="show_monthly_capital-table" fields=fields data=data %}
+        {% endif %}
+    </div>
+</div>
 {% endblock content %}
 {% block extra_scripts %}
     {{ block.super }}
