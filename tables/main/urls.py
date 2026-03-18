@@ -101,4 +101,6 @@ urlpatterns = [
 	path('profit_by_month/', views.profit_by_month, name='profit_by_month'),
 
 	path("supplier-income-report/", views.supplier_income_report, name="supplier_income_report"),
+
+	path('transaction/<int:transaction_id>/related/', views.transaction_related_objects, name='transaction_related_objects'),
 ]

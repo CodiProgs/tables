@@ -3,7 +3,7 @@ from django.contrib.auth.decorators import login_required
 from tables.utils import get_model_fields
 from django.db import transaction, models
 from .models import Transaction, Client, Supplier, Account, CashFlow, SupplierAccount, PaymentPurpose, MoneyTransfer, Branch, SupplierDebtRepayment, Investor, InvestorDebtOperation, BalanceData, MonthlyCapital, ShortTermLiability, Credit, InventoryItem, ClientDebtRepayment
-from django.http import JsonResponse
+from django.http import JsonResponse, Http404
 from django.forms.models import model_to_dict
 from django.template.loader import render_to_string
 from django.views.decorators.http import require_http_methods
@@ -6774,3 +6774,21 @@ def cash_flow_report(request):
     }
 
     return render(request, "main/cash_flow_report.html", context)
+
+
+def transaction_related_objects(request, transaction_id):
+    try:
+        transaction = Transaction.objects.get(pk=transaction_id)
+    except Transaction.DoesNotExist:
+        raise Http404("Транзакция не найдена")
+
+    cash_flows = list(transaction.cash_flows.values())
+    client_debt_repayments = list(transaction.client_debt_repayments.values())
+
+
+    data = {
+        "transaction_id": transaction_id,
+        "cash_flows": cash_flows,
+        "client_debt_repayments": client_debt_repayments,
+    }
+    return JsonResponse(data, safe=False)
