@@ -3187,8 +3187,15 @@ def debtors(request):
         branch['debt'] for branch in branch_debts_list if branch['branch'] != "Филиал 1" and branch['branch'] != "Наши ИП"
     )
 
+    dt_client = Client.objects.filter(name__iexact="ДТ").first()
+    dt_client_id = dt_client.id if dt_client else None
+
     total_bonuses = sum(float(t.bonus_debt) for t in transactions)
-    total_remaining = sum(float(t.client_debt_paid) for t in transactions)
+    total_remaining = sum(
+        float(t.client_debt_paid)
+        for t in transactions
+        if not t.client or t.client_id != dt_client_id
+    )
     total_profit = sum(float(t.profit) for t in transactions if float(t.paid_amount) - float(t.amount) == 0)
 
     transactionsInvestors = [
@@ -3200,13 +3207,23 @@ def debtors(request):
 
     cashflows = CashFlow.objects.filter(
         purpose__operation_type=PaymentPurpose.INCOME
-    ).exclude(purpose__name__in=["Оплата", "Внесение инвестора", "Возврат от поставщиков", "Возврат от поставщиков"])
+    ).exclude(purpose__name__in=["Оплата", "Внесение инвестора", "Возврат от поставщиков", "Возврат от поставщиков", "Корректировка баланса"])
 
     total_profit = sum(float(t.profit - t.returned_to_investor) for t in transactionsInvestors) + sum(float(cf.amount - (cf.returned_to_investor or 0)) for cf in cashflows)
+
+    dt_client = Client.objects.filter(name__iexact="ДТ").first()
+    dt_client_id = dt_client.id if dt_client else None
+
+    dt_total = sum(
+        float(t.client_debt_paid)
+        for t in transactions
+        if t.client and t.client_id == dt_client_id
+    )
 
     summary = [
         {"name": "Бонусы", "amount": total_bonuses},
         {"name": "Выдачи клиентам", "amount": total_remaining},
+        {"name": "ДТ", "amount": dt_total},
     ]
 
     if is_admin:
@@ -4214,7 +4231,7 @@ def debtor_details(request):
         if value == "Выдачи клиентам":
             transactions = [
                 t for t in Transaction.objects.filter(paid_amount__gt=0)
-                if getattr(t, 'client_debt_paid', 0) != 0
+                if getattr(t, 'client_debt_paid', 0) != 0 and (not t.client or str(t.client) != "ДТ")
             ]
             fields = [
                 {"name": "created_at", "verbose_name": "Дата", "is_date": True},
@@ -4238,7 +4255,13 @@ def debtor_details(request):
                 {"id": table_id, "fields": fields, "data": data}
             )
 
+            dt_client = Client.objects.filter(name__iexact="ДТ").first()
+            dt_client_id = dt_client.id if dt_client else None
+
             client_debt_qs = ClientDebtRepayment.objects.order_by('-created_at')
+            if dt_client_id:
+                client_debt_qs = client_debt_qs.exclude(client_id=dt_client_id)
+
             try:
                 per_page = int(request.GET.get('cdr_per_page', 25))
                 if per_page <= 0:
@@ -4256,6 +4279,7 @@ def debtor_details(request):
                 {"name": "amount", "verbose_name": "Сумма", "is_amount": True},
                 {"name": "comment", "verbose_name": "Комментарий"}
             ]
+            
             repayment_data = []
             for cdr in client_debt_repayments:
                 repayment_data.append(type("Row", (), {
@@ -4315,7 +4339,7 @@ def debtor_details(request):
 
             cashflows = CashFlow.objects.filter(
                 purpose__operation_type=PaymentPurpose.INCOME,
-            ).exclude(purpose__name__in=["Оплата", "Внесение инвестора", "Возврат от поставщиков"])
+            ).exclude(purpose__name__in=["Оплата", "Внесение инвестора", "Возврат от поставщиков", "Корректировка баланса"])
 
             cashflows = [cf for cf in cashflows if (cf.amount - (cf.returned_to_investor or 0)) > 0]
 
@@ -4405,6 +4429,76 @@ def debtor_details(request):
                 "html_investors": html_investors,
                 "investor_ids": investor_ids,
                 "html_operations": html_operations,
+            })
+        elif value == "ДТ":
+            dt_client = Client.objects.filter(name__iexact="ДТ").first()
+            dt_client_id = dt_client.id if dt_client else None
+            transactions = [
+                t for t in Transaction.objects.filter(paid_amount__gt=0)
+                if t.client and t.client_id == dt_client_id and getattr(t, 'client_debt_paid', 0) != 0
+            ]
+            fields = [
+                {"name": "created_at", "verbose_name": "Дата", "is_date": True},
+                {"name": "client", "verbose_name": "Клиент", "is_relation": True},
+                {"name": "amount", "verbose_name": "Сумма сделки", "is_amount": True},
+                {"name": "client_debt_paid", "verbose_name": "Выдать", "is_amount": True},
+            ]
+            data = []
+            for t in transactions:
+                data.append(type("Row", (), {
+                    "created_at": timezone.localtime(t.created_at).strftime("%d.%m.%Y") if t.created_at else "",
+                    "client": str(t.client) if t.client else "",
+                    "amount": t.amount,
+                    "client_debt_paid": t.client_debt_paid,
+                })())
+            table_id = "summary-dt"
+            data_ids = [t.id for t in transactions]
+
+            html = render_to_string(
+                "components/table.html",
+                {"id": table_id, "fields": fields, "data": data}
+            )
+
+            client_debt_qs = ClientDebtRepayment.objects.filter(client_id=dt_client_id).order_by('-created_at')
+            try:
+                per_page = int(request.GET.get('cdr_per_page', 25))
+                if per_page <= 0:
+                    per_page = 25
+            except Exception:
+                per_page = 25
+            page_number = request.GET.get('cdr_page', 1)
+            paginator = Paginator(client_debt_qs, per_page)
+            page = paginator.get_page(page_number)
+            client_debt_repayments = page.object_list
+
+            repayment_fields = [
+                {"name": "created_at", "verbose_name": "Дата", "is_date": True},
+                {"name": "client", "verbose_name": "Клиент"},
+                {"name": "amount", "verbose_name": "Сумма", "is_amount": True},
+                {"name": "comment", "verbose_name": "Комментарий"}
+            ]
+            repayment_data = []
+            for cdr in client_debt_repayments:
+                repayment_data.append(type("Row", (), {
+                    "created_at": timezone.localtime(cdr.created_at).strftime("%d.%m.%Y %H:%M") if cdr.created_at else "",
+                    "client": str(cdr.client) if cdr.client else "",
+                    "amount": cdr.amount,
+                    "comment": cdr.comment or "",
+                })())
+
+            html_client_debt_repayments = render_to_string(
+                "components/table.html",
+                {"id": "client-debt-repayments-table", "fields": repayment_fields, "data": repayment_data}
+            )
+
+            return JsonResponse({
+                "html": html,
+                "table_id": table_id,
+                "data_ids": data_ids,
+                "html_client_debt_repayments": html_client_debt_repayments,
+                "client_debt_repayments_page": page.number,
+                "client_debt_repayments_total_pages": paginator.num_pages,
+                "client_debt_repayment_ids": [r.id for r in client_debt_repayments],
             })
 
     return JsonResponse({"html": "<div>Нет данных</div>"})
