@@ -6443,7 +6443,7 @@ def supplier_income_report(request):
         "Зорин",
         "ИА ОБМЕН",
         "Карты Китай",
-        "Кошевая",
+        # "Кошевая",
     ]
 
     suppliers = Supplier.objects.filter(
