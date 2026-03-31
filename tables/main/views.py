@@ -3297,7 +3297,7 @@ def balance(request):
 
     cashflows = CashFlow.objects.filter(
         purpose__operation_type=PaymentPurpose.INCOME
-    ).exclude(purpose__name__in=["Оплата", "Внесение инвестора", "Возврат от поставщиков"])
+    ).exclude(purpose__name__in=["Оплата", "Внесение инвестора", "Возврат от поставщиков", "Корректировка баланса"])
 
     total_profit = sum(float(t.profit - t.returned_to_investor) for t in transactionsInvestors) + \
                    sum(float(cf.amount - (cf.returned_to_investor or 0)) for cf in cashflows)
@@ -3572,7 +3572,7 @@ def settle_supplier_debt(request, pk: int):
 
                 cashflows = CashFlow.objects.filter(
                     purpose__operation_type=PaymentPurpose.INCOME
-                ).exclude(purpose__name__in=["Оплата", "Внесение инвестора", "Возврат от поставщиков"])
+                ).exclude(purpose__name__in=["Оплата", "Внесение инвестора", "Возврат от поставщиков", "Корректировка баланса"])
 
                 total_profit = sum(float(getattr(t, 'profit', 0) - getattr(t, 'returned_to_investor', 0)) for t in transactionsInvestors) + sum(float(cf.amount - (cf.returned_to_investor or 0)) for cf in cashflows)
 
@@ -3692,7 +3692,7 @@ def settle_supplier_debt(request, pk: int):
 
                 cashflows = CashFlow.objects.filter(
                     purpose__operation_type=PaymentPurpose.INCOME
-                ).exclude(purpose__name__in=["Оплата", "Внесение инвестора", "Возврат от поставщиков"])
+                ).exclude(purpose__name__in=["Оплата", "Внесение инвестора", "Возврат от поставщиков", "Корректировка баланса"])
 
                 total_profit = sum(float(getattr(t, 'profit', 0) - getattr(t, 'returned_to_investor', 0)) for t in transactionsInvestors) + sum(float(cf.amount - (cf.returned_to_investor or 0)) for cf in cashflows)
 
@@ -3853,7 +3853,7 @@ def settle_supplier_debt(request, pk: int):
 
                 cashflows = CashFlow.objects.filter(
                     purpose__operation_type=PaymentPurpose.INCOME
-                ).exclude(purpose__name__in=["Оплата", "Внесение инвестора", "Возврат от поставщиков"])
+                ).exclude(purpose__name__in=["Оплата", "Внесение инвестора", "Возврат от поставщиков", "Корректировка баланса"])
 
                 total_profit = sum(float(getattr(t, 'profit', 0) - getattr(t, 'returned_to_investor', 0)) for t in transactionsInvestors) + sum(float(cf.amount - (cf.returned_to_investor or 0)) for cf in cashflows)
 
@@ -3989,7 +3989,7 @@ def settle_supplier_debt(request, pk: int):
 
                 cashflows = CashFlow.objects.filter(
                     purpose__operation_type=PaymentPurpose.INCOME
-                ).exclude(purpose__name__in=["Оплата", "Внесение инвестора", "Возврат от поставщиков"])
+                ).exclude(purpose__name__in=["Оплата", "Внесение инвестора", "Возврат от поставщиков", "Корректировка баланса"])
 
                 total_debt = sum(float(Decimal(str(t.profit or 0)) - Decimal(str(t.returned_to_investor or 0))) for t in transactionsInvestors) + sum(float(Decimal(str(cf.amount or 0)) - Decimal(str(cf.returned_to_investor or 0))) for cf in cashflows)
                 total_profit = total_debt
@@ -4093,7 +4093,7 @@ def debtor_detail(request, type, pk):
 
             cashflows = CashFlow.objects.filter(
                 purpose__operation_type=PaymentPurpose.INCOME
-            ).exclude(purpose__name__in=["Оплата", "Внесение инвестора", "Возврат от поставщиков"])
+            ).exclude(purpose__name__in=["Оплата", "Внесение инвестора", "Возврат от поставщиков", "Корректировка баланса"])
             total_cashflow_income = sum(float(Decimal(str(cf.amount or 0)) - Decimal(str(cf.returned_to_investor or 0))) for cf in cashflows if cf.amount > 0)
             data = {}
             data["amount"] = total_investor_debt + total_cashflow_income
@@ -4628,7 +4628,7 @@ def company_balance_stats(request):
     ]
     cashflows = CashFlow.objects.filter(
         purpose__operation_type=PaymentPurpose.INCOME
-    ).exclude(purpose__name__in=["Оплата", "Внесение инвестора", "Возврат от поставщиков"])
+    ).exclude(purpose__name__in=["Оплата", "Внесение инвестора", "Возврат от поставщиков", "Корректировка баланса"])
 
     total_profit_decimal = sum(
         (Decimal(str(getattr(t, 'profit', 0) or 0)) - Decimal(str(getattr(t, 'returned_to_investor', 0) or 0)))
@@ -5891,7 +5891,7 @@ def add_balance_item(request):
         ]
         cashflows = CashFlow.objects.filter(
             purpose__operation_type=PaymentPurpose.INCOME
-        ).exclude(purpose__name__in=["Оплата", "Внесение инвестора", "Возврат от поставщиков"])
+        ).exclude(purpose__name__in=["Оплата", "Внесение инвестора", "Возврат от поставщиков", "Корректировка баланса"])
 
         total_profit_decimal = sum(
             (Decimal(str(getattr(t, 'profit', 0) or 0)) - Decimal(str(getattr(t, 'returned_to_investor', 0) or 0)))
@@ -6052,7 +6052,7 @@ def edit_balance_item(request, pk=None):
         ]
         cashflows = CashFlow.objects.filter(
             purpose__operation_type=PaymentPurpose.INCOME
-        ).exclude(purpose__name__in=["Оплата", "Внесение инвестора", "Возврат от поставщиков"])
+        ).exclude(purpose__name__in=["Оплата", "Внесение инвестора", "Возврат от поставщиков", "Корректировка баланса"])
 
         total_profit_decimal = sum(
             (Decimal(str(getattr(t, 'profit', 0) or 0)) - Decimal(str(getattr(t, 'returned_to_investor', 0) or 0)))
@@ -6256,7 +6256,7 @@ def delete_balance_item(request, pk=None):
         ]
         cashflows = CashFlow.objects.filter(
             purpose__operation_type=PaymentPurpose.INCOME
-        ).exclude(purpose__name__in=["Оплата", "Внесение инвестора", "Возврат от поставщиков"])
+        ).exclude(purpose__name__in=["Оплата", "Внесение инвестора", "Возврат от поставщиков", "Корректировка баланса"])
 
         total_profit_decimal = sum(
             (Decimal(str(getattr(t, 'profit', 0) or 0)) - Decimal(str(getattr(t, 'returned_to_investor', 0) or 0)))
@@ -6331,7 +6331,7 @@ def investor_debt_problems(request):
 
     cashflows = CashFlow.objects.filter(
         purpose__operation_type=PaymentPurpose.INCOME
-    ).exclude(purpose__name__in=["Оплата", "Внесение инвестора", "Возврат от поставщиков"])
+    ).exclude(purpose__name__in=["Оплата", "Внесение инвестора", "Возврат от поставщиков", "Корректировка баланса"])
 
     problem_cashflows = [
         {
