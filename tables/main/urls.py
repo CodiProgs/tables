@@ -17,6 +17,7 @@ register_converter(SignedIntConverter, 'signed_int')
 
 urlpatterns = [
 	path("", views.index, name="index"),
+    path("list/", views.transaction_list_sorted, name="transaction_list_sorted"),
 	path("accounts/", views.accounts, name="accounts"),
 	path("accounts/list/", views.account_list, name="account_list"),
 	path('supplier-accounts/', views.supplier_accounts, name='supplier_accounts'),
@@ -71,6 +72,7 @@ urlpatterns = [
 	path("suppliers/settle-debt/<pk>/", views.settle_supplier_debt, name="settle_supplier_debt"),
     path("suppliers/repay-debt/<signed_int:pk>/", views.repay_supplier_debt, name="repay_supplier_debt"),
     path("suppliers/repay-debt/edit/<int:pk>/", views.edit_supplier_debt_repayment, name="edit_supplier_debt_repayment"),
+	path("supplier-accounts/list/", views.money_logs_list, name="supplier_accounts_list"),
 	path("branches/list/", views.branch_list, name="branch_list"),
 	path("company_balance_stats/", views.company_balance_stats, name="company_balance_stats"),
     path("company_balance_stats/by_month/", views.company_balance_stats_by_month, name="company_balance_stats_by_month"),

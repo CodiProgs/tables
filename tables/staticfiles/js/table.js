@@ -912,12 +912,13 @@ class ResizableTable {
 
 		this.updateSortingIndicator(columnIndex, direction)
 
-		TableManager.sortTable(
-			this.tableElement.id,
-			columnIndex,
-			direction,
-			columnType,
-		)
+		// TableManager.sortTable(
+		// 	this.tableElement.id,
+		// 	columnIndex,
+		// 	direction,
+		// 	columnType,
+		// )
+		TableManager.sortColumnServer(this.tableElement.id, columnIndex, direction)
 	}
 
 	updateSortingIndicator(columnIndex, direction) {
@@ -1932,12 +1933,22 @@ export const TableManager = {
 		const tableId = table.id
 		const filters = this.getTableFilters(tableId)
 
-		const updateSummary = () => {
-			if (summaryOptions?.columns?.length > 0) {
-				this.calculateTableSummary(tableId, summaryOptions.columns, {
-					className: summaryOptions.className,
-				})
-			}
+		// Сохраняем состояние сортировки
+		if (!this.currentSort) this.currentSort = {}
+
+		const updateTableFromServer = () => {
+			// Получаем параметры фильтрации
+			const filterParams = this.getFiltersQueryParams(tableId)
+			// Параметры сортировки
+			const sortParam = this.currentSort.column
+				? `&sort=${this.currentSort.column}&order=${this.currentSort.direction}`
+				: ''
+			// Текущая страница (можно брать из data-атрибута или из контекста, если нужно)
+			const page = 1
+			// Собираем url
+			const baseUrl = window.location.pathname.replace(/\/$/, '') + '/list/'
+			const url = `${baseUrl}?page=${page}${filterParams ? '&' + filterParams : ''}${sortParam}`
+			this.refreshTableFromServer(url, tableId, summaryOptions)
 		}
 
 		if (inputElement.classList.contains('select')) {
@@ -1950,64 +1961,148 @@ export const TableManager = {
 			selectControl.addEventListener('click', () => {
 				const observer = new MutationObserver(() => {
 					const dropdownOptions = dropdown.querySelectorAll('.select__option')
-
 					dropdownOptions.forEach(option => {
 						option.addEventListener('click', () => {
-							const filterText = this.normalizeString(option.textContent)
-
+							const value = option.getAttribute('data-value') // <-- id
 							filters.set(columnIndex, {
 								type: 'select',
-								value: filterText,
+								value: value, // <-- id, а не текст!
 							})
-							this.applyFilters(table, filters)
-							updateSummary()
+							updateTableFromServer()
 						})
 					})
-
 					observer.disconnect()
 				})
-
 				observer.observe(dropdown, { childList: true })
 			})
 
 			clearButton.addEventListener('click', () => {
 				const selectInput = inputElement.querySelector('.select__input')
 				const selectText = inputElement.querySelector('.select__text')
-
 				if (selectInput) selectInput.value = ''
 				if (selectText) selectText.textContent = ''
 				filters.delete(columnIndex)
-				this.applyFilters(table, filters)
-				updateSummary()
+				updateTableFromServer()
 			})
 		} else {
 			const input = inputElement.querySelector('input')
 			const clearButton = inputElement.querySelector('.clear-button')
-
 			if (!input || !clearButton) return
 
+			// --- debounce реализация ---
+			let debounceTimeout = null
+			const debounceDelay = 400 // мс
+
 			input.addEventListener('input', () => {
-				const filterValue = this.normalizeString(input.value)
-				if (filterValue) {
-					filters.set(columnIndex, {
-						type: 'text',
-						value: filterValue,
-					})
-				} else {
-					filters.delete(columnIndex)
-				}
-				this.applyFilters(table, filters)
-				updateSummary()
+				if (debounceTimeout) clearTimeout(debounceTimeout)
+				debounceTimeout = setTimeout(() => {
+					const filterValue = this.normalizeString(input.value)
+					if (filterValue) {
+						filters.set(columnIndex, {
+							type: 'text',
+							value: filterValue,
+						})
+					} else {
+						filters.delete(columnIndex)
+					}
+					updateTableFromServer()
+				}, debounceDelay)
 			})
 
 			clearButton.addEventListener('click', () => {
 				input.value = ''
 				input.focus()
 				filters.delete(columnIndex)
-				this.applyFilters(table, filters)
-				updateSummary()
+				updateTableFromServer()
 			})
 		}
+	},
+
+	sortColumnServer(tableId, columnIndex, direction) {
+		const table = document.getElementById(tableId)
+		if (!table) return
+
+		const headerCell = table.querySelectorAll('th')[columnIndex]
+		const columnName = headerCell.dataset.name
+
+		const serverField = this.getServerFieldName(columnName)
+
+		TableManager.currentSort = {
+			column: serverField,
+			direction: direction,
+		}
+
+		const filterParams = this.getFiltersQueryParams(tableId)
+		const sortParam = `&sort=${serverField}&order=${direction}`
+		const page = 1
+		const baseUrl = window.location.pathname.replace(/\/$/, '') + '/list/'
+		const url = `${baseUrl}?page=${page}${filterParams ? '&' + filterParams : ''}${sortParam}`
+		this.refreshTableFromServer(url, tableId)
+	},
+
+	getServerFieldName(columnName) {
+		if (columnName === 'formatted_amount') return 'amount'
+		// Добавьте другие соответствия при необходимости
+		return columnName
+	},
+
+	updatePaginationControls(context) {
+		const currentPage = context.current_page
+		const totalPages = context.total_pages
+
+		document.getElementById('current-page').value = currentPage
+		document.getElementById('total-pages').textContent = totalPages
+
+		document.getElementById('first-page').disabled = currentPage <= 1
+		document.getElementById('prev-page').disabled = currentPage <= 1
+		document.getElementById('next-page').disabled = currentPage >= totalPages
+		document.getElementById('last-page').disabled = currentPage >= totalPages
+	},
+
+	async refreshTableFromServer(url, tableId, summaryOptions = null) {
+		const table = document.getElementById(tableId)
+		if (!table) return
+
+		const loader = createLoader()
+		document.body.appendChild(loader)
+
+		try {
+			const response = await fetch(url, {
+				headers: { 'X-Requested-With': 'XMLHttpRequest' },
+			})
+			if (!response.ok)
+				throw new Error(`HTTP error! status: ${response.status}`)
+			const data = await response.json()
+			this.replaceTableContent(data.html, tableId)
+			this.reinitializeTable(tableId)
+			this.setInitialCellSelection()
+			this.attachGlobalCellClickHandler()
+			if (summaryOptions && summaryOptions.columns?.length > 0) {
+				this.calculateTableSummary(tableId, summaryOptions.columns, {
+					className: summaryOptions.className,
+				})
+			}
+			if (data.context) {
+				this.updatePaginationControls(data.context)
+				if (data.context.current_page > data.context.total_pages) {
+					this.goToPage(1, tableId)
+				}
+			}
+		} catch (error) {
+			showError(error.message)
+		} finally {
+			loader.remove()
+		}
+	},
+
+	goToPage(page, tableId) {
+		const filterParams = this.getFiltersQueryParams(tableId)
+		const sortParam = this.currentSort?.column
+			? `&sort=${this.currentSort.column}&order=${this.currentSort.direction}`
+			: ''
+		const baseUrl = window.location.pathname.replace(/\/$/, '') + '/list/'
+		const url = `${baseUrl}?page=${page}${filterParams ? '&' + filterParams : ''}${sortParam}`
+		this.refreshTableFromServer(url, tableId)
 	},
 
 	getTableFilters(tableId) {
@@ -2043,7 +2138,6 @@ export const TableManager = {
 		return params.toString()
 	},
 
-	// ...existing code...
 	applyFilters(table, filters) {
 		const tbody = table.querySelector('tbody')
 
@@ -2087,7 +2181,6 @@ export const TableManager = {
 			row.style.display = shouldShow ? '' : 'none'
 		})
 	},
-	// ...existing code...
 
 	destroyTables() {
 		this.tables.forEach(table => table.destroy())

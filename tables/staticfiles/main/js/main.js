@@ -2010,9 +2010,12 @@ function setupUserTypeBranchToggle() {
 
 export class TablePaginator {
 	constructor(config) {
-		this.baseUrl = config.baseUrl || '/'
+		this.baseUrl =
+			config.baseUrl || window.location.pathname.replace(/\/$/, '') + '/list/'
 		this.entityName = config.entityName
 		this.tableId = config.tableId
+		this.getFiltersQueryParams = config.getFiltersQueryParams // функция из TableManager
+		this.getSortParams = config.getSortParams // функция из TableManager
 		this.selectors = {
 			nextPage: 'next-page',
 			prevPage: 'prev-page',
@@ -2139,9 +2142,13 @@ export class TablePaginator {
 		document.body.appendChild(loader)
 
 		try {
-			const res = await fetch(
-				`${this.baseUrl}${this.entityName}/list/?page=${page}`,
-			)
+			const filterParams = this.getFiltersQueryParams
+				? this.getFiltersQueryParams(this.tableId)
+				: ''
+			const sortParams = this.getSortParams ? this.getSortParams() : ''
+			const url = `${this.baseUrl}?page=${page}${filterParams ? '&' + filterParams : ''}${sortParams ? '&' + sortParams : ''}`
+
+			const res = await fetch(url)
 			if (!res.ok) {
 				let errBody = { message: `HTTP error! status: ${res.status}` }
 				try {
@@ -2156,20 +2163,20 @@ export class TablePaginator {
 			if (res.ok && data.html && data.context) {
 				TableManager.updateTable(data.html, this.tableId)
 
-				try {
-					const filters = TableManager.getTableFilters(this.tableId)
-					if (filters && filters.size > 0) {
-						const tableEl = document.getElementById(this.tableId)
-						if (tableEl) {
-							TableManager.applyFilters(tableEl, filters)
-						}
-					}
-				} catch (e) {
-					console.warn(
-						'Ошибка при применении клиентских фильтров после пагинации:',
-						e,
-					)
-				}
+				// try {
+				// 	const filters = TableManager.getTableFilters(this.tableId)
+				// 	if (filters && filters.size > 0) {
+				// 		const tableEl = document.getElementById(this.tableId)
+				// 		if (tableEl) {
+				// 			TableManager.applyFilters(tableEl, filters)
+				// 		}
+				// 	}
+				// } catch (e) {
+				// 	console.warn(
+				// 		'Ошибка при применении клиентских фильтров после пагинации:',
+				// 		e,
+				// 	)
+				// }
 
 				this.updatePagination(data.context)
 				this.onDataLoaded(data)
@@ -3402,7 +3409,7 @@ const handleTransactions = async config => {
 	}
 
 	new TablePaginator({
-		baseUrl: BASE_URL,
+		baseUrl: window.location.pathname.replace(/\/$/, '') + '/list/',
 		entityName: TRANSACTION,
 		tableId: `${TRANSACTION}-table`,
 		onDataLoaded: data => {
@@ -3412,6 +3419,7 @@ const handleTransactions = async config => {
 				showChangedCells(changed_cells, `${TRANSACTION}-table`)
 			}
 			highlightModifiedRows()
+			TableManager.init('transactions-table')
 			TableManager.formatCurrencyValues(`${TRANSACTION}-table`)
 			const table = document.getElementById(`${TRANSACTION}-table`)
 			const hasProfitColumn =
@@ -3437,6 +3445,18 @@ const handleTransactions = async config => {
 			} catch (err) {
 				console.error('Ошибка при обработке debts после пагинации:', err)
 			}
+		},
+		getFiltersQueryParams: tableId =>
+			TableManager.getFiltersQueryParams(tableId),
+		getSortParams: () => {
+			if (
+				TableManager.currentSort &&
+				TableManager.currentSort.column &&
+				TableManager.currentSort.direction
+			) {
+				return `sort=${TableManager.currentSort.column}&order=${TableManager.currentSort.direction}`
+			}
+			return ''
 		},
 	})
 
@@ -3661,7 +3681,7 @@ const handleSupplierAccounts = async (is_init = true) => {
 		const summaryContainer = document.getElementById('summary-container')
 		if (summaryContainer) {
 			const moneyLogsPaginator = new TablePaginator({
-				baseUrl: BASE_URL,
+				baseUrl: window.location.pathname.replace(/\/$/, '') + '/list/',
 				entityName: 'money_logs',
 				tableId: 'money-logs-table',
 				onDataLoaded: data => {
@@ -3707,6 +3727,18 @@ const handleSupplierAccounts = async (is_init = true) => {
 					} catch (e) {
 						console.error('Ошибка при подсветке money-logs:', e)
 					}
+				},
+				getFiltersQueryParams: tableId =>
+					TableManager.getFiltersQueryParams(tableId),
+				getSortParams: () => {
+					if (
+						TableManager.currentSort &&
+						TableManager.currentSort.column &&
+						TableManager.currentSort.direction
+					) {
+						return `sort=${TableManager.currentSort.column}&order=${TableManager.currentSort.direction}`
+					}
+					return ''
 				},
 			})
 
@@ -3944,13 +3976,25 @@ const handleCashFlow = async config => {
 	initTableHandlers(config)
 
 	new TablePaginator({
-		baseUrl: BASE_URL,
+		baseUrl: window.location.pathname.replace(/\/$/, '') + '/list/',
 		entityName: CASH_FLOW,
 		tableId: `${CASH_FLOW}-table`,
 		onDataLoaded: data => {
 			const { cash_flow_ids = [] } = data.context
 			setIds(cash_flow_ids, `${CASH_FLOW}-table`)
 			colorizeAmounts(`${CASH_FLOW}-table`)
+		},
+		getFiltersQueryParams: tableId =>
+			TableManager.getFiltersQueryParams(tableId),
+		getSortParams: () => {
+			if (
+				TableManager.currentSort &&
+				TableManager.currentSort.column &&
+				TableManager.currentSort.direction
+			) {
+				return `sort=${TableManager.currentSort.column}&order=${TableManager.currentSort.direction}`
+			}
+			return ''
 		},
 	})
 
@@ -4988,7 +5032,7 @@ const handleDebtors = async () => {
 							}
 
 							if (
-								value === 'Выдачи клиентам' &&
+								(value === 'Выдачи клиентам' || value === 'ДТ') &&
 								data.html_client_debt_repayments
 							) {
 								const repaymentTitle = document.createElement('div')
@@ -5256,42 +5300,6 @@ const handleDebtors = async () => {
 									)
 
 									if (clientIndex === -1 || debtIndex === -1) return
-
-									const tableRows = Array.from(
-										table.querySelectorAll(
-											'tbody tr:not(.table__row--summary)',
-										),
-									)
-									let total = 0
-
-									tableRows.forEach(row => {
-										const cells = row.querySelectorAll('td')
-										const clientCell = cells[clientIndex]
-										const debtCell = cells[debtIndex]
-
-										if (
-											clientCell &&
-											debtCell &&
-											clientCell.textContent.trim() === 'ДТ'
-										) {
-											const valueText = debtCell.textContent
-												.replace(/\s*р\.$/, '')
-												.replace(/\s+/g, '')
-												.trim()
-											const value = parseFloat(valueText.replace(',', '.')) || 0
-
-											total += value
-										}
-									})
-
-									const div = document.createElement('div')
-									div.classList.add('dt-summary')
-									div.textContent = `ДТ ${total.toLocaleString('ru-RU')} р.`
-
-									const summaryContainer = document.getElementById('summary-2')
-									if (summaryContainer) {
-										summaryContainer.prepend(div)
-									}
 								}
 
 								updateDTSummary()

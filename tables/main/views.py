@@ -211,6 +211,179 @@ def get_transaction_fields(is_accountant, is_assistant=False):
 
 @forbid_supplier
 @login_required
+def transaction_list_sorted(request):
+    from decimal import Decimal
+    import math
+
+    is_accountant = request.user.user_type.name == 'Бухгалтер' if hasattr(request.user, 'user_type') else False
+    is_assistant = request.user.user_type.name == 'Ассистент' if hasattr(request.user, 'user_type') else False
+
+    fields = get_transaction_fields(is_accountant, is_assistant)
+    transactions = Transaction.objects.select_related('client', 'supplier', 'account').all()
+
+    # Фильтрация по обычным полям
+    client_id = request.GET.get('client')
+    supplier_id = request.GET.get('supplier')
+    account_id = request.GET.get('account')
+    amount = request.GET.get('amount')
+    client_percentage = request.GET.get('client_percentage')
+    bonus_percentage = request.GET.get('bonus_percentage')
+    supplier_percentage = request.GET.get('supplier_percentage')
+    paid_amount = request.GET.get('paid_amount')
+    documents = request.GET.get('documents')
+
+    if client_id:
+        transactions = transactions.filter(client_id=client_id)
+    if supplier_id:
+        transactions = transactions.filter(supplier_id=supplier_id)
+    if account_id:
+        transactions = transactions.filter(account_id=account_id)
+    if amount:
+        transactions = transactions.filter(amount__icontains=amount)
+    if client_percentage:
+        transactions = transactions.filter(client_percentage__icontains=client_percentage)
+    if bonus_percentage:
+        transactions = transactions.filter(bonus_percentage__icontains=bonus_percentage)
+    if supplier_percentage:
+        transactions = transactions.filter(supplier_percentage__icontains=supplier_percentage)
+    if paid_amount:
+        transactions = transactions.filter(paid_amount__icontains=paid_amount)
+    if documents is not None:
+        if documents.lower() in ['1', 'true', 'on']:
+            transactions = transactions.filter(documents=True)
+        elif documents.lower() in ['0', 'false', 'off']:
+            transactions = transactions.filter(documents=False)
+
+    # Получаем QuerySet как список для дальнейшей фильтрации по вычисляемым полям и датам
+    transactions = list(transactions)
+
+    # Фильтрация по дате (created_at, fully_paid_at) по подстроке в любом формате
+    created_at = request.GET.get('created_at')
+    fully_paid_at = request.GET.get('fully_paid_at')
+
+    def date_matches(dt, query):
+        if not dt or not query:
+            return False
+        # Проверяем несколько форматов
+        dt_strs = [
+            dt.strftime('%d.%m.%Y'),
+            dt.strftime('%Y-%m-%d'),
+            dt.strftime('%d.%m'),
+            dt.strftime('%d'),
+            dt.strftime('%m.%Y'),
+            dt.strftime('%Y'),
+            dt.strftime('%d.%m.%Y %H:%M'),
+            dt.strftime('%Y-%m-%d %H:%M'),
+            dt.strftime('%d.%m %H:%M'),
+            dt.strftime('%H:%M'),
+        ]
+        return any(query in s for s in dt_strs)
+
+    if created_at:
+        transactions = [t for t in transactions if t.created_at and date_matches(t.created_at, created_at)]
+    if fully_paid_at:
+        transactions = [t for t in transactions if t.fully_paid_at and date_matches(t.fully_paid_at, fully_paid_at)]
+
+    # Фильтрация по вычисляемым полям
+    remaining_amount = request.GET.get('remaining_amount')
+    bonus = request.GET.get('bonus')
+    profit = request.GET.get('profit')
+    debt = request.GET.get('debt')
+
+    if remaining_amount:
+        transactions = [t for t in transactions if remaining_amount in str(int(t.remaining_amount))]
+    if bonus:
+        transactions = [t for t in transactions if bonus in str(int(t.bonus))]
+    if profit:
+        transactions = [t for t in transactions if profit in str(int(t.profit))]
+    if debt:
+        transactions = [t for t in transactions if debt in str(int(t.debt['amount']))]
+
+    # Сортировка
+    sort = request.GET.get('sort')
+    order = request.GET.get('order', 'asc')
+    allowed_sort_fields = {
+        'created_at': lambda t: t.created_at,
+        'client': lambda t: t.client.name if t.client else '',
+        'supplier': lambda t: t.supplier.name if t.supplier else '',
+        'account': lambda t: t.account.name if t.account else '',
+        'amount': lambda t: t.amount,
+        'client_percentage': lambda t: t.client_percentage,
+        'bonus_percentage': lambda t: t.bonus_percentage,
+        'supplier_percentage': lambda t: t.supplier_percentage,
+        'paid_amount': lambda t: t.paid_amount,
+        'documents': lambda t: t.documents,
+        'remaining_amount': lambda t: t.remaining_amount,
+        'bonus': lambda t: t.bonus,
+        'profit': lambda t: t.profit,
+        'debt': lambda t: t.debt['amount'],
+        'fully_paid_at': lambda t: t.fully_paid_at or '',
+    }
+    if sort in allowed_sort_fields:
+        reverse = (order == 'desc')
+        transactions = sorted(transactions, key=allowed_sort_fields[sort], reverse=reverse)
+    else:
+        transactions = sorted(transactions, key=lambda t: t.created_at, reverse=True)
+
+    # Пагинация
+    paginator = Paginator(transactions, 200)
+    page_number = request.GET.get('page', 1)
+    page = paginator.get_page(page_number)
+    transaction_ids = [tr.id for tr in page.object_list]
+    html = "".join(
+        render_to_string(
+            "components/table_row.html",
+            {"item": tr, "fields": fields},
+        )
+        for tr in page.object_list
+    )
+
+    changed_cells = {}
+    for t in page.object_list:
+        client_changed = t.client and t.client_percentage != t.client.percentage
+        supplier_changed = t.supplier and t.supplier_percentage != t.supplier.cost_percentage
+        if client_changed or supplier_changed:
+            changed_cells[t.id] = {
+                'client_percentage': client_changed,
+                'supplier_percentage': supplier_changed
+            }
+
+    supplier_debts = [
+        strip_cents(getattr(t, 'supplier_debt', 0))
+        for t in page.object_list
+    ]
+    client_debts = [
+        strip_cents(getattr(t, 'client_debt', 0))
+        for t in page.object_list
+    ]
+    bonus_debts = [
+        strip_cents(Decimal(str(t.amount or 0)) * Decimal(str(t.bonus_percentage or 0)) / Decimal('100') - Decimal(str(t.returned_bonus or 0)))
+        for t in page.object_list
+    ]
+    investor_debts = [
+        strip_cents(getattr(t, 'investor_debt', 0))
+        for t in page.object_list
+    ]
+
+    return JsonResponse({
+        "html": html,
+        "context": {
+            "total_pages": paginator.num_pages,
+            "current_page": page.number,
+            "transaction_ids": transaction_ids,
+            "changed_cells": changed_cells,
+            "supplier_debts": supplier_debts,
+            "debts": {
+                "supplier_debts": supplier_debts,
+                "client_debt": client_debts,
+                "bonus_debt": bonus_debts,
+                "investor_debt": investor_debts,
+            },
+        },
+    })
+
+@forbid_supplier
+@login_required
 def transaction_detail(request, pk: int):
     transaction = get_object_or_404(Transaction, id=pk)
     data = model_to_dict(transaction)
@@ -1033,38 +1206,56 @@ def cash_flow(request):
 @login_required
 def cash_flow_list(request):
     fields = get_cash_flow_fields()
-    cash_flow = CashFlow.objects.all().order_by('-created_at')
+    cash_flow = CashFlow.objects.all()
 
-    id_purpose = request.GET.get('id_purpose')
+    # Фильтрация
     created_at = request.GET.get('created_at')
-    
+    id_account = request.GET.get('account')
+    id_supplier = request.GET.get('supplier')
+    amount = request.GET.get('formatted_amount')
+    id_purpose = request.GET.get('purpose')
+    comment = request.GET.get('comment')
+    id_created_by = request.GET.get('created_by')
+
+    if created_at:
+        # Фильтрация по подстроке даты (например, "2" найдёт все даты, где есть "2")
+        cash_flow = cash_flow.filter(created_at__strftime__icontains=created_at)
+    if id_account:
+        cash_flow = cash_flow.filter(account_id=id_account)
+    if id_supplier:
+        cash_flow = cash_flow.filter(supplier_id=id_supplier)
+    if amount:
+        cash_flow = cash_flow.extra(where=["CAST(amount AS CHAR) LIKE %s"], params=[f"%{amount}%"])
     if id_purpose:
         cash_flow = cash_flow.filter(purpose_id=id_purpose)
-    if created_at:
-        from datetime import datetime
-        from django.utils.timezone import make_aware
-        try:
-            if '.' in created_at and len(created_at.split('.')) == 2:
-                month, year = map(int, created_at.split('.'))
-                dt = make_aware(datetime(year, month, 1))
-                from calendar import monthrange
-                last_day = monthrange(year, month)[1]
-                dt_end = make_aware(datetime(year, month, last_day, 23, 59, 59))
-            elif '.' in created_at:
-                dt = make_aware(datetime.strptime(created_at, "%d.%m.%Y"))
-                dt_end = make_aware(datetime.strptime(created_at, "%d.%m.%Y").replace(hour=23, minute=59, second=59))
-            elif '-' in created_at and len(created_at.split('-')) == 2:
-                year, month = map(int, created_at.split('-'))
-                dt = make_aware(datetime(year, month, 1))
-                from calendar import monthrange
-                last_day = monthrange(year, month)[1]
-                dt_end = make_aware(datetime(year, month, last_day, 23, 59, 59))
-            else:
-                dt = make_aware(datetime.strptime(created_at, "%Y-%m-%d"))
-                dt_end = make_aware(datetime.strptime(created_at, "%Y-%m-%d").replace(hour=23, minute=59, second=59))
-            cash_flow = cash_flow.filter(created_at__range=(dt, dt_end))
-        except Exception:
-            cash_flow = CashFlow.objects.none()
+    if comment:
+        cash_flow = cash_flow.filter(comment__icontains=comment)
+    if id_created_by:
+        cash_flow = cash_flow.filter(created_by_id=id_created_by)
+
+    # Сортировка
+    sort = request.GET.get('sort')
+    order = request.GET.get('order', 'asc')
+    allowed_sort_fields = {
+        'created_at': 'created_at',
+        'id_account': 'account_id',
+        'account': 'account_id',
+        'id_supplier': 'supplier_id',
+        'supplier': 'supplier_id',
+        'amount': 'amount',
+        'id_purpose': 'purpose_id',
+        'purpose': 'purpose_id',
+        'comment': 'comment',
+        'id_created_by': 'created_by_id',
+        'created_by': 'created_by_id',
+    }
+    if sort in allowed_sort_fields:
+        sort_field = allowed_sort_fields[sort]
+        if order == 'desc':
+            sort_field = '-' + sort_field
+        cash_flow = cash_flow.order_by(sort_field)
+    else:
+        cash_flow = cash_flow.order_by('-created_at')
 
     paginator = Paginator(cash_flow, 200)
     page_number = request.GET.get('page', 1)
@@ -5238,144 +5429,183 @@ def money_logs(request):
 @forbid_supplier
 @login_required
 def money_logs_list(request):
+    from decimal import Decimal
+
+    fields = [
+        {"name": "date", "verbose_name": "Дата", "is_date": True},
+        {"name": "type", "verbose_name": "Тип", "is_relation": True},
+        {"name": "info", "verbose_name": "Инфо"},
+        {"name": "amount", "verbose_name": "Сумма", "is_amount": True},
+        {"name": "comment", "verbose_name": "Комментарий"},
+        {"name": "created_by", "verbose_name": "Создал", "is_relation": True},
+    ]
+
+    # Получаем фильтры
+    filter_date = request.GET.get('date', '').strip()
+    filter_type = request.GET.get('type', '').strip().lower()
+    filter_info = request.GET.get('info', '').strip().lower()
+    filter_amount = request.GET.get('amount', '').strip().replace(',', '.').replace(' ', '')
+    filter_comment = request.GET.get('comment', '').strip().lower()
+    filter_created_by = request.GET.get('created_by', '').strip().lower()
+
+    # Собираем все логи: CashFlow и InvestorDebtOperation
+    cash_flows = CashFlow.objects.select_related('account', 'supplier', 'purpose', 'created_by').all()
+    investor_ops = InvestorDebtOperation.objects.select_related('investor', 'created_by').filter(operation_type="profit")
+
+    # Собираем строки
+    rows = []
+    for cf in cash_flows:
+        purpose_name = cf.purpose.name if cf.purpose else ""
+        # Определяем type_id и type_label
+        if purpose_name == "Погашение долга поставщика" or purpose_name == "Возврат от поставщиков":
+            type_label = "Погашение долга поставщика"
+            type_id = "dr"
+            info = f"Поставщик: {cf.supplier.name if cf.supplier else ''}, Счет: {cf.account.name if cf.account else ''}"
+        elif purpose_name == "Погашение долга клиента":
+            type_label = "Погашение долга клиента"
+            type_id = "cdr"
+            client_name = ""
+            try:
+                cdr = ClientDebtRepayment.objects.filter(cash_flow=cf).first()
+                if cdr and cdr.client:
+                    client_name = cdr.client.name
+            except Exception:
+                pass
+            info = f"Клиент: {client_name}, Счет: {cf.account.name if cf.account else ''}"
+        elif purpose_name == "Забор инвестора":
+            type_label = "Инвестор: Забор"
+            type_id = "io-withdrawal"
+            info = f"Счет: {cf.account.name if cf.account else ''}"
+            if cf.supplier:
+                info += f", Поставщик: {cf.supplier.name}"
+        elif purpose_name == "Внесение инвестора":
+            type_label = "Инвестор: Внесение"
+            type_id = "io-deposit"
+            info = f"Счет: {cf.account.name if cf.account else ''}"
+            if cf.supplier:
+                info += f", Поставщик: {cf.supplier.name}"
+        elif purpose_name == "Выдача бонусов":
+            type_label = "Выдача бонусов"
+            type_id = "bonus"
+            parts = []
+            if cf.account:
+                parts.append(f"Счет: {cf.account.name}")
+            info = ", ".join(parts)
+        elif purpose_name == "ДТ":
+            type_label = "Выдача клиенту ДТ"
+            type_id = "dt"
+            parts = []
+            if cf.account:
+                parts.append(f"Счет: {cf.account.name}")
+            info = ", ".join(parts)
+        else:
+            type_label = "Движение ДС"
+            type_id = "cf"
+            parts = []
+            if cf.account:
+                parts.append(f"Счет: {cf.account.name}")
+            if cf.supplier:
+                parts.append(f"Поставщик: {cf.supplier.name}")
+            if purpose_name:
+                parts.append(f"Назначение: {purpose_name}")
+            info = ", ".join(parts)
+
+        obj = type("LogRow", (), {})()
+        obj.id = f"cf-{cf.id}"
+        obj.dt = cf.created_at
+        obj.date = timezone.localtime(cf.created_at).strftime("%d.%m.%Y %H:%M") if cf.created_at else ""
+        obj.type = type_label
+        obj.type_id = type_id
+        obj.info = info
+        obj.amount = cf.amount
+        obj.comment = cf.comment or ""
+        obj.created_by = cf.created_by.username if cf.created_by else ""
+        obj.created_by_id = str(cf.created_by.id) if cf.created_by else ""
+        rows.append(obj)
+
+    for io in investor_ops:
+        type_label = "Инвестор: Прибыль"
+        type_id = "io-profit"
+        info = f"Инвестор: {io.investor.name if io.investor else ''}"
+        obj = type("LogRow", (), {})()
+        obj.id = f"io-{io.id}"
+        obj.dt = io.created_at
+        obj.date = timezone.localtime(io.created_at).strftime("%d.%m.%Y %H:%M") if io.created_at else ""
+        obj.type = type_label
+        obj.type_id = type_id
+        obj.info = info
+        obj.amount = io.amount
+        obj.comment = ""
+        obj.created_by = io.created_by.username if io.created_by else ""
+        obj.created_by_id = str(io.created_by.id) if io.created_by else ""
+        rows.append(obj)
+
+    # --- Фильтрация ---
+    def contains(val, query):
+        return query in str(val).lower() if query else True
+
+    filtered = []
+    for row in rows:
+        if filter_date and filter_date not in row.date:
+            continue
+        if filter_type:
+            # Фильтрация по type_id (точное совпадение)
+            if filter_type != str(getattr(row, 'type_id', '')).lower():
+                continue
+        if filter_info and filter_info not in str(row.info).lower():
+            continue
+        if filter_amount and filter_amount not in str(row.amount):
+            continue
+        if filter_comment and filter_comment not in str(row.comment).lower():
+            continue
+        if filter_created_by:
+            # Фильтрация по username или по id
+            if filter_created_by not in str(row.created_by).lower() and filter_created_by != str(getattr(row, 'created_by_id', '')):
+                continue
+        filtered.append(row)
+    rows = filtered
+
+    # --- Сортировка ---
+    sort = request.GET.get('sort')
+    order = request.GET.get('order', 'desc')
+    allowed_sort_fields = {
+        'date': lambda r: r.dt,
+        'type': lambda r: r.type,
+        'info': lambda r: r.info,
+        'amount': lambda r: r.amount,
+        'comment': lambda r: r.comment,
+        'created_by': lambda r: r.created_by,
+    }
+    if sort in allowed_sort_fields:
+        reverse = (order == 'desc')
+        rows = sorted(rows, key=allowed_sort_fields[sort], reverse=reverse)
+    else:
+        rows = sorted(rows, key=lambda r: r.dt or timezone.make_aware(datetime.min), reverse=True)
+
+    # Пагинация
+    paginator = Paginator(rows, 200)
     page_number = request.GET.get('page', 1)
     try:
         page_number = int(page_number)
     except Exception:
         page_number = 1
-
-    per_page = request.GET.get('per_page', 200)
-    try:
-        per_page = int(per_page)
-        if per_page <= 0:
-            per_page = 200
-    except Exception:
-        per_page = 200
-
-    offset = (page_number - 1) * per_page
-
-    cash_flows = CashFlow.objects.select_related(
-        'account', 'supplier', 'purpose', 'created_by'
-    ).order_by('-created_at')
-
-    investor_ops = InvestorDebtOperation.objects.select_related(
-        'investor', 'created_by'
-    ).filter(operation_type='profit').order_by('-created_at')
-
-    combined_items = list(cash_flows) + list(investor_ops)
-    
-    combined_items.sort(key=lambda x: x.created_at, reverse=True)
-
-    total_count = len(combined_items)
-    total_pages = max(1, (total_count + per_page - 1) // per_page)
-
-    page_items = combined_items[offset:offset + per_page]
-
-    rows = []
-    for item in page_items:
-        if isinstance(item, CashFlow):
-            cf = item
-            purpose_name = cf.purpose.name if cf.purpose else ""
-            
-            if purpose_name == "Погашение долга поставщика":
-                type_label = "Погашение долга поставщика"
-                info = f"Поставщик: {cf.supplier.name if cf.supplier else ''}, Счет: {cf.account.name if cf.account else ''}"
-            elif purpose_name == "Возврат от поставщиков":
-                type_label = "Погашение долга поставщика"
-                info = f"Поставщик: {cf.supplier.name if cf.supplier else ''}, Счет: {cf.account.name if cf.account else ''}"
-            elif purpose_name == "Погашение долга клиента":
-                type_label = "Погашение долга клиента"
-                client_name = ""
-                try:
-                    cdr = ClientDebtRepayment.objects.filter(cash_flow=cf).first()
-                    if cdr and cdr.client:
-                        client_name = cdr.client.name
-                except Exception:
-                    pass
-                info = f"Клиент: {client_name}, Счет: {cf.account.name if cf.account else ''}"
-            elif purpose_name in ["Забор инвестора", "Внесение инвестора"]:
-                operation_map = {
-                    'Забор инвестора': 'Забор',
-                    'Внесение инвестора': 'Внесение',
-                }
-                type_label = f"Инвестор: {operation_map.get(purpose_name, purpose_name)}"
-                info = f"Счет: {cf.account.name if cf.account else ''}"
-                if cf.supplier:
-                    info += f", Поставщик: {cf.supplier.name}"
-            elif purpose_name == "Выдача бонусов":
-                type_label = "Выдача бонусов"
-                parts = []
-                if cf.account:
-                    parts.append(f"Счет: {cf.account.name}")
-                info = ", ".join(parts)
-            elif purpose_name == "ДТ":
-                type_label = "Выдача клиенту ДТ"
-                parts = []
-                if cf.account:
-                    parts.append(f"Счет: {cf.account.name}")
-                info = ", ".join(parts)
-            else:
-                type_label = "Движение ДС"
-                parts = []
-                if cf.account:
-                    parts.append(f"Счет: {cf.account.name}")
-                if cf.supplier:
-                    parts.append(f"Поставщик: {cf.supplier.name}")
-                if purpose_name:
-                    parts.append(f"Назначение: {purpose_name}")
-                info = ", ".join(parts)
-
-            obj = type("LogRow", (), {})()
-            obj.id = f"cf-{cf.id}"
-            obj.dt = cf.created_at
-            obj.date = timezone.localtime(cf.created_at).strftime("%d.%m.%Y %H:%M") if cf.created_at else ""
-            obj.type = type_label
-            obj.info = info
-            obj.amount = cf.amount
-            obj.comment = cf.comment or ""
-            obj.created_by = cf.created_by.username if cf.created_by else ""
-
-            rows.append(obj)
-
-        elif isinstance(item, InvestorDebtOperation):
-            io = item
-            type_label = "Инвестор: Прибыль"
-            info = f"Инвестор: {io.investor.name if io.investor else ''}"
-
-            obj = type("LogRow", (), {})()
-            obj.id = f"io-{io.id}"
-            obj.dt = io.created_at
-            obj.date = timezone.localtime(io.created_at).strftime("%d.%m.%Y %H:%M") if io.created_at else ""
-            obj.type = type_label
-            obj.info = info
-            obj.amount = io.amount
-            obj.comment = ""
-            obj.created_by = io.created_by.username if io.created_by else ""
-
-            rows.append(obj)
+    page = paginator.get_page(page_number)
 
     html = "".join(
-        render_to_string("components/table_row.html", {"item": row, "fields": [
-            {"name": "date", "verbose_name": "Дата", "is_date": True},
-            {"name": "type", "verbose_name": "Тип", "is_relation": True},
-            {"name": "info", "verbose_name": "Инфо"},
-            {"name": "amount", "verbose_name": "Сумма", "is_amount": True},
-            {"name": "comment", "verbose_name": "Комментарий"},
-            {"name": "created_by", "verbose_name": "Создал", "is_relation": True},
-        ]})
-        for row in rows
+        render_to_string("components/table_row.html", {"item": row, "fields": fields})
+        for row in page.object_list
     )
-
-    money_log_ids = [row.id for row in rows]
+    money_log_ids = [row.id for row in page.object_list]
 
     return JsonResponse({
         "html": html,
         "context": {
-            "current_page": page_number,
-            "total_pages": total_pages,
+            "total_pages": paginator.num_pages,
+            "current_page": page.number,
             "money_log_ids": money_log_ids,
         },
     })
+
 
 @forbid_supplier
 @login_required
@@ -6299,6 +6529,8 @@ def money_logs_types(request):
         {"id": "cf", "name": "Движение ДС"},
         {"id": "dr", "name": "Погашение долга поставщика"},
         {"id": "cdr", "name": "Погашение долга клиента"},
+        {"id": "dt", "name": "Выдача клиенту ДТ"},
+        {"id": "bonus", "name": "Выдача бонусов"},
         {"id": "io-withdrawal", "name": "Инвестор: Забор"},
         {"id": "io-deposit", "name": "Инвестор: Внесение"},
         {"id": "io-profit", "name": "Инвестор: Прибыль"},
