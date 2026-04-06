@@ -105,4 +105,6 @@ urlpatterns = [
 	path("supplier-income-report/", views.supplier_income_report, name="supplier_income_report"),
 
 	path('transaction/<int:transaction_id>/related/', views.transaction_related_objects, name='transaction_related_objects'),
+
+	path('investor-operations-pdf/', views.investor_operations_pdf, name='investor_operations_pdf')
 ]
