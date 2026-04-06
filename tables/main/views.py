@@ -7167,7 +7167,8 @@ def investor_operations_pdf(request):
     for op in operations:
         p.drawString(2*cm, y, op.created_at.strftime("%d.%m.%Y %H:%M"))
         # Форматирование суммы с пробелами и знаком рубля
-        amount_str = f"{int(op.amount):,}".replace(",", " ") + " р."
+        # amount_str = f"{int(op.amount):,}".replace(",", " ") + " р."
+        amount_str = f"{int(op.amount):,}".replace(",", " ")
         p.drawString(8*cm, y, amount_str)
         y -= 0.7*cm
         if y < 2*cm:
