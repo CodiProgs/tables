@@ -66,11 +66,11 @@
 
         {% endif %}
     </div>
-    {% if show_monthly_capital_table %}
-        <div style="min-height: 40%; width: 100%;">
+    <div style="min-height: 40%; width: 100%;">
+        {% if show_monthly_capital_table %}
             {% include "components/table.html" with id="show_monthly_capital-table" fields=fields data=data %}
-        </div>
-    {% endif %}
+        {% endif %}
+    </div>
 </div>
 {% endblock content %}
 {% block extra_scripts %}
