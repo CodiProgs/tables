@@ -3414,7 +3414,7 @@ def debtors(request):
     summary = [
         {"name": "Бонусы", "amount": total_bonuses},
         {"name": "Выдачи клиентам", "amount": total_remaining},
-        {"name": "ДТ", "amount": dt_total},
+        # {"name": "ДТ", "amount": dt_total},
     ]
 
     if is_admin:
