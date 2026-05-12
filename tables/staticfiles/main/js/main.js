@@ -1978,6 +1978,17 @@ const setupMultipleSupplierAccountSelects = (pairs = []) => {
 			})
 		}
 
+		const supplierClear = supplierSelect?.querySelector('.select__clear')
+		if (supplierClear && !supplierClear.dataset.accountsClearBound) {
+			supplierClear.dataset.accountsClearBound = 'true'
+			supplierClear.addEventListener('click', () => {
+				setTimeout(async () => {
+					clearAccountSelectionUI()
+					await loadAccountsForSupplier('')
+				}, 0)
+			})
+		}
+
 		const initialSupplierId = supplierInput?.value
 		if (initialSupplierId) {
 			loadAccountsForSupplier(initialSupplierId)
