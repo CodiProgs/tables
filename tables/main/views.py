@@ -2779,9 +2779,9 @@ def money_transfer_create(request):
 
             is_exchange = request.GET.get("exchange") == "true"
 
-            if not all([source_supplier_id, destination_supplier_id, amount, source_account_id, destination_account_id]):
+            if not all([amount, source_account_id, destination_account_id]):
                 return JsonResponse(
-                    {"status": "error", "message": "Все поля должны быть заполнены"},
+                    {"status": "error", "message": "Сумма и счета должны быть заполнены"},
                     status=400,
                 )
 
@@ -2798,13 +2798,13 @@ def money_transfer_create(request):
                     status=400,
                 )
 
-            source_supplier = get_object_or_404(Supplier, id=source_supplier_id)
-            destination_supplier = get_object_or_404(Supplier, id=destination_supplier_id)
+            source_supplier = get_object_or_404(Supplier, id=source_supplier_id) if source_supplier_id else None
+            destination_supplier = get_object_or_404(Supplier, id=destination_supplier_id) if destination_supplier_id else None
 
             transfer_type = None
             is_counted = None
 
-            if is_exchange:
+            if is_exchange and source_supplier and destination_supplier:
                 source_visible = getattr(source_supplier, "visible_for_assistant", False)
                 destination_visible = getattr(destination_supplier, "visible_for_assistant", False)
                 if source_visible:
@@ -2824,22 +2824,30 @@ def money_transfer_create(request):
             source_account = get_object_or_404(Account, id=source_account_id)
             destination_account = get_object_or_404(Account, id=destination_account_id)
 
-            if source_account.id == destination_account.id and source_supplier.id == destination_supplier.id:
+            if source_account.id == destination_account.id and source_supplier_id == destination_supplier_id:
                 return JsonResponse(
                     {"status": "error", "message": "Нельзя переводить средства на тот же счет того же поставщика"},
                     status=400,
                 )
 
-            source_supplier_account = SupplierAccount.objects.filter(
-                supplier=source_supplier,
-                account=source_account
-            ).first()
-
-            if not source_supplier_account or Decimal(source_supplier_account.balance or 0) < Decimal(amount_value):
-                return JsonResponse(
-                    {"status": "error", "message": "Недостаточно средств на счете поставщика-отправителя"},
-                    status=400,
-                )
+            # Check balance based on whether supplier is selected
+            if source_supplier:
+                source_supplier_account = SupplierAccount.objects.filter(
+                    supplier=source_supplier,
+                    account=source_account
+                ).first()
+                if not source_supplier_account or Decimal(source_supplier_account.balance or 0) < Decimal(amount_value):
+                    return JsonResponse(
+                        {"status": "error", "message": "Недостаточно средств на счете поставщика-отправителя"},
+                        status=400,
+                    )
+            else:
+                # Direct account transfer (cash account)
+                if Decimal(source_account.balance or 0) < Decimal(amount_value):
+                    return JsonResponse(
+                        {"status": "error", "message": "Недостаточно средств на счете"},
+                        status=400,
+                    )
 
             money_transfer = MoneyTransfer.objects.create(
                 source_account=source_account,
@@ -2853,16 +2861,28 @@ def money_transfer_create(request):
                 created_at=timezone.now()
             )
 
-            source_supplier_account.balance = Decimal(source_supplier_account.balance or 0) - Decimal(amount_value)
-            source_supplier_account.save()
+            # Update source account balance
+            if source_supplier:
+                source_supplier_account.balance = Decimal(source_supplier_account.balance or 0) - Decimal(amount_value)
+                source_supplier_account.save()
+            else:
+                source_account.balance = F('balance') - amount_value
+                source_account.save(update_fields=['balance'])
+                source_account.refresh_from_db(fields=['balance'])
 
-            destination_supplier_account, _ = SupplierAccount.objects.get_or_create(
-                supplier=destination_supplier,
-                account=destination_account,
-                defaults={'balance': 0}
-            )
-            destination_supplier_account.balance = Decimal(destination_supplier_account.balance or 0) + Decimal(amount_value)
-            destination_supplier_account.save()
+            # Update destination account balance
+            if destination_supplier:
+                destination_supplier_account, _ = SupplierAccount.objects.get_or_create(
+                    supplier=destination_supplier,
+                    account=destination_account,
+                    defaults={'balance': 0}
+                )
+                destination_supplier_account.balance = Decimal(destination_supplier_account.balance or 0) + Decimal(amount_value)
+                destination_supplier_account.save()
+            else:
+                destination_account.balance = F('balance') + amount_value
+                destination_account.save(update_fields=['balance'])
+                destination_account.refresh_from_db(fields=['balance'])
 
             transfer_purpose = PaymentPurpose.objects.filter(name="Перевод").first()
             if not transfer_purpose:
@@ -2875,8 +2895,10 @@ def money_transfer_create(request):
                 comment_source = comment
                 comment_destination = comment
             else:
-                comment_source = f"Перевод {destination_supplier.name} на счет {destination_account.name}"
-                comment_destination = f"Получено от {source_supplier.name} со счета {source_account.name}"
+                source_name = source_supplier.name if source_supplier else source_account.name
+                dest_name = destination_supplier.name if destination_supplier else destination_account.name
+                comment_source = f"Перевод {dest_name} на счет {destination_account.name}"
+                comment_destination = f"Получено от {source_name} со счета {source_account.name}"
                 
             CashFlow.objects.create(
                 account=source_account,
@@ -2967,8 +2989,8 @@ def money_transfer_create(request):
             row = MoneyTransferRow(
                 source_account.name,
                 destination_account.name,
-                source_supplier.name,
-                destination_supplier.name,
+                source_supplier.name if source_supplier else source_account.name,
+                destination_supplier.name if destination_supplier else destination_account.name,
                 format_currency(amount_value)
             )
 
@@ -3038,9 +3060,9 @@ def money_transfer_edit(request, pk: int):
             source_account_id = request.POST.get("source_account")
             destination_account_id = request.POST.get("destination_account")
 
-            if not all([source_supplier_id, destination_supplier_id, amount, source_account_id, destination_account_id]):
+            if not all([amount, source_account_id, destination_account_id]):
                 return JsonResponse(
-                    {"status": "error", "message": "Все поля должны быть заполнены"},
+                    {"status": "error", "message": "Сумма и счета должны быть заполнены"},
                     status=400,
                 )
 
@@ -3065,27 +3087,36 @@ def money_transfer_edit(request, pk: int):
             old_destination_supplier = money_transfer.destination_supplier
             old_amount = int(money_transfer.amount)
 
-            new_source_supplier = get_object_or_404(Supplier, id=source_supplier_id)
-            new_destination_supplier = get_object_or_404(Supplier, id=destination_supplier_id)
+            new_source_supplier = get_object_or_404(Supplier, id=source_supplier_id) if source_supplier_id else None
+            new_destination_supplier = get_object_or_404(Supplier, id=destination_supplier_id) if destination_supplier_id else None
 
             new_source_account = get_object_or_404(Account, id=source_account_id)
             new_destination_account = get_object_or_404(Account, id=destination_account_id)
 
-            if new_source_account.id == new_destination_account.id and new_source_supplier.id == new_destination_supplier.id:
+            if new_source_account.id == new_destination_account.id and source_supplier_id == destination_supplier_id:
                 return JsonResponse(
                     {"status": "error", "message": "Нельзя переводить средства на тот же счет того же поставщика"},
                     status=400,
                 )
 
-            new_source_supplier_account = SupplierAccount.objects.filter(
-                supplier=new_source_supplier,
-                account=new_source_account
-            ).first()
-            if not new_source_supplier_account or Decimal(new_source_supplier_account.balance or 0) < Decimal(amount_value):
-                return JsonResponse(
-                    {"status": "error", "message": "Недостаточно средств на счете поставщика-отправителя"},
-                    status=400,
-                )
+            # Check new source balance
+            if new_source_supplier:
+                new_source_supplier_account = SupplierAccount.objects.filter(
+                    supplier=new_source_supplier,
+                    account=new_source_account
+                ).first()
+                if not new_source_supplier_account or Decimal(new_source_supplier_account.balance or 0) < Decimal(amount_value):
+                    return JsonResponse(
+                        {"status": "error", "message": "Недостаточно средств на счете поставщика-отправителя"},
+                        status=400,
+                    )
+            else:
+                # Direct account transfer (cash account)
+                if Decimal(new_source_account.balance or 0) < Decimal(amount_value):
+                    return JsonResponse(
+                        {"status": "error", "message": "Недостаточно средств на счете"},
+                        status=400,
+                    )
 
             if old_source_supplier:
                 old_source_supplier_account, _ = SupplierAccount.objects.get_or_create(
@@ -3113,21 +3144,32 @@ def money_transfer_edit(request, pk: int):
                 old_destination_account.save(update_fields=['balance'])
                 old_destination_account.refresh_from_db(fields=['balance'])
 
-            new_source_supplier_account.balance = Decimal(new_source_supplier_account.balance or 0) - Decimal(amount_value)
-            new_source_supplier_account.save()
+            # Apply new balances
+            if new_source_supplier:
+                new_source_supplier_account.balance = Decimal(new_source_supplier_account.balance or 0) - Decimal(amount_value)
+                new_source_supplier_account.save()
+            else:
+                new_source_account.balance = F('balance') - amount_value
+                new_source_account.save(update_fields=['balance'])
+                new_source_account.refresh_from_db(fields=['balance'])
 
-            new_destination_supplier_account, _ = SupplierAccount.objects.get_or_create(
-                supplier=new_destination_supplier,
-                account=new_destination_account,
-                defaults={'balance': 0}
-            )
-            new_destination_supplier_account.balance = Decimal(new_destination_supplier_account.balance or 0) + Decimal(amount_value)
-            new_destination_supplier_account.save()
+            if new_destination_supplier:
+                new_destination_supplier_account, _ = SupplierAccount.objects.get_or_create(
+                    supplier=new_destination_supplier,
+                    account=new_destination_account,
+                    defaults={'balance': 0}
+                )
+                new_destination_supplier_account.balance = Decimal(new_destination_supplier_account.balance or 0) + Decimal(amount_value)
+                new_destination_supplier_account.save()
+            else:
+                new_destination_account.balance = F('balance') + amount_value
+                new_destination_account.save(update_fields=['balance'])
+                new_destination_account.refresh_from_db(fields=['balance'])
 
             transfer_type = None
             is_counted = None
 
-            if money_transfer.transfer_type in ["from_us", "to_us"]:
+            if money_transfer.transfer_type in ["from_us", "to_us"] and new_source_supplier and new_destination_supplier:
                 source_visible = getattr(new_source_supplier, "visible_for_assistant", False)
                 destination_visible = getattr(new_destination_supplier, "visible_for_assistant", False)
                 if source_visible:
@@ -3161,8 +3203,10 @@ def money_transfer_edit(request, pk: int):
                     comment_source = comment
                     comment_destination = comment
                 else:
-                    comment_source = f"Перевод {new_destination_supplier.name} на счет {new_destination_account.name}"
-                    comment_destination = f"Получено от {new_source_supplier.name} со счета {new_source_account.name}"
+                    source_name = new_source_supplier.name if new_source_supplier else new_source_account.name
+                    dest_name = new_destination_supplier.name if new_destination_supplier else new_destination_account.name
+                    comment_source = f"Перевод {dest_name} на счет {new_destination_account.name}"
+                    comment_destination = f"Получено от {source_name} со счета {new_source_account.name}"
 
                 source_cf = CashFlow.objects.filter(
                     account=old_source_account,
@@ -3201,8 +3245,8 @@ def money_transfer_edit(request, pk: int):
             row = MoneyTransferRow(
                 new_source_account.name,
                 new_destination_account.name,
-                new_source_supplier.name,
-                new_destination_supplier.name,
+                new_source_supplier.name if new_source_supplier else new_source_account.name,
+                new_destination_supplier.name if new_destination_supplier else new_destination_account.name,
                 format_currency(amount_value)
             )
 
@@ -6700,8 +6744,9 @@ def supplier_income_report(request):
 
         if supplier_id in rows_dict:
             current_value = getattr(rows_dict[supplier_id], f"month_{month_num}")
-            setattr(rows_dict[supplier_id], f"month_{month_num}", current_value + transaction.amount)
-            rows_dict[supplier_id].total += transaction.amount
+            paid_amount = transaction.paid_amount or 0
+            setattr(rows_dict[supplier_id], f"month_{month_num}", current_value + paid_amount)
+            rows_dict[supplier_id].total += paid_amount
 
     rows = list(rows_dict.values())
     rows.sort(key=lambda x: x.supplier)

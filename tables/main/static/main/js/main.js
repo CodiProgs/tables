@@ -1930,11 +1930,21 @@ const setupMultipleSupplierAccountSelects = (pairs = []) => {
 
 			SelectHandler.updateSelectOptions(accountSelect, [])
 
-			if (!supplierId) return
-			const url = `/accounts/list/?supplier_id=${encodeURIComponent(
-				supplierId,
-			)}`
-			const data = await SelectHandler.fetchSelectOptions(url)
+			let data = []
+			if (!supplierId) {
+				// When supplier is empty, keep only the cash account in options.
+				const allAccounts = await SelectHandler.fetchSelectOptions(
+					`/accounts/list/?include_cash=true`,
+				)
+				data = (allAccounts || []).filter(item => {
+					const name = (item?.name || '').toString().trim().toLowerCase()
+					return name === 'наличные'
+				})
+			} else {
+				data = await SelectHandler.fetchSelectOptions(
+					`/accounts/list/?supplier_id=${encodeURIComponent(supplierId)}`,
+				)
+			}
 
 			if (myToken !== loadToken) return
 			SelectHandler.updateSelectOptions(accountSelect, data)
@@ -1950,9 +1960,13 @@ const setupMultipleSupplierAccountSelects = (pairs = []) => {
 
 		if (accountControl) {
 			accountControl.addEventListener('click', async () => {
-				if (accountDropdown?.hasChildNodes()) return
 				const sid = supplierInput?.value
-				await loadAccountsForSupplier(sid)
+				const hasOptions = !!accountDropdown?.querySelector(
+					'.select__option[data-value]',
+				)
+				if (!hasOptions) {
+					await loadAccountsForSupplier(sid)
+				}
 			})
 		}
 
@@ -1968,7 +1982,7 @@ const setupMultipleSupplierAccountSelects = (pairs = []) => {
 		if (initialSupplierId) {
 			loadAccountsForSupplier(initialSupplierId)
 		} else {
-			SelectHandler.updateSelectOptions(accountSelect, [])
+			loadAccountsForSupplier('')
 		}
 	})
 }
