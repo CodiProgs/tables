@@ -4853,7 +4853,13 @@ def company_balance_stats(request):
     safe_amount = Decimal(safe_amount) + cash_balance
 
     bonuses = sum((t.bonus_debt or Decimal(0)) for t in Transaction.objects.filter(paid_amount__gt=0))
-    total_remaining = sum((t.client_debt_paid or Decimal(0)) for t in Transaction.objects.filter(paid_amount__gt=0))
+    dt_client = Client.objects.filter(name__iexact="ДТ").first()
+    dt_client_id = dt_client.id if dt_client else None
+    total_remaining = sum(
+        (t.client_debt_paid or Decimal(0))
+        for t in Transaction.objects.filter(paid_amount__gt=0)
+        if t.client_id is None or t.client_id != dt_client_id
+    )
     
     transactionsInvestors = [
         t for t in Transaction.objects.filter(paid_amount__gt=0)
@@ -6155,7 +6161,13 @@ def add_balance_item(request):
         safe_amount = Decimal(safe_amount) + cash_balance
 
         bonuses = sum((t.bonus_debt or Decimal(0)) for t in Transaction.objects.filter(paid_amount__gt=0))
-        total_remaining = sum((t.client_debt_paid or Decimal(0)) for t in Transaction.objects.filter(paid_amount__gt=0))
+        dt_client = Client.objects.filter(name__iexact="ДТ").first()
+        dt_client_id = dt_client.id if dt_client else None
+        total_remaining = sum(
+            (t.client_debt_paid or Decimal(0))
+            for t in Transaction.objects.filter(paid_amount__gt=0)
+            if t.client_id is None or t.client_id != dt_client_id
+        )
 
         transactionsInvestors = [
             t for t in Transaction.objects.filter(paid_amount__gt=0)
@@ -6316,7 +6328,13 @@ def edit_balance_item(request, pk=None):
         safe_amount = Decimal(safe_amount) + cash_balance
 
         bonuses = sum((t.bonus_debt or Decimal(0)) for t in Transaction.objects.filter(paid_amount__gt=0))
-        total_remaining = sum((t.client_debt_paid or Decimal(0)) for t in Transaction.objects.filter(paid_amount__gt=0))
+        dt_client = Client.objects.filter(name__iexact="ДТ").first()
+        dt_client_id = dt_client.id if dt_client else None
+        total_remaining = sum(
+            (t.client_debt_paid or Decimal(0))
+            for t in Transaction.objects.filter(paid_amount__gt=0)
+            if t.client_id is None or t.client_id != dt_client_id
+        )
 
         transactionsInvestors = [
             t for t in Transaction.objects.filter(paid_amount__gt=0)
@@ -6520,7 +6538,13 @@ def delete_balance_item(request, pk=None):
         safe_amount = Decimal(safe_amount) + cash_balance
 
         bonuses = sum((t.bonus_debt or Decimal(0)) for t in Transaction.objects.filter(paid_amount__gt=0))
-        total_remaining = sum((t.client_debt_paid or Decimal(0)) for t in Transaction.objects.filter(paid_amount__gt=0))
+        dt_client = Client.objects.filter(name__iexact="ДТ").first()
+        dt_client_id = dt_client.id if dt_client else None
+        total_remaining = sum(
+            (t.client_debt_paid or Decimal(0))
+            for t in Transaction.objects.filter(paid_amount__gt=0)
+            if t.client_id is None or t.client_id != dt_client_id
+        )
 
         transactionsInvestors = [
             t for t in Transaction.objects.filter(paid_amount__gt=0)
