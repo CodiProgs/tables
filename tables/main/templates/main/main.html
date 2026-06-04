@@ -22,11 +22,12 @@
             <a class="dropdown-item context-action"
                id="payment-button"
                data-action="payment">
-               {% if request.user.is_authenticated and request.user.user_type.name == "Ассистент" %}
+               {% comment %} {% if request.user.is_authenticated and request.user.user_type.name == "Ассистент" %}
                Редактировать
                {% else %}
                Оплата
-               {% endif %}
+               {% endif %} {% endcomment %}
+                Оплата
                </a>
                <div class="dropdown-divider">
             </div>

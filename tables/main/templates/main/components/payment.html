@@ -11,7 +11,7 @@
                    spellcheck="false"
                    placeholder="Введите оплаченную сумму"
                    autocomplete="off"
-                   {% if request.user.is_authenticated and request.user.user_type.name == "Ассистент" %} hidden {% endif %}
+                   {% comment %} {% if request.user.is_authenticated and request.user.user_type.name == "Ассистент" %} hidden {% endif %} {% endcomment %}
             />
         </div>
 		<div class="modal-form__group">{% include "components/checkbox.html" with value="false" id="documents" label="Документы" %}</div>
