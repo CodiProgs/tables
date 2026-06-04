@@ -6,7 +6,7 @@
         <div id="context-menu"
              class="dropdown-menu"
              data-is-admin="{{ is_admin|yesno:'true,false' }}">
-            {% if request.user.is_authenticated and request.user.user_type.name != "Ассистент" %}
+            {% comment %} {% if request.user.is_authenticated and request.user.user_type.name != "Ассистент" %} {% endcomment %}
             <a class="dropdown-item context-action"
                id="add-button"
                data-action="add">Добавить</a>
@@ -18,7 +18,7 @@
                    id="delete-button"
                    data-action="delete">Удалить</a>
             {% endif %}
-            {% endif %}
+            {% comment %} {% endif %} {% endcomment %}
             <a class="dropdown-item context-action"
                id="payment-button"
                data-action="payment">
