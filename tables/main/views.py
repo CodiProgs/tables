@@ -693,36 +693,31 @@ def transaction_payment(request, pk=None):
 
             trans = get_object_or_404(Transaction, id=pk)
 
-            is_assistant = request.user.user_type.name == 'Ассистент' if hasattr(request.user, 'user_type') else False
+            paid_amount = clean_currency(request.POST.get("paid_amount"))
 
-            if not is_assistant:
-                paid_amount = clean_currency(request.POST.get("paid_amount"))
+            if paid_amount is None or paid_amount == "":
+                return JsonResponse(
+                    {"status": "error", "message": "Сумма оплаты не может быть пустой"},
+                    status=400,
+                )
 
-                if paid_amount is None or paid_amount == "":
+            try:
+                amount_float = float(paid_amount)
+                if amount_float < 0:
                     return JsonResponse(
-                        {"status": "error", "message": "Сумма оплаты не может быть пустой"},
+                        {"status": "error", "message": "Сумма должна быть неотрицательной"},
                         status=400,
                     )
-
-                try:
-                    amount_float = float(paid_amount)
-                    if amount_float < 0:
-                        return JsonResponse(
-                            {"status": "error", "message": "Сумма должна быть неотрицательной"},
-                            status=400,
-                        )
-                    if amount_float > trans.amount:
-                        return JsonResponse(
-                            {"status": "error", "message": "Сумма оплаты не может превышать общую сумму транзакции"},
-                            status=400,
-                        )
-                except ValueError:
+                if amount_float > trans.amount:
                     return JsonResponse(
-                        {"status": "error", "message": "Некорректное значение суммы"},
+                        {"status": "error", "message": "Сумма оплаты не может превышать общую сумму транзакции"},
                         status=400,
                     )
-            else:
-                paid_amount = trans.paid_amount
+            except ValueError:
+                return JsonResponse(
+                    {"status": "error", "message": "Некорректное значение суммы"},
+                    status=400,
+                )
 
             documents = request.POST.get("documents") == "on"
 
