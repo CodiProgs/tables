@@ -14,6 +14,6 @@
 {% block extra_scripts %}
     {{ block.super }}
     <script src="{% static 'main/js/main.js' %}" type="module"></script>
-    <script src="{% static 'main/js/autonumeric.js' %}"></script>
+    {% comment %} <script src="{% static 'main/js/autonumeric.js' %}"></script> {% endcomment %}
     {{ data_ids|json_script:"data-ids" }}
 {% endblock extra_scripts %}
