@@ -106,7 +106,7 @@ def index(request):
     if is_assistant:
         transactions_qs = transactions_qs.filter(supplier__visible_for_assistant=True)
 
-    paginator = Paginator(transactions_qs, 200)
+    paginator = Paginator(transactions_qs, 100)
     page_number = request.GET.get('page', 1)
     page = paginator.get_page(page_number)
 
