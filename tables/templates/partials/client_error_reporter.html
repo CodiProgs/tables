@@ -1,0 +1,54 @@
+<script>
+(function () {
+  var endpoint = '/api/log-client-error/';
+  var sent = {};
+
+  function send(payload) {
+    var key = (payload.message || '') + (payload.url || '') + (payload.line || '');
+    if (sent[key]) return;
+    sent[key] = true;
+
+    var body = JSON.stringify(payload);
+    if (navigator.sendBeacon) {
+      navigator.sendBeacon(endpoint, new Blob([body], { type: 'application/json' }));
+    } else {
+      fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: body,
+        keepalive: true
+      }).catch(function () {});
+    }
+  }
+
+  window.addEventListener('error', function (e) {
+    if (e.target && e.target.tagName === 'SCRIPT') {
+      send({
+        type: 'script_load',
+        message: 'Failed to load script: ' + (e.target.src || ''),
+        url: location.href,
+        stack: ''
+      });
+      return;
+    }
+    send({
+      type: 'error',
+      message: e.message || String(e.error),
+      stack: e.error && e.error.stack ? e.error.stack : '',
+      url: location.href,
+      line: e.lineno,
+      column: e.colno
+    });
+  }, true);
+
+  window.addEventListener('unhandledrejection', function (e) {
+    var reason = e.reason || {};
+    send({
+      type: 'unhandledrejection',
+      message: reason.message || String(reason),
+      stack: reason.stack || '',
+      url: location.href
+    });
+  });
+})();
+</script>

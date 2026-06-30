@@ -28,4 +28,5 @@ urlpatterns = [
     ),
 	path("block/", views.block_site, name="block_site"),
 	path("site-unavailable/", views.site_unavailable, name="site_unavailable"),
+	path("api/log-client-error/", views.log_client_error, name="log_client_error"),
 ]

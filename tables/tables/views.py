@@ -1,11 +1,16 @@
+import json
+
 from django.shortcuts import render, redirect
 from django.contrib.auth.views import LoginView
 from django.urls import reverse_lazy
 from users.forms import CustomAuthForm
 from django.views.generic import TemplateView
-from django.http import HttpResponseForbidden, Http404
+from django.http import HttpResponseForbidden, Http404, JsonResponse
 
 from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_POST
+
+from main.error_logger import write_error_log
 
 from django.shortcuts import render, redirect
 from users.models import SiteBlock
@@ -55,6 +60,28 @@ def error_404_view(request, exception):
 
 def error_403_view(request, exception=None):
     return render(request, "errors/403.html", status=403)
+
+
+@csrf_exempt
+@require_POST
+def log_client_error(request):
+    try:
+        payload = json.loads(request.body.decode("utf-8"))
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        return JsonResponse({"ok": False}, status=400)
+
+    write_error_log("client", {
+        "type": payload.get("type", "error"),
+        "message": payload.get("message", ""),
+        "stack": payload.get("stack", ""),
+        "url": payload.get("url", ""),
+        "line": payload.get("line"),
+        "column": payload.get("column"),
+        "user_agent": request.META.get("HTTP_USER_AGENT", ""),
+        "ip": request.META.get("HTTP_X_FORWARDED_FOR", request.META.get("REMOTE_ADDR", "")),
+        "user": str(request.user) if request.user.is_authenticated else "anonymous",
+    })
+    return JsonResponse({"ok": True})
 
 class ComponentView(TemplateView):
     # @method_decorator(cache_page(60 * 60 * 24))

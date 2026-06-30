@@ -57,6 +57,7 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
         'main.middleware.BlockSiteMiddleware',
         "users.middleware.AuthMiddleware",
+        'main.middleware.ServerErrorLoggingMiddleware',
 ]
 
 ROOT_URLCONF = 'tables.urls'
@@ -152,6 +153,28 @@ LOGIN_URL = "login"
 LOGOUT_REDIRECT_URL = "login"
 
 SESSION_COOKIE_AGE = 2592000
+
+LOG_DIR = BASE_DIR / "logs"
+LOG_DIR.mkdir(exist_ok=True)
+
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "handlers": {
+        "file": {
+            "class": "logging.FileHandler",
+            "filename": LOG_DIR / "django_errors.log",
+            "encoding": "utf-8",
+        },
+    },
+    "loggers": {
+        "django.request": {
+            "handlers": ["file"],
+            "level": "ERROR",
+            "propagate": True,
+        },
+    },
+}
 
 #CSRF_TRUSTED_ORIGINS = [
 #    'http://93.183.80.15',

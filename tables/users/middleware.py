@@ -4,7 +4,7 @@ from django.utils.deprecation import MiddlewareMixin
 from users.models import SiteBlock
 
 class AuthMiddleware(MiddlewareMixin):
-    EXEMPT_URLS = ["login", "site-unavailable", "block"]
+    EXEMPT_URLS = ["login", "site-unavailable", "block", "log_client_error"]
 
     def process_view(self, request, view_func, view_args, view_kwargs):
         url_name = request.resolver_match.url_name or ""
