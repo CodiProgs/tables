@@ -1052,6 +1052,73 @@ export const TableManager = {
 		return parseFloat(numStr) || 0
 	},
 
+	parseCellNumericValue(text) {
+		const trimmed = text.trim()
+		const val = trimmed.replace(/[^\d.,-]/g, '').replace(',', '.')
+		const num = parseFloat(val)
+		if (isNaN(num)) return null
+
+		const dotIndex = val.indexOf('.')
+		const decimalPlaces = dotIndex === -1 ? 0 : val.length - dotIndex - 1
+
+		return { value: num, decimalPlaces }
+	},
+
+	sumSelectedCellValues(cells) {
+		let maxDecimals = 0
+		let hasNumbers = false
+		const parsedValues = []
+
+		cells.forEach(cell => {
+			const parsed = this.parseCellNumericValue(cell.textContent)
+			if (!parsed) return
+			hasNumbers = true
+			maxDecimals = Math.max(maxDecimals, parsed.decimalPlaces)
+			parsedValues.push(parsed.value)
+		})
+
+		if (!hasNumbers) return { sum: 0, decimalPlaces: 0 }
+
+		const factor = Math.pow(10, maxDecimals)
+		const sumScaled = parsedValues.reduce(
+			(acc, value) => acc + Math.round(value * factor),
+			0,
+		)
+
+		return {
+			sum: sumScaled / factor,
+			decimalPlaces: maxDecimals,
+		}
+	},
+
+	updateSumIndicator(cells) {
+		const sumDiv = document.querySelector('.table-sum-indicator')
+		if (!sumDiv) return
+
+		if (cells.length === 0) {
+			sumDiv.style.display = 'none'
+			return
+		}
+
+		const { sum, decimalPlaces } = this.sumSelectedCellValues(cells)
+		let allRub = true
+		let allPercent = true
+
+		cells.forEach(cell => {
+			const text = cell.textContent.trim()
+			if (!/р\.$/.test(text)) allRub = false
+			if (!/%$/.test(text)) allPercent = false
+		})
+
+		let suffix = ''
+		if (allRub) suffix = ' р.'
+		else if (allPercent) suffix = '%'
+
+		sumDiv.textContent =
+			'Сумма: ' + this.formatNumber(sum, decimalPlaces) + suffix
+		sumDiv.style.display = 'block'
+	},
+
 	attachGlobalCellClickHandler() {
 		document.addEventListener(
 			'contextmenu',
@@ -1164,31 +1231,10 @@ export const TableManager = {
 
 			this.currentCell = cell
 
-			let sum = 0
-			let allRub = true
-			let allPercent = true
-
 			const currentSelected = document.querySelectorAll(
 				'.table__cell--selected',
 			)
-			currentSelected.forEach(selectedCell => {
-				const text = selectedCell.textContent.trim()
-				const val = text.replace(/[^\d.,-]/g, '').replace(',', '.')
-				const num = parseFloat(val)
-				if (!isNaN(num)) sum += num
-
-				if (!/р\.$/.test(text)) allRub = false
-				if (!/%$/.test(text)) allPercent = false
-			})
-
-			let suffix = ''
-			if (allRub) suffix = ' р.'
-			else if (allPercent) suffix = '%'
-
-			if (sumDiv) {
-				sumDiv.textContent = 'Сумма: ' + TableManager.formatNumber(sum) + suffix
-				sumDiv.style.display = 'block'
-			}
+			this.updateSumIndicator(Array.from(currentSelected))
 
 			return
 		}
@@ -2455,7 +2501,15 @@ export const TableManager = {
 		row.appendChild(actionCell)
 	},
 
-	formatNumber(num) {
+	formatNumber(num, decimalPlaces = null) {
+		if (decimalPlaces !== null && decimalPlaces > 0) {
+			const factor = Math.pow(10, decimalPlaces)
+			const rounded = Math.round(num * factor) / factor
+			const [intPart, decPart = ''] = rounded.toFixed(decimalPlaces).split('.')
+			const formattedInt = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, ' ')
+			return formattedInt + ',' + decPart
+		}
+
 		return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ')
 	},
 }
@@ -2571,33 +2625,10 @@ document.addEventListener('DOMContentLoaded', function () {
 					targetCell.parentElement.classList.add('table__row--selected')
 				}
 
-				let sum = 0
-				let allRub = true
-				let allPercent = true
-
 				const currentSelected = document.querySelectorAll(
 					'.table__cell--selected',
 				)
-				currentSelected.forEach(selectedCell => {
-					const text = selectedCell.textContent.trim()
-					const val = text.replace(/[^\d.,-]/g, '').replace(',', '.')
-					const num = parseFloat(val)
-					if (!isNaN(num)) sum += num
-
-					if (!/р\.$/.test(text)) allRub = false
-					if (!/%$/.test(text)) allPercent = false
-				})
-
-				let suffix = ''
-				if (allRub) suffix = ' р.'
-				else if (allPercent) suffix = '%'
-
-				const sumDiv = document.querySelector('.table-sum-indicator')
-				if (sumDiv) {
-					sumDiv.textContent =
-						'Сумма: ' + TableManager.formatNumber(sum) + suffix
-					sumDiv.style.display = 'block'
-				}
+				TableManager.updateSumIndicator(Array.from(currentSelected))
 			} else {
 				document.querySelectorAll('.table__cell--selected').forEach(el => {
 					el.classList.remove('table__cell--selected')
